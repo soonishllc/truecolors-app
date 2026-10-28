@@ -1,0 +1,17 @@
+{%- comment -%}
+  Truecolors Design Studio: credits a sale to the designer whose share link brought the buyer.
+  Campaign links add ?ref=<designer handle> to the product URL. This saves it as the cart attribute
+  "tc_ref", which Shopify copies onto the order for the studio's webhook.
+  Install: add {% render 'tc-designer-ref' %} just before </body> in layout/theme.liquid.
+{%- endcomment -%}
+<script>
+  (function () {
+    var ref = new URLSearchParams(location.search).get('ref');
+    if (!ref || !/^[a-z0-9]{1,24}$/i.test(ref)) return;
+    fetch('{{ routes.cart_update_url }}.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes: { tc_ref: ref.toLowerCase() } })
+    });
+  })();
+</script>

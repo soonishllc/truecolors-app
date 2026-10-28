@@ -1,0 +1,159 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  acceptAgreement, createInvite, requireAdmin, requireUser, sendLoginLink, signUp,
+} from "@/lib/auth/session";
+import {
+  clearAttention, relaunchCampaign, reviewCampaign, submitCampaign, tick,
+} from "@/lib/campaigns/service";
+import { db } from "@/lib/db/client";
+import { users } from "@/lib/db/schema";
+import { colourDesign, createDesign, refineDesign, renderMedia, UserError } from "@/lib/design/service";
+import { createBatch, markBatch } from "@/lib/production/batch";
+import { markPayoutPaid, preparePayouts } from "@/lib/royalties/ledger";
+import { eq, sql } from "drizzle-orm";
+
+export type FormState = { error?: string; message?: string; link?: string } | undefined;
+
+const text = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
+
+// Turns expected failures into a message on the form; anything else is a real error.
+async function attempt(fn: () => Promise<FormState | void>): Promise<FormState> {
+  try {
+    return (await fn()) ?? undefined;
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export async function joinAction(_: FormState, f: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const link = await signUp({
+      email: text(f, "email"), name: text(f, "name"), invite: text(f, "invite"), acceptAgreement: f.get("agree") === "on",
+    });
+    return { message: "Account created. We've sent you a login link.", link };
+  });
+}
+
+export async function loginAction(_: FormState, f: FormData): Promise<FormState> {
+  const link = await sendLoginLink(text(f, "email"));
+  return { message: "If that email has an account, a login link is on its way.", link };
+}
+
+export async function acceptAgreementAction() {
+  const user = await requireUser();
+  await acceptAgreement(user.id);
+  revalidatePath("/studio");
+}
+
+export async function createDesignAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  let id = "";
+  const res = await attempt(async () => {
+    const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea") });
+    id = design.id;
+  });
+  if (id) redirect(`/studio/designs/${id}`);
+  return res;
+}
+
+export async function designStepAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const designId = text(f, "designId");
+  const step = text(f, "step");
+  const res = await attempt(async () => {
+    if (step === "refine") await refineDesign(user.id, designId, text(f, "instruction"));
+    else if (step === "colour") await colourDesign(user.id, designId);
+    else if (step === "media") await renderMedia(user.id, designId);
+    else if (step === "launch") {
+      await submitCampaign(user.id, designId, { title: text(f, "title"), story: text(f, "story") });
+      return { message: "Sent for review. Truecolors will approve it before it goes live." };
+    }
+  });
+  revalidatePath(`/studio/designs/${designId}`);
+  return res;
+}
+
+export async function relaunchAction(f: FormData) {
+  const user = await requireUser();
+  await attempt(async () => {
+    await relaunchCampaign(user.id, text(f, "campaignId"));
+  });
+  revalidatePath("/studio");
+}
+
+// ---- Admin -------------------------------------------------------------------------------------------
+
+export async function reviewAction(_: FormState, f: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const res = await attempt(async () => {
+    await reviewCampaign(admin.email, text(f, "campaignId"), text(f, "decision") === "approve", text(f, "note"));
+  });
+  revalidatePath("/admin");
+  return res;
+}
+
+export async function inviteAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const code = await createInvite(text(f, "note"));
+  revalidatePath("/admin");
+  return { message: `Invite code: ${code}` };
+}
+
+export async function grantCreditsAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const amount = Number(text(f, "amount"));
+  if (!Number.isInteger(amount) || amount <= 0) return { error: "Enter a whole number of credits." };
+  const d = await db();
+  const rows = await d
+    .update(users)
+    .set({ credits: sql`${users.credits} + ${amount}` })
+    .where(eq(users.email, text(f, "email").toLowerCase()))
+    .returning();
+  return rows.length ? { message: `Added ${amount} credits.` } : { error: "No designer with that email." };
+}
+
+export async function tickAction(): Promise<FormState> {
+  await requireAdmin();
+  const log = await tick();
+  revalidatePath("/admin");
+  return { message: log.length ? log.join(" · ") : "Nothing to do." };
+}
+
+export async function batchAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await createBatch(f.getAll("campaignId").map(String), text(f, "note"));
+  });
+  revalidatePath("/admin");
+  return res;
+}
+
+export async function markBatchAction(f: FormData) {
+  await requireAdmin();
+  await markBatch(text(f, "batchId"), text(f, "status") as "sent" | "received");
+  revalidatePath("/admin");
+}
+
+export async function preparePayoutsAction(): Promise<FormState> {
+  await requireAdmin();
+  const made = await preparePayouts();
+  revalidatePath("/admin");
+  return { message: made.length ? `${made.length} payouts ready to pay.` : "No earnings are payable yet." };
+}
+
+export async function payoutPaidAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(() => markPayoutPaid(text(f, "payoutId"), text(f, "reference")));
+  revalidatePath("/admin");
+  return res;
+}
+
+export async function clearAttentionAction(f: FormData) {
+  await requireAdmin();
+  await clearAttention(text(f, "pledgeId"));
+  revalidatePath("/admin");
+}
