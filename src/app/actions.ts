@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  acceptAgreement, createInvite, requireAdmin, requireUser, sendLoginLink, signUp,
+  acceptAgreement, clearPendingSignUp, createInvite, pendingSignUp, requireAdmin, requireUser, sendLoginLink, signUp,
 } from "@/lib/auth/session";
 import {
   clearAttention, relaunchCampaign, reviewCampaign, submitCampaign, tick,
@@ -30,12 +30,24 @@ async function attempt(fn: () => Promise<FormState | void>): Promise<FormState> 
 }
 
 export async function joinAction(_: FormState, f: FormData): Promise<FormState> {
-  return attempt(async () => {
+  // Someone who came back from Google, Apple, X or Instagram is logged straight in.
+  const via = await pendingSignUp();
+  let joined = false;
+  const res = await attempt(async () => {
     const link = await signUp({
-      email: text(f, "email"), name: text(f, "name"), invite: text(f, "invite"), acceptAgreement: f.get("agree") === "on",
+      email: via?.profile.email ?? text(f, "email"), name: text(f, "name"), invite: text(f, "invite"),
+      acceptAgreement: f.get("agree") === "on", via,
     });
-    return { message: "Account created. We've sent you a login link.", link };
+    if (via) joined = true;
+    else return { message: "Account created. We've sent you a login link.", link };
   });
+  if (joined) redirect("/studio?welcome=1");
+  return res;
+}
+
+export async function cancelSocialJoinAction() {
+  await clearPendingSignUp();
+  redirect("/join");
 }
 
 export async function loginAction(_: FormState, f: FormData): Promise<FormState> {
@@ -53,7 +65,9 @@ export async function createDesignAction(_: FormState, f: FormData): Promise<For
   const user = await requireUser();
   let id = "";
   const res = await attempt(async () => {
-    const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea") });
+    const file = f.get("sketch");
+    const sketch = file instanceof File && file.size ? Buffer.from(await file.arrayBuffer()) : undefined;
+    const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea"), sketch });
     id = design.id;
   });
   if (id) redirect(`/studio/designs/${id}`);

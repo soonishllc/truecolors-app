@@ -46,6 +46,18 @@ export function lineArtPrompt(p: Preset, idea: string): string {
   ].join(" ");
 }
 
+// For a designer's own drawing: the AI keeps their idea and composition and redraws it print-ready.
+export function sketchPrompt(p: Preset, idea: string): string {
+  return [
+    `Redraw this hand-drawn sketch as black ink line art for a t-shirt chest print: ${idea}.`,
+    "Keep the sketch's subject, composition and character; clean up and complete the drawing, don't replace it.",
+    `Style: ${p.style}.`,
+    "Pure black lines on a plain white background. No shading, no grey, no colour, no fills.",
+    "Bold, clean outlines at least 2 pt thick, closed shapes ready to be coloured in.",
+    "Centered, fills the frame, no shirt, no mockup, no paper texture, no text unless the sketch has it.",
+  ].join(" ");
+}
+
 export function colourPrompt(idea: string, maxFillColours: number): string {
   return [
     `Colour in this line art for a t-shirt print: ${idea}.`,

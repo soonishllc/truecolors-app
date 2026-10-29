@@ -1,5 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
-import { colourPrompt, lineArtPrompt, preset, promptFlags, refinePrompt } from "../ai/presets";
+import sharp from "sharp";
+import { colourPrompt, lineArtPrompt, preset, promptFlags, refinePrompt, sketchPrompt } from "../ai/presets";
 import { imageProvider } from "../ai/provider";
 import { db } from "../db/client";
 import { designs, generations, media, users } from "../db/schema";
@@ -54,14 +55,29 @@ async function checkImage(png: Buffer) {
   if (m.flagged) throw new UserError("The result was blocked by moderation. Try a different idea.");
 }
 
-export async function createDesign(userId: string, input: { title: string; presetId: string; idea: string }) {
+// A photo or scan of a drawing, upright, on white and small enough for the image model.
+async function readSketch(upload: Buffer) {
+  try {
+    return await sharp(upload).rotate().resize(1536, 1536, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" }).png().toBuffer();
+  } catch {
+    throw new UserError("That sketch couldn't be opened. Upload a JPG, PNG or HEIC photo of it.");
+  }
+}
+
+// From a written idea, or from the designer's own sketch, which the AI redraws as print-ready line art.
+export async function createDesign(
+  userId: string, input: { title: string; presetId: string; idea: string; sketch?: Buffer },
+) {
   const p = preset(input.presetId);
   await checkText(`${input.title}\n${input.idea}`);
+  const sketch = input.sketch && (await readSketch(input.sketch));
+  if (sketch) await checkImage(sketch);
   const ai = imageProvider();
-  const prompt = lineArtPrompt(p, input.idea);
+  const prompt = sketch ? sketchPrompt(p, input.idea) : lineArtPrompt(p, input.idea);
 
   const lineArt = await withCredits(userId, CREDIT_COST.line_art, async () => {
-    const raw = await ai.lineArt(prompt, userId);
+    const raw = sketch ? await ai.fromSketch(sketch, prompt, userId) : await ai.lineArt(prompt, userId);
     await checkImage(raw);
     return cleanLineArt(raw);
   });

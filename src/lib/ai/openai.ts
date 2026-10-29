@@ -22,7 +22,6 @@ export function openaiProvider(): ImageProvider {
         image: await toFile(image, "line-art.png", { type: "image/png" }),
         prompt,
         size: SIZE,
-        input_fidelity: "high",
         output_format: "png",
         safety_identifier: userId,
       }),
@@ -50,6 +49,7 @@ export function openaiProvider(): ImageProvider {
         }),
       );
     },
+    fromSketch: edit,
     colour: edit,
     refine: edit,
     async moderateText(text) {

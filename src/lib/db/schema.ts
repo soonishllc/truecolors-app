@@ -26,6 +26,24 @@ export const users = pgTable("users", {
   createdAt: createdAt(),
 });
 
+// Social accounts a designer signs in with. Connecting them also tells the studio where they share.
+export const identities = pgTable(
+  "identities",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    provider: text("provider").$type<"google" | "apple" | "x" | "instagram">().notNull(),
+    // The provider's stable id for the account.
+    subject: text("subject").notNull(),
+    username: text("username"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("identities_subject_unique").on(t.provider, t.subject),
+    uniqueIndex("identities_user_provider_unique").on(t.userId, t.provider),
+  ],
+);
+
 export const invites = pgTable("invites", {
   code: text("code").primaryKey(),
   note: text("note"),

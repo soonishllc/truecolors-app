@@ -8,6 +8,8 @@ export interface ImageProvider {
   name: string;
   // Black line art on white, PNG.
   lineArt(prompt: string, userId: string): Promise<Buffer>;
+  // A designer's sketch (photo or scan) redrawn as line art like lineArt's.
+  fromSketch(sketch: Buffer, prompt: string, userId: string): Promise<Buffer>;
   // Same line art coloured in, PNG, same size as the input.
   colour(lineArt: Buffer, prompt: string, userId: string): Promise<Buffer>;
   refine(lineArt: Buffer, prompt: string, userId: string): Promise<Buffer>;

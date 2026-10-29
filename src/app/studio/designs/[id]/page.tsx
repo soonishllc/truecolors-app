@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { designStepAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { ShadeSun } from "@/components/ShadeSun";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, media } from "@/lib/db/schema";
@@ -48,8 +49,8 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
       {design.compositeKey ? (
         <div className="pair">
           <div>
-            <img className="art" src={fileUrl(design.compositeKey)} alt="Design in full colour, as it looks in the sun" />
-            <p className="small muted">In the sun: the SolarShift colours appear.</p>
+            <ShadeSun shade={fileUrl(design.lineArtKey!)} sun={fileUrl(design.compositeKey)} alt={design.title} />
+            <p className="small muted">Drag the sun across it: only the line art shows in the shade, and the colours appear in the sun.</p>
           </div>
           <div className="card">
             <h3>Print check</h3>

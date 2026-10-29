@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ShadeSun } from "@/components/ShadeSun";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
@@ -46,6 +47,8 @@ export default async function CampaignPage({
   const ref = (await searchParams).ref ?? designer.handle;
   const video = files.find((m) => m.kind === "video");
   const mockups = files.filter((m) => m.kind === "mockup");
+  const pairShade = mockups.find((m) => m.template === "flat-square" && m.view === "shade");
+  const pairSun = mockups.find((m) => m.template === "flat-square" && m.view === "sun");
   const target = nextStretch(stats.pledged, c.goal, c.stretchGoals) ?? stats.pledged;
   const pct = Math.min(100, Math.round((stats.pledged / Math.max(target, 1)) * 100));
   const pageUrl = `${config().APP_URL}/c/${c.slug}?ref=${designer.handle}`;
@@ -57,11 +60,12 @@ export default async function CampaignPage({
       <div className="pair">
         <div>{video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline /> : null}</div>
         <div>
+          <div className="eyebrow">Pre-order campaign</div>
           <h1>{c.title}</h1>
           <p className="muted">Designed by {designer.name}</p>
           <p>{c.story}</p>
-          <p><strong>{money(c.priceCents, c.currency)}</strong> · sizes S–XL · ships in the US</p>
-          <div className="progress"><div style={{ width: `${pct}%` }} /></div>
+          <p><span className="stat">{money(c.priceCents, c.currency)}</span> <span className="muted">· sizes S–XL · ships in the US</span></p>
+          <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
           <p>
             <strong>{stats.pledged} of {target}</strong> pre-orders
             {open && <> · {daysLeft(c.endsAt)} days left</>}
@@ -82,6 +86,13 @@ export default async function CampaignPage({
           </div>
         </div>
       </div>
+      {pairShade && pairSun && (
+        <>
+          <div className="eyebrow" style={{ marginTop: 48 }}>Try it</div>
+          <h2 style={{ marginTop: 8 }}>Drag the sun across it</h2>
+          <div style={{ maxWidth: 560 }}><ShadeSun shade={fileUrl(pairShade.key)} sun={fileUrl(pairSun.key)} alt={c.title} /></div>
+        </>
+      )}
       <div className="grid" style={{ marginTop: 24 }}>
         {mockups.map((m) => <img key={m.id} className="art" src={fileUrl(m.key)} alt={`${c.title} ${m.view}`} />)}
       </div>

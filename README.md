@@ -1,4 +1,4 @@
-# Truecolors Design Studio
+# Truecolors Design
 
 Phase 1 of the [product spec](https://claude.ai/artifact/X7K9eXduSTmgfecuxC6Cp5). Invited designers create a colour-changing shirt design with AI, pre-sell it to US buyers, and earn a share of every sale once it reaches 100 pre-orders.
 
@@ -54,6 +54,8 @@ Business rules (goal, prices, shares, retry window, print limits) all live in `s
 
 `tick()` runs from `POST /api/cron/tick` (header `Authorization: Bearer $CRON_SECRET`). Run it every 15 minutes. You can also run it from the Admin page.
 
+To see the studio dashboard with numbers in it, `npm run demo` (local database only) adds a demo designer with campaigns and pre-orders, drawn by the mock artist, and prints their login link.
+
 ## Before the first live campaign
 
 - **Shopify custom app.**
@@ -78,9 +80,11 @@ Business rules (goal, prices, shares, retry window, print limits) all live in `s
 - **Designer agreement.** Set `DESIGNER_AGREEMENT_VERSION` once the lawyers sign off. Until then, the review queue refuses to approve campaigns.
 - **Mockup templates.** Put the model photos in `templates/` and list them, with each photo's print box, in `templates/templates.json` (see `src/lib/media/mockups.ts`). Until then a drawn placeholder tee is used.
 - **OpenAI.** Set `AI_PROVIDER=openai` and `OPENAI_API_KEY`.
+- **Site photos and wordmark.** Run `npm run site:images` to make the Truecolors Design wordmark and the banner and "how it works" photos with the OpenAI image model, styled on the store's product photos and logo (7 images, one paid call each; the home banner is a shade and sun pair, made one from the other). They're saved in `public/site/`; commit them. To remake one, name it: `npm run site:images -- wordmark`. The prompts are in `src/lib/site-images.ts`. Until they exist, the pages use plain dark banners, numbered tiles and the store logo.
+- **Social sign-in.** Designers can sign in with Google, Apple, X or Instagram, and connect those accounts in the studio. Each button switches on once its keys are in the environment (see `.env.example`); register `<APP_URL>/auth/<provider>/callback` as the redirect URL with each provider. Instagram sign-in only works for creator and business accounts. New people still need an invite code. The app keeps no tokens, so it can't post for designers; sharing is through their own link, one-tap posts and the downloadable reveal video.
 - **Hosting.**
   - Postgres (`DATABASE_URL`).
-  - A public `APP_URL`: Shopify fetches product images from it.
+  - A public `APP_URL`, `https://truecolors.design`: Shopify fetches product images from it.
   - Move file storage to S3-compatible storage (`src/lib/storage.ts`).
   - A mail provider for login links (`sendLoginLink`).
 

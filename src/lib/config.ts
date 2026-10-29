@@ -32,6 +32,20 @@ const schema = z.object({
   // Blank until the lawyers sign off; campaigns cannot be approved while blank.
   DESIGNER_AGREEMENT_VERSION: z.string().default(""),
 
+  // Social sign-in. Each button shows once its keys are set; redirect URLs are APP_URL/auth/<provider>/callback.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Apple: the Services ID, plus the Sign in with Apple key (.p8 contents, newlines as \n).
+  APPLE_CLIENT_ID: z.string().optional(),
+  APPLE_TEAM_ID: z.string().optional(),
+  APPLE_KEY_ID: z.string().optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
+  X_CLIENT_ID: z.string().optional(),
+  X_CLIENT_SECRET: z.string().optional(),
+  // Instagram API with Instagram Login: works for professional (creator or business) accounts only.
+  INSTAGRAM_CLIENT_ID: z.string().optional(),
+  INSTAGRAM_CLIENT_SECRET: z.string().optional(),
+
   CRON_SECRET: z.string().default("dev-cron-secret"),
   DEV_SHOW_LOGIN_LINKS: bool,
 });

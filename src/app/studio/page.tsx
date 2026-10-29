@@ -1,92 +1,349 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 import { acceptAgreementAction, createDesignAction, relaunchAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { ShareKit } from "@/components/ShareKit";
+import { ProviderIcon } from "@/components/SocialButtons";
 import { PRESETS } from "@/lib/ai/presets";
-import { requireUser } from "@/lib/auth/session";
+import { enabledProviders, providerLabel, type Provider } from "@/lib/auth/oauth";
+import { connectedAccounts, requireUser } from "@/lib/auth/session";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
-import { campaigns, designs } from "@/lib/db/schema";
-import { money } from "@/lib/format";
+import { campaigns, designs, media, pledges } from "@/lib/db/schema";
+import { daysLeft, money, nextStretch } from "@/lib/format";
+import { CREDIT_COST, FUNDING_GOAL } from "@/lib/rules";
 import { designerEarnings } from "@/lib/royalties/ledger";
+import { siteImageUrl } from "@/lib/site-images";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-export default async function Studio() {
+const SPARK_DAYS = 14;
+const SHOWN: Provider[] = ["instagram", "x", "google", "apple"];
+
+const ago = (d: Date, now = Date.now()) => {
+  const m = Math.round((now - d.getTime()) / 60_000);
+  if (m < 60) return `${Math.max(1, m)}m ago`;
+  if (m < 1440) return `${Math.round(m / 60)}h ago`;
+  return `${Math.round(m / 1440)}d ago`;
+};
+
+// What to tell a designer about a live campaign right now, if anything.
+function nudge(pledged: number, goal: number, days: number) {
+  const left = goal - pledged;
+  if (left <= 0) return;
+  if (days <= 2) return `Last ${days <= 1 ? "day" : "48 hours"}: this is when most pre-orders land. Post again today.`;
+  if (left <= 15) return `Only ${left} to go. Ask your followers to push it over the line.`;
+  if (pledged < goal / 2 && days <= 10) return "Halfway is the hardest bit. Post the reveal video: the colour change sells it.";
+}
+
+function Ring({ value, goal }: { value: number; goal: number }) {
+  const pct = Math.min(1, value / Math.max(goal, 1));
+  const r = 34;
+  const len = 2 * Math.PI * r;
+  return (
+    <svg className="ring" viewBox="0 0 80 80" role="img" aria-label={`${value} of ${goal} pre-orders`}>
+      <defs>
+        <linearGradient id="ring-sun" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#c8336a" /><stop offset=".5" stopColor="#e8762a" /><stop offset="1" stopColor="#c4b200" />
+        </linearGradient>
+      </defs>
+      <circle cx="40" cy="40" r={r} className="ring-track" />
+      <circle
+        cx="40" cy="40" r={r} className="ring-fill" stroke="url(#ring-sun)"
+        style={{ "--len": len, "--off": len * (1 - pct) } as React.CSSProperties}
+      />
+      <text x="40" y="38" className="ring-num">{value}</text>
+      <text x="40" y="53" className="ring-of">of {goal}</text>
+    </svg>
+  );
+}
+
+function Spark({ counts }: { counts: number[] }) {
+  const max = Math.max(1, ...counts);
+  const pts = counts.map((c, i) => `${(i / (counts.length - 1)) * 100},${28 - (c / max) * 26}`).join(" ");
+  return (
+    <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={`0,30 ${pts} 100,30`} className="spark-area" />
+      <polyline points={pts} className="spark-line" />
+    </svg>
+  );
+}
+
+export default async function Studio({ searchParams }: { searchParams: Promise<{ connected?: string; connect?: string; welcome?: string }> }) {
   const user = await requireUser();
+  const q = await searchParams;
   const d = await db();
   const mine = await d.select().from(designs).where(eq(designs.userId, user.id)).orderBy(desc(designs.updatedAt));
   const myCampaigns = await d.select().from(campaigns).where(eq(campaigns.userId, user.id)).orderBy(desc(campaigns.createdAt));
   const stats = await Promise.all(myCampaigns.map((c) => campaignStats(c.id)));
   const earnings = await designerEarnings(user.id);
+  const accounts = await connectedAccounts(user.id);
   const agreement = config().DESIGNER_AGREEMENT_VERSION;
+  const ids = myCampaigns.map((c) => c.id);
+  const counted = inArray(pledges.status, ["pledged", "charged", "charge_failed"]);
+
+  const since = new Date(Date.now() - (SPARK_DAYS - 1) * 86_400_000);
+  since.setHours(0, 0, 0, 0);
+  const [totals] = ids.length
+    ? await d
+        .select({
+          all: sql<number>`coalesce(sum(${pledges.quantity}), 0)::int`,
+          viaLink: sql<number>`coalesce(sum(${pledges.quantity}) filter (where ${pledges.viaDesignerLink}), 0)::int`,
+        })
+        .from(pledges)
+        .where(and(inArray(pledges.campaignId, ids), counted))
+    : [{ all: 0, viaLink: 0 }];
+  const daily = ids.length
+    ? await d
+        .select({ day: sql<string>`to_char(${pledges.createdAt}, 'YYYY-MM-DD')`, n: sql<number>`sum(${pledges.quantity})::int` })
+        .from(pledges)
+        .where(and(inArray(pledges.campaignId, ids), counted, gte(pledges.createdAt, since)))
+        .groupBy(sql`1`)
+    : [];
+  const spark = Array.from({ length: SPARK_DAYS }, (_, i) => {
+    const day = new Date(since.getTime() + i * 86_400_000).toISOString().slice(0, 10);
+    return daily.find((x) => x.day === day)?.n ?? 0;
+  });
+  const recent = ids.length
+    ? await d
+        .select({ p: pledges, title: campaigns.title })
+        .from(pledges)
+        .innerJoin(campaigns, eq(campaigns.id, pledges.campaignId))
+        .where(and(inArray(pledges.campaignId, ids), counted))
+        .orderBy(desc(pledges.createdAt))
+        .limit(8)
+    : [];
+
+  const live = myCampaigns.map((c, i) => ({ c, s: stats[i] })).filter(({ c }) => ["live", "closing", "funded"].includes(c.status));
+  const liveMedia = live.length
+    ? await d.select().from(media).where(inArray(media.designId, live.map(({ c }) => c.designId)))
+    : [];
+  const designOf = (id: string) => mine.find((x) => x.id === id);
+  const firstName = user.name.split(" ")[0];
+  const banner = siteImageUrl("studio-hero");
 
   return (
-    <>
-      <h1>Your studio</h1>
+    <div className="dashboard">
+      <section className={banner ? "dash-head photo" : "dash-head"}>
+        {banner && <img className="dash-head-bg" src={banner} alt="" />}
+        <div className="dash-head-content">
+          <div className="eyebrow">Studio</div>
+          <h1>Hi, {firstName}<span className="sun-text">.</span></h1>
+          <div className="row">
+            <span className="pill-stat"><b>{user.credits}</b> credits</span>
+            <span className="pill-stat">Your code <b>{user.handle}</b></span>
+            <a className="button small" href="#new">＋ New design</a>
+          </div>
+        </div>
+      </section>
+
+      {q.welcome && <p className="notice">Welcome to the studio. Start with an idea or a sketch below.</p>}
+      {q.connected && <p className="notice good-notice">Connected {providerLabel(q.connected as Provider)}.</p>}
+      {q.connect === "taken" && <p className="notice">That account is already connected to another designer.</p>}
       {agreement && user.agreementVersion !== agreement && (
         <form action={acceptAgreementAction} className="notice row">
           <span>The designer agreement has been updated. Accept it before your campaigns can go live.</span>
           <button>Accept agreement</button>
         </form>
       )}
-      <p className="muted">
-        {user.credits} credits left · your share link code is <strong>{user.handle}</strong>
-      </p>
 
-      <h2>New design</h2>
-      <div className="card">
-        <ActionForm action={createDesignAction} submit="Draw the line art (1 credit)" pendingText="Drawing… this takes up to a minute">
-          <label>Title<input name="title" required maxLength={60} placeholder="Dubai Marina Sunset" /></label>
-          <label>Style
-            <select name="preset">{PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
-          </label>
-          <label>Your idea<textarea name="idea" required maxLength={600} placeholder="A dhow sailing past the Burj Al Arab at sunset, with palm trees" /></label>
-          <p className="small muted">No brands, logos, celebrities, real people or political figures.</p>
-        </ActionForm>
+      <div className="kpis">
+        <div className="kpi">
+          <div className="eyebrow">Pre-orders</div>
+          <div className="kpi-num">{totals.all}</div>
+          <Spark counts={spark} />
+          <div className="kpi-note">last {SPARK_DAYS} days</div>
+        </div>
+        <div className="kpi">
+          <div className="eyebrow">Through your link</div>
+          <div className="kpi-num">{totals.all ? Math.round((totals.viaLink / totals.all) * 100) : 0}<small>%</small></div>
+          <div className="kpi-note">{totals.viaLink} pre-orders earn you 15% instead of 10%</div>
+        </div>
+        <div className="kpi">
+          <div className="eyebrow">Earned</div>
+          <div className="kpi-num">{money(earnings.earned)}</div>
+          <div className="kpi-note">{money(earnings.payable)} ready for the next payout</div>
+        </div>
+        <div className="kpi">
+          <div className="eyebrow">Live campaigns</div>
+          <div className="kpi-num">{live.filter(({ c }) => c.status === "live").length}</div>
+          <div className="kpi-note">{mine.length} design{mine.length === 1 ? "" : "s"} in your studio</div>
+        </div>
       </div>
 
-      <h2>Designs</h2>
-      {mine.length === 0 && <p className="muted">Nothing yet. Start with an idea above.</p>}
-      <div className="grid">
-        {mine.map((x) => (
-          <Link key={x.id} href={`/studio/designs/${x.id}`} className="card" style={{ textDecoration: "none" }}>
-            {x.lineArtKey && <img className="art" src={fileUrl(x.compositeKey ?? x.lineArtKey)} alt="" />}
-            <p><strong>{x.title}</strong></p>
-          </Link>
-        ))}
-      </div>
+      <div className="dash">
+        <div className="dash-main">
+          <div className="section-head"><h2>Live campaigns</h2></div>
+          {live.length === 0 && (
+            <div className="empty card">
+              <p>No campaigns live yet. Finish a design, then launch it: it goes live once Truecolors approves it.</p>
+            </div>
+          )}
+          {live.map(({ c, s }) => {
+            const design = designOf(c.designId);
+            const files = liveMedia.filter((m) => m.designId === c.designId);
+            const video = files.find((m) => m.kind === "video");
+            const image = files.find((m) => m.template === "split-square");
+            const days = daysLeft(c.endsAt);
+            const target = nextStretch(s.pledged, c.goal, c.stretchGoals) ?? s.pledged;
+            const url = `${config().APP_URL}/c/${c.slug}?ref=${user.handle}`;
+            const tip = c.status === "live" ? nudge(s.pledged, c.goal, days) : undefined;
+            return (
+              <article key={c.id} className="campaign card">
+                <div className="campaign-art tile-art">
+                  {design?.lineArtKey && <img className="art" src={fileUrl(design.lineArtKey)} alt="" />}
+                  {design?.compositeKey && <img className="art tile-sun" src={fileUrl(design.compositeKey)} alt="" />}
+                </div>
+                <div className="campaign-body">
+                  <div className="campaign-top">
+                    <div>
+                      <Link href={`/c/${c.slug}`} className="campaign-title">{c.title}</Link>
+                      <div className="row small muted">
+                        <span className={`badge status-${c.status}`}>{c.status.replace("_", " ")}</span>
+                        {c.status === "live" && <span className="countdown">⏱ {days} day{days === 1 ? "" : "s"} left</span>}
+                        {s.pledged >= c.goal && <span>Next goal: {target}</span>}
+                      </div>
+                    </div>
+                    <Ring value={s.pledged} goal={s.pledged >= c.goal ? target : c.goal} />
+                  </div>
+                  {tip && <p className="nudge">☀ {tip}</p>}
+                  <ShareKit
+                    url={url}
+                    text={`My design "${c.title}" changes colour in the sun. Pre-order it before it's gone:`}
+                    video={video && fileUrl(video.key)}
+                    image={image && fileUrl(image.key)}
+                  />
+                </div>
+              </article>
+            );
+          })}
 
-      <h2>Campaigns</h2>
-      {myCampaigns.length === 0 ? <p className="muted">No campaigns yet.</p> : (
-        <table>
-          <thead><tr><th>Design</th><th>Status</th><th>Pre-orders</th><th></th></tr></thead>
-          <tbody>
-            {myCampaigns.map((c, i) => (
-              <tr key={c.id}>
-                <td>{c.status === "live" ? <Link href={`/c/${c.slug}`}>{c.title}</Link> : c.title}</td>
-                <td><span className="badge">{c.status.replace("_", " ")}</span>{c.reviewNote && <div className="small muted">{c.reviewNote}</div>}</td>
-                <td>{stats[i].pledged} of {c.goal}</td>
-                <td>
-                  {c.status === "missed" && !c.relaunchOf && (
-                    <form action={relaunchAction}><input type="hidden" name="campaignId" value={c.id} /><button className="secondary">Relaunch</button></form>
-                  )}
-                </td>
-              </tr>
+          <div className="section-head">
+            <h2>Your designs</h2>
+            <a href="#new" className="button small secondary">＋ New design</a>
+          </div>
+          {mine.length === 0 && <p className="muted">Nothing yet. Start with an idea or a sketch below.</p>}
+          <div className="grid designs">
+            {mine.map((x) => (
+              <Link key={x.id} href={`/studio/designs/${x.id}`} className="tile">
+                <div className="tile-art">
+                  {x.lineArtKey && <img className="art" src={fileUrl(x.lineArtKey)} alt="" />}
+                  {x.compositeKey && <img className="art tile-sun" src={fileUrl(x.compositeKey)} alt="" />}
+                </div>
+                <div className="name">{x.title}</div>
+                <div className="meta">
+                  {myCampaigns.find((c) => c.designId === x.id)?.status.replace("_", " ") ?? (x.compositeKey ? "coloured" : "line art")}
+                </div>
+              </Link>
             ))}
-          </tbody>
-        </table>
-      )}
+          </div>
 
-      <h2>Earnings</h2>
-      <div className="row">
-        <div className="card"><div className="muted small">Earned</div><strong>{money(earnings.earned)}</strong></div>
-        <div className="card"><div className="muted small">Held until returns close</div><strong>{money(earnings.held)}</strong></div>
-        <div className="card"><div className="muted small">Ready for next payout</div><strong>{money(earnings.payable)}</strong></div>
-        <div className="card"><div className="muted small">Paid</div><strong>{money(earnings.paid)}</strong></div>
+          <h2 id="new">New design</h2>
+          <div className="card new-design">
+            <ActionForm action={createDesignAction} submit={`Draw the line art (${CREDIT_COST.line_art} credit)`} pendingText="Drawing… this takes up to a minute">
+              <div className="two">
+                <label>Title<input name="title" required maxLength={60} placeholder="Dubai Marina Sunset" /></label>
+                <label>Style
+                  <select name="preset">{PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+                </label>
+              </div>
+              <label>Your idea<textarea name="idea" required maxLength={600} placeholder="A dhow sailing past the Burj Al Arab at sunset, with palm trees" /></label>
+              <label className="dropzone">
+                <input type="file" name="sketch" accept="image/*" />
+                <span className="dz-title">✎ Got a sketch? Add it (optional)</span>
+                <span className="small muted">A photo of your drawing works. The AI keeps your idea and redraws it as clean, print-ready line art.</span>
+              </label>
+              <p className="small muted">No brands, logos, celebrities, real people or political figures.</p>
+            </ActionForm>
+          </div>
+
+          {myCampaigns.length > 0 && (
+            <>
+              <h2>All campaigns</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Design</th><th>Status</th><th>Pre-orders</th><th></th></tr></thead>
+                  <tbody>
+                    {myCampaigns.map((c, i) => (
+                      <tr key={c.id}>
+                        <td>{c.status === "live" ? <Link href={`/c/${c.slug}`}>{c.title}</Link> : c.title}</td>
+                        <td><span className={`badge status-${c.status}`}>{c.status.replace("_", " ")}</span>{c.reviewNote && <div className="small muted">{c.reviewNote}</div>}</td>
+                        <td>{stats[i].pledged} of {c.goal}</td>
+                        <td>
+                          {c.status === "missed" && !c.relaunchOf && (
+                            <form action={relaunchAction}><input type="hidden" name="campaignId" value={c.id} /><button className="secondary small">Relaunch</button></form>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        <aside className="dash-rail">
+          <div className="card rail-card">
+            <div className="eyebrow">Activity</div>
+            {recent.length === 0 ? <p className="small muted">Pre-orders show up here the moment they come in.</p> : (
+              <ul className="feed">
+                {recent.map(({ p, title }) => (
+                  <li key={p.id}>
+                    <span className="feed-dot" aria-hidden="true" />
+                    <span>
+                      <b>{p.quantity > 1 ? `${p.quantity}× ` : ""}{p.size}</b> pre-ordered · {title}
+                      {p.viaDesignerLink && <span className="via"> via your link</span>}
+                    </span>
+                    <time className="muted">{ago(p.createdAt)}</time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="card rail-card">
+            <div className="eyebrow">Earnings</div>
+            <dl className="money">
+              <div><dt>Earned</dt><dd>{money(earnings.earned)}</dd></div>
+              <div><dt>Held until returns close</dt><dd>{money(earnings.held)}</dd></div>
+              <div><dt>Ready for next payout</dt><dd>{money(earnings.payable)}</dd></div>
+              <div><dt>Paid</dt><dd>{money(earnings.paid)}</dd></div>
+            </dl>
+          </div>
+
+          <div className="card rail-card">
+            <div className="eyebrow">Your accounts</div>
+            <p className="small muted">Connect where your followers are, so you can sign in with them and share in a tap.</p>
+            <ul className="accounts">
+              {SHOWN.map((p) => {
+                const acct = accounts.find((a) => a.provider === p);
+                const canConnect = enabledProviders().includes(p);
+                return (
+                  <li key={p}>
+                    <ProviderIcon provider={p} />
+                    <span>{providerLabel(p)}{acct?.username && <span className="muted"> @{acct.username}</span>}</span>
+                    {acct ? <span className="badge status-funded">Connected</span>
+                      : canConnect ? <a className="button small secondary" href={`/auth/${p}`}>Connect</a>
+                      : <span className="small muted">Soon</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="card rail-card tips">
+            <div className="eyebrow">Get to {FUNDING_GOAL} faster</div>
+            <ol>
+              <li>Share your own link: you earn 15% on those pre-orders, not 10%.</li>
+              <li>Post the reveal video. Shade to sun is the hook.</li>
+              <li>Post again at halfway and in the last 48 hours, when most pre-orders land.</li>
+            </ol>
+          </div>
+        </aside>
       </div>
-    </>
+    </div>
   );
 }

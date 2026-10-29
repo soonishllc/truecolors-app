@@ -49,6 +49,7 @@ async function promptOf(png: Buffer): Promise<string> {
 export const mockProvider: ImageProvider = {
   name: "mock",
   lineArt: (prompt) => render(prompt, false),
+  fromSketch: async (_, prompt) => render(prompt, false),
   colour: async (lineArt) => render(await promptOf(lineArt), true),
   refine: async (lineArt, prompt) => render(`${await promptOf(lineArt)} ${prompt}`, false),
   moderateText: async (text) => ({
