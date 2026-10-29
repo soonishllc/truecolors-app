@@ -127,10 +127,9 @@ export const SITE_IMAGES: SiteImage[] = [
       "A professional screen-printing factory, wide shot. In the foreground, a big M&R-style automatic screen-printing " +
       "press: a 12-station carousel with a central hub, a ring of printing heads holding mesh screens, a heavy-duty " +
       "industrial steel frame, and red flash-cure units glowing orange-red between stations. Exactly two operators: " +
-      "one loads blank white tees onto the pallets on one side, and the other stands at the entry of a long conveyor " +
-      "dryer next to the press, taking each printed tee off the press and laying it on the moving belt one at a time, " +
-      "perfectly flat, front up, in a single neat row with an even gap between shirts: nothing overlaps or bunches at " +
-      "the entry; only at the far exit do finished shirts gather. Behind them: a wall rack of aluminium-framed mesh " +
+      "one loads blank white tees onto the pallets on one side, and the other stands at the exit of a conveyor dryer " +
+      "next to the press. Its short exit belt ends in a steel roller, with an open cardboard box of folded finished " +
+      "tees on the floor just past it; she lifts the only shirt on the belt, by its shoulders, as it comes out. Behind them: a wall rack of aluminium-framed mesh " +
       "screens lined up side by side, neat stacks of normal retail-folded tees (each about the size of a shoebox lid, " +
       "in realistic proportion to the people), and shipping boxes, taped and ready to go. The windows are blacked out and the hall is " +
       "lit by warm amber UV-filtered lights, because UV-reactive ink must be kept out of sunlight. Both operators wear " +
