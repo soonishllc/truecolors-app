@@ -1,0 +1,5 @@
+reportlab
+pillow
+numpy
+opencv-python-headless
+openai

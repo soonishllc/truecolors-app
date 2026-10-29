@@ -6,3 +6,9 @@ storage/
 .pglite/
 *.tsbuildinfo
 next-env.d.ts
+
+# Retail displays: raw image-model renders (~50 MB, kept locally) and the generated page preview
+retail-displays/renders/
+retail-displays/preview.html
+__pycache__/
+.venv-displays/
