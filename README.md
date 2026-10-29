@@ -54,7 +54,13 @@ Business rules (goal, prices, shares, retry window, print limits) all live in `s
 
 `tick()` runs from `POST /api/cron/tick` (header `Authorization: Bearer $CRON_SECRET`). Run it every 15 minutes. You can also run it from the Admin page.
 
-To see the studio dashboard with numbers in it, `npm run demo` (local database only) adds a demo designer with campaigns and pre-orders, drawn by the mock artist, and prints their login link.
+- **Email.** Login links, fan confirmations, waitlist launches, backer updates (halfway, 90%, goal, last 24 hours, numbered-edition and missed-goal emails) and fan rewards all go through `src/lib/email.ts`. Add `RESEND_API_KEY` and a verified sending domain to send them; until then they're only logged, and listed under Admin → Emails.
+- **Fans.** Fans have no accounts: they confirm their email once from a link and a cookie remembers them. That lets them vote in design challenges and get their own referral link (every 5 charged pre-orders through it earns a single-use free-tee code, created in Shopify by the cron tick). Anyone can follow a designer or ask for a missed design to come back without confirming.
+- **Numbered editions.** When a funded campaign closes, every charged shirt is numbered in pre-order order and each backer is told theirs. Batches have an "Edition numbers CSV" for the tags or cards.
+- **Stretch goal rewards** are set in `src/lib/rules.ts` (`STRETCH_REWARDS`); the current ones are placeholders.
+- **Payouts.** Designers choose PayPal, bank transfer (IBAN + SWIFT, or US account + routing) or USDC (Base, Solana, Ethereum, Polygon) under Studio → Payouts. Details are encrypted with `PAYOUT_ENCRYPTION_KEY` (set it before launch and never change it); admins see them in full next to each pending payout and still pay by hand.
+
+To see the studio dashboard with numbers in it, `npm run demo` (local database only) adds a demo designer with campaigns, pre-orders and a design challenge, drawn by the mock artist, and prints their login link. `npm run demo -- --reset --ai` rebuilds it with real designs from the OpenAI image model (YALLA, Las Vegas, Beast Mode and a tattoo-flash draft; 8 paid image calls).
 
 ## Before the first live campaign
 
@@ -81,7 +87,7 @@ To see the studio dashboard with numbers in it, `npm run demo` (local database o
 - **Mockup templates.** Put the model photos in `templates/` and list them, with each photo's print box, in `templates/templates.json` (see `src/lib/media/mockups.ts`). Until then a drawn placeholder tee is used.
 - **OpenAI.** Set `AI_PROVIDER=openai` and `OPENAI_API_KEY`.
 - **Site photos and wordmark.** Run `npm run site:images` to make the Truecolors Design wordmark and the banner and "how it works" photos with the OpenAI image model, styled on the store's product photos and logo (7 images, one paid call each; the home banner is a shade and sun pair, made one from the other). They're saved in `public/site/`; commit them. To remake one, name it: `npm run site:images -- wordmark`. The prompts are in `src/lib/site-images.ts`. Until they exist, the pages use plain dark banners, numbered tiles and the store logo.
-- **Social sign-in.** Designers can sign in with Google, Apple, X or Instagram, and connect those accounts in the studio. Each button switches on once its keys are in the environment (see `.env.example`); register `<APP_URL>/auth/<provider>/callback` as the redirect URL with each provider. Instagram sign-in only works for creator and business accounts. New people still need an invite code. The app keeps no tokens, so it can't post for designers; sharing is through their own link, one-tap posts and the downloadable reveal video.
+- **Social sign-in.** Designers can sign in with Google, Apple, Instagram, TikTok or X, and connect those accounts in the studio. Each button switches on once its keys are in the environment (see `.env.example`); register `<APP_URL>/auth/<provider>/callback` as the redirect URL with each provider. Instagram sign-in only works for creator and business accounts. New people still need an invite code. The app keeps no tokens, so it can't post for designers; sharing is through their own link, one-tap posts and the downloadable reveal video.
 - **Hosting.**
   - Postgres (`DATABASE_URL`).
   - A public `APP_URL`, `https://truecolors.design`: Shopify fetches product images from it.

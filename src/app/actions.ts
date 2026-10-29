@@ -14,6 +14,9 @@ import { colourDesign, createDesign, refineDesign, renderMedia, UserError } from
 import { createBatch, markBatch } from "@/lib/production/batch";
 import { markPayoutPaid, preparePayouts } from "@/lib/royalties/ledger";
 import { eq, sql } from "drizzle-orm";
+import { currentFan, joinWaitlist, leaveWaitlist, sendFanLink, signOutFan } from "@/lib/fans";
+import { createChallenge, enterChallenge, toggleVote } from "@/lib/challenges";
+import { savePayoutMethod } from "@/lib/payouts/methods";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
 
@@ -170,4 +173,85 @@ export async function clearAttentionAction(f: FormData) {
   await requireAdmin();
   await clearAttention(text(f, "pledgeId"));
   revalidatePath("/admin");
+}
+
+// ---- Fans: waitlists, referral links, votes ---------------------------------------------------------
+
+const TARGET = /^(designer|campaign):[0-9a-f-]{36}$/;
+
+export async function waitlistAction(_: FormState, f: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const target = text(f, "target");
+    if (!TARGET.test(target)) throw new UserError("Something went wrong. Reload the page and try again.");
+    await joinWaitlist(text(f, "email"), target);
+    return { message: target.startsWith("designer:") ? "You're on the list. We'll email you when they launch." : "Done. If it comes back, you'll hear first." };
+  });
+}
+
+// Fans confirm their email once; the link brings them back to the page they were on.
+export async function fanEmailAction(_: FormState, f: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const why = {
+      vote: "vote for your favourite designs",
+      orders: "see your pre-orders",
+    }[text(f, "why")] ?? "get your own link";
+    const link = await sendFanLink(text(f, "email"), text(f, "next"), why);
+    return { message: "Check your email and tap the link to carry on.", link };
+  });
+}
+
+// ---- Design challenges ------------------------------------------------------------------------------
+
+export async function voteAction(f: FormData) {
+  const fan = await currentFan();
+  if (!fan) redirect(`/challenges/${text(f, "slug")}?vote=email`);
+  const slug = await toggleVote(fan.id, text(f, "entryId"));
+  revalidatePath(`/challenges/${slug}`);
+}
+
+export async function enterChallengeAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const res = await attempt(async () => {
+    await enterChallenge(user.id, text(f, "challengeId"), text(f, "designId"));
+    return { message: "You're in. Share the challenge page so fans vote for it." };
+  });
+  revalidatePath(`/challenges/${text(f, "slug")}`);
+  return res;
+}
+
+export async function createChallengeAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  return attempt(async () => {
+    const ch = await createChallenge({
+      title: text(f, "title"), brief: text(f, "brief"), prize: text(f, "prize"),
+      submitBy: new Date(text(f, "submitBy")), voteBy: new Date(text(f, "voteBy")),
+    });
+    revalidatePath("/admin");
+    return { message: `Created: /challenges/${ch.slug}` };
+  });
+}
+
+// ---- Payout details ----------------------------------------------------------------------------------
+
+const PAYOUT_FIELDS = ["paypalEmail", "holder", "country", "bankName", "iban", "swift", "accountNumber", "routing", "network", "address"];
+
+export async function payoutMethodAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const res = await attempt(async () => {
+    const summary = await savePayoutMethod(user.id, text(f, "kind"), Object.fromEntries(PAYOUT_FIELDS.map((k) => [k, text(f, k)])));
+    return { message: `Saved. You'll be paid by ${summary}.` };
+  });
+  revalidatePath("/studio");
+  return res;
+}
+
+export async function unfollowAction(f: FormData) {
+  const fan = await currentFan();
+  if (fan) await leaveWaitlist(fan.email, text(f, "target"));
+  revalidatePath("/me");
+}
+
+export async function fanSignOutAction() {
+  await signOutFan();
+  redirect("/me");
 }

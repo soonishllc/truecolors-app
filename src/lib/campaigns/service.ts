@@ -8,6 +8,8 @@ import {
   MAX_LIVE_CAMPAIGNS_PER_DESIGNER, PAYOUT_BUFFER_DAYS, PRICE_CENTS, RELAUNCHES_ALLOWED, RETURN_WINDOW_DAYS,
   SIZES, STRETCH_GOALS, royaltyCents, shareBps,
 } from "../rules";
+import { sendEmail } from "../email";
+import { campaignTarget, designerTarget, fanByReferralCode, issueFanRewards, joinWaitlist, notifyWaitlists } from "../fans";
 import { fileUrl } from "../storage";
 import {
   lineNetCents, lineTaxCents, refCode, cents,
@@ -125,6 +127,8 @@ export async function reviewCampaign(reviewer: string, campaignId: string, appro
       variantIds: product.variantIds, sellingPlanGroupId: product.sellingPlanGroupId,
     })
     .where(eq(campaigns.id, c.id));
+  const [live] = await d.select().from(campaigns).where(eq(campaigns.id, c.id));
+  await notifyWaitlists(live, [designerTarget(c.userId), ...(c.relaunchOf ? [campaignTarget(c)] : [])]);
 }
 
 function escapeHtml(s: string) {
@@ -161,6 +165,8 @@ export async function recordOrder(order: OrderPayload) {
   const campaignsInOrder = new Set(campaignLines.map((l) => String(l.product_id)));
   const sharedOrder = campaignLines.length < order.line_items.length || campaignsInOrder.size > 1;
   const ref = refCode(order);
+  const fan = ref?.startsWith("f-") ? await fanByReferralCode(ref) : undefined;
+  const email = (order.email || order.contact_email || "").trim().toLowerCase() || null;
 
   for (const line of campaignLines) {
     const { c, handle } = byProduct.get(String(line.product_id))!;
@@ -178,6 +184,9 @@ export async function recordOrder(order: OrderPayload) {
         netCents: lineNetCents(line),
         taxCents: lineTaxCents(line),
         viaDesignerLink: ref === handle.toLowerCase(),
+        fanRef: fan && fan.email !== email ? fan.id : null,
+        email,
+        city: order.shipping_address?.city?.trim() || null,
         sharedOrder,
         status: accepting ? "pledged" : "cancelled",
         needsAttention: accepting ? null : `Order arrived after the campaign stopped taking pre-orders (${c.status}); cancel this line by hand.`,
@@ -412,9 +421,88 @@ export async function tickCampaign(c: Campaign, now: Date, log: TickLog) {
     for (const group of byOrder(list)) await cancelPledges(group, "The design didn't reach its pre-order goal.");
     await d.update(campaigns).set({ status: "missed", closedAt: now }).where(eq(campaigns.id, c.id));
     log.push(`${c.slug}: missed with ${pledged()} of ${c.goal}`);
+    for (const email of new Set(list.map((p) => p.email).filter((e): e is string => !!e))) {
+      await joinWaitlist(email, campaignTarget(c));
+      await sendEmail({
+        to: email, key: `missed:${c.id}:${email}`,
+        subject: `${c.title} didn't reach its goal, so you weren't charged`,
+        body: `${c.title} ended with ${pledged()} of ${c.goal} pre-orders, so it won't be printed this time and nobody ` +
+          `pays. If the designer brings it back, we'll email you first.`,
+      });
+    }
   } else if (!retrying && charged() >= c.goal) {
+    const size = await numberEditions(c);
     await d.update(campaigns).set({ status: "funded", closedAt: now, fundedAt: c.fundedAt ?? now }).where(eq(campaigns.id, c.id));
-    log.push(`${c.slug}: closed funded with ${charged()}`);
+    log.push(`${c.slug}: closed funded with ${charged()}, edition of ${size}`);
+  }
+}
+
+// Numbers every charged shirt in the order its pre-order came in, so the earliest backers get the lowest
+// numbers, and tells each backer theirs: "#37 of 142". The edition is closed: no restocks.
+async function numberEditions(c: Campaign) {
+  const d = await db();
+  const charged = await d
+    .select()
+    .from(pledges)
+    .where(and(eq(pledges.campaignId, c.id), eq(pledges.status, "charged")))
+    .orderBy(pledges.createdAt, pledges.id);
+  const size = charged.reduce((s, p) => s + p.quantity, 0);
+  let next = 1;
+  for (const p of charged) {
+    await d.update(pledges).set({ editionStart: next }).where(eq(pledges.id, p.id));
+    if (p.email) {
+      const numbers = p.quantity > 1 ? `#${next}–${next + p.quantity - 1}` : `#${next}`;
+      await sendEmail({
+        to: p.email, key: `funded:${c.id}:${p.id}`,
+        subject: `${c.title} is going to print. Yours is ${numbers} of ${size}`,
+        body: `${c.title} closed with ${size} pre-orders, so it's being printed. It's a numbered limited edition: your ` +
+          `${p.size} is ${numbers} of ${size}, and it will never be restocked. Shirts ship in about 3–4 weeks.`,
+      });
+    }
+    next += p.quantity;
+  }
+  await d.update(campaigns).set({ editionSize: size }).where(eq(campaigns.id, c.id));
+  return size;
+}
+
+// Update emails to backers while a campaign runs. Each goes once, and only to people who'd pre-ordered by then.
+const MILESTONES = [
+  { key: "halfway", due: (n: number, c: Campaign) => n >= c.goal / 2 && n < c.goal * 0.9 },
+  { key: "almost", due: (n: number, c: Campaign) => n >= c.goal * 0.9 && n < c.goal },
+  { key: "goal", due: (n: number, c: Campaign) => n >= c.goal },
+  { key: "last-day", due: (n: number, c: Campaign, now: Date) => n < c.goal && !!c.endsAt && c.endsAt.getTime() - now.getTime() <= DAY },
+] as const;
+
+function milestoneEmail(key: string, c: Campaign, n: number) {
+  const url = `${config().APP_URL}/c/${c.slug}`;
+  const left = c.goal - n;
+  switch (key) {
+    case "halfway": return { subject: `${c.title} is halfway there`, body: `${n} of ${c.goal} pre-orders so far. Share it with a friend and help it get printed:
+${url}` };
+    case "almost": return { subject: `Only ${left} to go for ${c.title}`, body: `${c.title} is ${left} pre-orders away from being printed. One share could do it:
+${url}` };
+    case "goal": return { subject: `${c.title} hit its goal: it's being printed`, body: `${c.title} reached ${c.goal} pre-orders, so it's happening. We'll charge your card now. Every shirt is numbered, and you'll get your number when the campaign closes.
+${url}` };
+    default: return { subject: `Last 24 hours for ${c.title}`, body: `${c.title} has ${n} of ${c.goal} pre-orders and closes tomorrow. If it doesn't make it, nobody pays. Share it now:
+${url}` };
+  }
+}
+
+export async function sendMilestones(c: Campaign, now: Date, log: TickLog) {
+  if (c.status !== "live") return;
+  const d = await db();
+  const n = (await campaignStats(c.id)).pledged;
+  for (const m of MILESTONES) {
+    if (c.milestones[m.key] || !m.due(n, c, now)) continue;
+    const backers = await d
+      .selectDistinct({ email: pledges.email })
+      .from(pledges)
+      .where(and(eq(pledges.campaignId, c.id), inArray(pledges.status, [...COUNTING])));
+    const mail = milestoneEmail(m.key, c, n);
+    for (const { email } of backers) if (email) await sendEmail({ to: email, key: `${m.key}:${c.id}:${email}`, ...mail });
+    c = { ...c, milestones: { ...c.milestones, [m.key]: now.toISOString() } };
+    await d.update(campaigns).set({ milestones: c.milestones }).where(eq(campaigns.id, c.id));
+    log.push(`${c.slug}: ${m.key} email to ${backers.length}`);
   }
 }
 
@@ -425,9 +513,16 @@ export async function tick(now = new Date()): Promise<TickLog> {
   for (const c of active) {
     try {
       await tickCampaign(c, now, log);
+      const [fresh] = await d.select().from(campaigns).where(eq(campaigns.id, c.id));
+      await sendMilestones(fresh, now, log);
     } catch (e) {
       log.push(`${c.slug}: error ${(e as Error).message}`);
     }
+  }
+  try {
+    await issueFanRewards(log);
+  } catch (e) {
+    log.push(`fan rewards: error ${(e as Error).message}`);
   }
   return log;
 }

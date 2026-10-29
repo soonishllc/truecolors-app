@@ -6,11 +6,12 @@ import { config, isAdminEmail } from "../config";
 import { db } from "../db/client";
 import { identities, invites, loginTokens, users } from "../db/schema";
 import { UserError } from "../design/service";
+import { sendEmail } from "../email";
 import { STARTING_CREDITS } from "../rules";
 import type { Handshake, Profile, Provider } from "./oauth";
 
-// Invite-only sign-up, email login links and social sign-in. Phase 1 sends no email itself: the link is logged (and shown
-// in dev) so Truecolors can send it; plug a mail provider into sendLoginLink when one is chosen.
+// Invite-only sign-up, email login links and social sign-in. Login links are emailed (see lib/email), and
+// also shown on screen in development.
 
 const COOKIE = "tc_session";
 const HANDSHAKE_COOKIE = "tc_oauth";
@@ -149,6 +150,11 @@ export async function sendLoginLink(emailInput: string): Promise<string | undefi
   });
   const link = `${config().APP_URL}/auth/verify?token=${token}`;
   console.log(`[login link] ${email}: ${link}`);
+  await sendEmail({
+    to: email,
+    subject: "Your Truecolors Design login link",
+    body: `Tap to log in to your studio:\n${link}\n\nThe link works once, for ${LINK_MINUTES} minutes.`,
+  });
   return config().DEV_SHOW_LOGIN_LINKS ? link : undefined;
 }
 
@@ -183,7 +189,9 @@ export async function takeHandshake() {
 async function linkIdentity(userId: string, provider: Provider, profile: Profile) {
   const d = await db();
   await d.delete(identities).where(and(eq(identities.userId, userId), eq(identities.provider, provider)));
-  await d.insert(identities).values({ userId, provider, subject: profile.subject, username: profile.username ?? null });
+  await d.insert(identities).values({
+    userId, provider, subject: profile.subject, username: profile.username ?? null, followers: profile.followers ?? null,
+  });
 }
 
 // Where to send someone who's just come back from a provider. Logged in: connect the account. Known account:
@@ -201,7 +209,10 @@ export async function completeSocialSignIn(provider: Provider, profile: Profile)
     return `/studio?connected=${provider}`;
   }
   if (known) {
-    if (profile.username) await d.update(identities).set({ username: profile.username }).where(eq(identities.id, known.id));
+    await d
+      .update(identities)
+      .set({ username: profile.username ?? known.username, followers: profile.followers ?? known.followers })
+      .where(eq(identities.id, known.id));
     await startSession(known.userId);
     return "/studio";
   }

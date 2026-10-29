@@ -33,6 +33,13 @@ const ICONS: Record<Provider, React.ReactNode> = {
       <circle cx="17.4" cy="6.6" r="1.3" fill="#d62976" />
     </svg>
   ),
+  tiktok: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#25F4EE" d="M9.4 9.7v-1A7 7 0 0 0 2.6 15a7 7 0 0 0 9.2 6.2 7 7 0 0 1-2.4-11.5z" opacity=".9" />
+      <path fill="#FE2C55" d="M16.6 2.5h-3.2v13.2a2.9 2.9 0 1 1-2-2.8V9.6a6.2 6.2 0 1 0 5.2 6.1V9a8 8 0 0 0 4.7 1.5V7.3a4.7 4.7 0 0 1-4.7-4.8z" opacity=".9" />
+      <path fill="currentColor" d="M15.8 2h-3.2v13.2a2.9 2.9 0 1 1-2-2.8V9.1a6.2 6.2 0 1 0 5.2 6.1V8.5a8 8 0 0 0 4.7 1.5V6.8A4.7 4.7 0 0 1 15.8 2z" />
+    </svg>
+  ),
 };
 
 export const ProviderIcon = ({ provider }: { provider: Provider }) => <span className="provider-icon">{ICONS[provider]}</span>;
@@ -40,7 +47,7 @@ export const ProviderIcon = ({ provider }: { provider: Provider }) => <span clas
 // One button per provider whose keys are set. In development the rest show greyed out, so the layout can be seen.
 export function SocialButtons({ verb }: { verb: string }) {
   const on = enabledProviders();
-  const all: Provider[] = ["google", "apple", "x", "instagram"];
+  const all: Provider[] = ["google", "apple", "instagram", "tiktok", "x"];
   const shown = config().DEV_SHOW_LOGIN_LINKS ? all : on;
   if (!shown.length) return null;
   return (

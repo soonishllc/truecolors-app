@@ -83,3 +83,23 @@ export async function inboundCsv(batchId: string) {
     }),
   ]);
 }
+
+// Every shirt's edition number, for the numbered tag or card that goes in with it.
+export async function editionsCsv(batchId: string) {
+  const d = await db();
+  const rows = await d
+    .select({ p: pledges, c: campaigns })
+    .from(pledges)
+    .innerJoin(campaigns, eq(campaigns.id, pledges.campaignId))
+    .where(and(eq(campaigns.batchId, batchId), eq(pledges.status, "charged")))
+    .orderBy(campaigns.designCode, pledges.editionStart);
+  return csv([
+    ["Order", "SKU", "Design", "Size", "Edition number", "Edition size"],
+    ...rows.flatMap(({ p, c }) =>
+      Array.from({ length: p.quantity }, (_, i) => [
+        p.orderName, sku(c.designCode, p.size as never), c.title, p.size,
+        p.editionStart ? `#${p.editionStart + i}` : "", c.editionSize ?? "",
+      ]),
+    ),
+  ]);
+}

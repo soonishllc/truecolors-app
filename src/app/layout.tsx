@@ -25,6 +25,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="top">
           <Link href="/" className="brand" aria-label={BRAND}><Wordmark /></Link>
           <nav>
+            <Link href="/explore">Explore</Link>
+            <Link href="/challenges" className="wide-only">Challenges</Link>
+            <Link href="/me">{user ? "Orders" : "My orders"}</Link>
             {user ? (
               <>
                 <Link href="/studio">Studio</Link>
@@ -34,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             ) : (
               <>
                 <Link href="/login">Log in</Link>
-                <Link href="/join" className="button small">Join with invite</Link>
+                <Link href="/join" className="button small wide-only">Join with invite</Link>
               </>
             )}
           </nav>
@@ -42,7 +45,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main>{children}</main>
         <footer className="foot">
           <span><Wordmark /> · colour-shifting shirts, designed by our community</span>
-          <a href={config().SHOPIFY_STOREFRONT_URL}>Shop the store →</a>
+          <span className="foot-links">
+            <Link href="/explore">Explore</Link>
+            <Link href="/challenges">Challenges</Link>
+            <Link href="/me">My pre-orders</Link>
+            <Link href="/join">Designers: join with invite</Link>
+            <a href={config().SHOPIFY_STOREFRONT_URL}>Shop the store →</a>
+          </span>
         </footer>
       </body>
     </html>

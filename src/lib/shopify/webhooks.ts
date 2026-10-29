@@ -26,6 +26,9 @@ export type OrderPayload = {
   currency: string;
   note_attributes?: { name: string; value: string }[];
   line_items: OrderLine[];
+  email?: string | null;
+  contact_email?: string | null;
+  shipping_address?: { city?: string | null } | null;
   cancelled_at?: string | null;
 };
 

@@ -1,13 +1,14 @@
 import { createHash, createSign, randomBytes } from "node:crypto";
 import { config } from "../config";
 
-// Sign in with Google, Apple, X or Instagram: the OAuth code flow, by hand, for the four providers.
-// Each provider only hands back who the person is; the studio keeps no tokens, so it can't post for them.
+// Sign in with Google, Apple, X, Instagram or TikTok: the OAuth code flow, by hand, for each provider.
+// Each provider hands back who the person is and, for the social ones, how many followers they have.
+// The studio keeps no tokens, so it can't post for them.
 
-export type Provider = "google" | "apple" | "x" | "instagram";
-export type Profile = { subject: string; name?: string; username?: string; email?: string };
+export type Provider = "google" | "apple" | "x" | "instagram" | "tiktok";
+export type Profile = { subject: string; name?: string; username?: string; email?: string; followers?: number };
 
-type Tokens = { access_token: string; id_token?: string; user_id?: string | number };
+type Tokens = { access_token: string; id_token?: string; user_id?: string | number; open_id?: string };
 
 type Spec = {
   label: string;
@@ -19,6 +20,8 @@ type Spec = {
   formPost?: boolean;
   // X wants the client credentials in a Basic header; the others take them in the body.
   basicAuth?: boolean;
+  // TikTok calls the client id "client_key".
+  clientIdParam?: string;
   credentials(): { id?: string; secret?: string };
   profile(tokens: Tokens, form: URLSearchParams): Promise<Profile>;
 };
@@ -89,8 +92,10 @@ const PROVIDERS: Record<Provider, Spec> = {
     basicAuth: true,
     credentials: () => ({ id: config().X_CLIENT_ID, secret: config().X_CLIENT_SECRET }),
     async profile(t) {
-      const { data } = await getJson("https://api.x.com/2/users/me", { headers: { Authorization: `Bearer ${t.access_token}` } });
-      return { subject: data.id, name: data.name, username: data.username };
+      const { data } = await getJson("https://api.x.com/2/users/me?user.fields=public_metrics", {
+        headers: { Authorization: `Bearer ${t.access_token}` },
+      });
+      return { subject: data.id, name: data.name, username: data.username, followers: data.public_metrics?.followers_count };
     },
   },
   instagram: {
@@ -101,8 +106,27 @@ const PROVIDERS: Record<Provider, Spec> = {
     pkce: false,
     credentials: () => ({ id: config().INSTAGRAM_CLIENT_ID, secret: config().INSTAGRAM_CLIENT_SECRET }),
     async profile(t) {
-      const me = await getJson(`https://graph.instagram.com/me?fields=user_id,username,name&access_token=${t.access_token}`);
-      return { subject: String(me.user_id ?? t.user_id), name: me.name, username: me.username };
+      const me = await getJson(
+        `https://graph.instagram.com/me?fields=user_id,username,name,followers_count&access_token=${t.access_token}`,
+      );
+      return { subject: String(me.user_id ?? t.user_id), name: me.name, username: me.username, followers: me.followers_count };
+    },
+  },
+  tiktok: {
+    label: "TikTok",
+    authorizeUrl: "https://www.tiktok.com/v2/auth/authorize/",
+    tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/",
+    scope: "user.info.basic,user.info.profile,user.info.stats",
+    pkce: true,
+    clientIdParam: "client_key",
+    credentials: () => ({ id: config().TIKTOK_CLIENT_KEY, secret: config().TIKTOK_CLIENT_SECRET }),
+    async profile(t) {
+      const { data } = await getJson(
+        "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,username,follower_count",
+        { headers: { Authorization: `Bearer ${t.access_token}` } },
+      );
+      const u = data.user;
+      return { subject: u.open_id ?? t.open_id, name: u.display_name, username: u.username, followers: u.follower_count };
     },
   },
 };
@@ -119,6 +143,7 @@ export function enabledProviders(): Provider[] {
     apple: c.APPLE_CLIENT_ID && c.APPLE_TEAM_ID && c.APPLE_KEY_ID && c.APPLE_PRIVATE_KEY,
     x: c.X_CLIENT_ID && c.X_CLIENT_SECRET,
     instagram: c.INSTAGRAM_CLIENT_ID && c.INSTAGRAM_CLIENT_SECRET,
+    tiktok: c.TIKTOK_CLIENT_KEY && c.TIKTOK_CLIENT_SECRET,
   };
   return (Object.keys(PROVIDERS) as Provider[]).filter((p) => on[p]);
 }
@@ -134,7 +159,7 @@ export function authorizeUrl(p: Provider): { url: string; handshake: Handshake }
   const verifier = spec.pkce ? randomBytes(32).toString("base64url") : undefined;
   const url = new URL(spec.authorizeUrl);
   url.search = new URLSearchParams({
-    client_id: spec.credentials().id!,
+    [spec.clientIdParam ?? "client_id"]: spec.credentials().id!,
     redirect_uri: callbackUrl(p),
     response_type: "code",
     scope: spec.scope,
@@ -162,7 +187,8 @@ export async function finishAuthorize(p: Provider, params: URLSearchParams, hand
     code,
     redirect_uri: callbackUrl(p),
     ...(handshake.verifier && { code_verifier: handshake.verifier }),
-    ...(spec.basicAuth ? { client_id: id! } : { client_id: id!, client_secret: secret! }),
+    [spec.clientIdParam ?? "client_id"]: id!,
+    ...(!spec.basicAuth && { client_secret: secret! }),
   });
   const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
   if (spec.basicAuth) headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;

@@ -11,6 +11,11 @@ export const COMPARE_AT_CENTS = 4500;
 
 export const FUNDING_GOAL = 100;
 export const STRETCH_GOALS = [250, 500];
+// What each stretch goal unlocks for every backer. Placeholders: Truecolors to confirm.
+export const STRETCH_REWARDS: Record<number, string> = {
+  250: "Every shirt ships with a numbered certificate card signed by the designer",
+  500: "Every backer gets the design as a free sticker sheet",
+};
 export const CAMPAIGN_DAYS = 21;
 export const MAX_LIVE_CAMPAIGNS_PER_DESIGNER = 2;
 export const RELAUNCHES_ALLOWED = 1;
@@ -26,6 +31,12 @@ export const CHARGE_RETRY_EVERY_HOURS = 12;
 // Earnings become payable once the return window has closed, plus a buffer.
 export const RETURN_WINDOW_DAYS = 7;
 export const PAYOUT_BUFFER_DAYS = 7;
+
+// A fan's own link: every this many pre-orders it brings in (once charged) earns them a free tee.
+export const REFERRALS_PER_REWARD = 5;
+
+// Design challenges: how many designs one designer can enter in a challenge.
+export const CHALLENGE_ENTRIES_PER_DESIGNER = 2;
 
 export const STARTING_CREDITS = 30;
 export const CREDIT_COST = { line_art: 1, colour: 1, refine: 1 } as const;

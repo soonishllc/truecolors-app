@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  primaryKey,
   integer,
   jsonb,
   pgTable,
@@ -32,10 +33,12 @@ export const identities = pgTable(
   {
     id: id(),
     userId: uuid("user_id").notNull().references(() => users.id),
-    provider: text("provider").$type<"google" | "apple" | "x" | "instagram">().notNull(),
+    provider: text("provider").$type<"google" | "apple" | "x" | "instagram" | "tiktok">().notNull(),
     // The provider's stable id for the account.
     subject: text("subject").notNull(),
     username: text("username"),
+    // Followers when they last signed in or connected; not every provider shares it.
+    followers: integer("followers"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -143,6 +146,10 @@ export const campaigns = pgTable("campaigns", {
   fundedAt: ts("funded_at"),
   closedAt: ts("closed_at"),
   relaunchOf: uuid("relaunch_of"),
+  // Every shirt is numbered when a funded campaign closes: "#37 of 142". No restocks.
+  editionSize: integer("edition_size"),
+  // When each update email went to backers, e.g. { halfway: "2026-11-02T…" }, so each goes once.
+  milestones: jsonb("milestones").$type<Record<string, string>>().notNull().default({}),
   batchId: uuid("batch_id"),
   createdAt: createdAt(),
 });
@@ -163,6 +170,13 @@ export const pledges = pgTable(
     netCents: integer("net_cents").notNull(),
     taxCents: integer("tax_cents").notNull().default(0),
     viaDesignerLink: boolean("via_designer_link").notNull().default(false),
+    // The fan whose link brought this pre-order, for referral rewards.
+    fanRef: uuid("fan_ref"),
+    // From the Shopify order: who to send campaign updates to, and the city shown in the live feed.
+    email: text("email"),
+    city: text("city"),
+    // This line's shirts are numbered editionStart … editionStart + quantity - 1.
+    editionStart: integer("edition_start"),
     // The order also holds other products, so it can't be charged in full or cancelled as a whole.
     sharedOrder: boolean("shared_order").notNull().default(false),
     status: text("status").$type<PledgeStatus>().notNull().default("pledged"),
@@ -221,4 +235,92 @@ export const webhookEvents = pgTable("webhook_events", {
   id: text("id").primaryKey(),
   topic: text("topic").notNull(),
   receivedAt: createdAt(),
+});
+
+// Fans don't have accounts: an email they've confirmed once, kept in a cookie. They vote in challenges,
+// join waitlists and get their own referral link.
+export const fans = pgTable("fans", {
+  id: id(),
+  email: text("email").notNull().unique(),
+  referralCode: text("referral_code").notNull().unique(),
+  verifiedAt: ts("verified_at"),
+  createdAt: createdAt(),
+});
+
+// "Tell me when it launches" for a designer, and "bring it back" for a campaign that missed its goal.
+// target is "designer:<user id>" or "campaign:<first campaign id>".
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: id(),
+    email: text("email").notNull(),
+    target: text("target").notNull(),
+    notifiedAt: ts("notified_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("waitlist_unique").on(t.email, t.target)],
+);
+
+// Every email the app sends. The key stops the same update going twice.
+export const emails = pgTable("emails", {
+  id: id(),
+  key: text("key").unique(),
+  to: text("to").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  provider: text("provider").notNull(),
+  error: text("error"),
+  createdAt: createdAt(),
+});
+
+// A free tee for every few pre-orders a fan's link brings in, issued as a single-use Shopify discount code.
+export const fanRewards = pgTable("fan_rewards", {
+  id: id(),
+  fanId: uuid("fan_id").notNull().references(() => fans.id),
+  code: text("code").notNull(),
+  createdAt: createdAt(),
+});
+
+export const challenges = pgTable("challenges", {
+  id: id(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  brief: text("brief").notNull(),
+  prize: text("prize").notNull(),
+  submitBy: ts("submit_by").notNull(),
+  voteBy: ts("vote_by").notNull(),
+  createdAt: createdAt(),
+});
+
+export const challengeEntries = pgTable(
+  "challenge_entries",
+  {
+    id: id(),
+    challengeId: uuid("challenge_id").notNull().references(() => challenges.id),
+    designId: uuid("design_id").notNull().references(() => designs.id),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("challenge_entry_unique").on(t.challengeId, t.designId)],
+);
+
+export const votes = pgTable(
+  "votes",
+  {
+    entryId: uuid("entry_id").notNull().references(() => challengeEntries.id),
+    fanId: uuid("fan_id").notNull().references(() => fans.id),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.entryId, t.fanId] })],
+);
+
+export type PayoutMethodKind = "paypal" | "bank" | "usdc";
+
+// Where a designer's earnings go. The details are encrypted; summary is the masked version shown on screen.
+export const payoutMethods = pgTable("payout_methods", {
+  userId: uuid("user_id").primaryKey().references(() => users.id),
+  kind: text("kind").$type<PayoutMethodKind>().notNull(),
+  details: text("details").notNull(),
+  summary: text("summary").notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
 });

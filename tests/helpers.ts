@@ -11,6 +11,7 @@ export async function freshDb() {
 
 export type FakeShopify = ShopifyOps & {
   charges: { orderId: string; amountCents?: number }[];
+  rewardCodes: string[];
   cancelled: string[];
   failOrders: Set<string>;
 };
@@ -18,6 +19,7 @@ export type FakeShopify = ShopifyOps & {
 export function fakeShopify(): FakeShopify {
   const fake: FakeShopify = {
     charges: [],
+    rewardCodes: [],
     cancelled: [],
     failOrders: new Set(),
     createCampaignProduct: async (input) => ({
@@ -32,6 +34,9 @@ export function fakeShopify(): FakeShopify {
     },
     cancelOrder: async (orderId) => {
       fake.cancelled.push(orderId);
+    },
+    createRewardCode: async (code) => {
+      fake.rewardCodes.push(code);
     },
   };
   useShopify(fake);
@@ -62,7 +67,7 @@ let orderSeq = 1000;
 export function order(
   productId: string,
   qty: number,
-  opts: { ref?: string; size?: string; extraLine?: boolean; alsoProduct?: string } = {},
+  opts: { ref?: string; size?: string; extraLine?: boolean; alsoProduct?: string; email?: string; city?: string } = {},
 ): OrderPayload {
   const id = orderSeq++;
   const lines = [
@@ -81,5 +86,7 @@ export function order(
   return {
     id, name: `#${id}`, currency: "USD", line_items: lines,
     note_attributes: opts.ref ? [{ name: "tc_ref", value: opts.ref }] : [],
+    email: opts.email ?? `backer${id}@example.com`,
+    shipping_address: { city: opts.city ?? "Austin" },
   };
 }

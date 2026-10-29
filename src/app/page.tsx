@@ -50,7 +50,10 @@ export default async function Home() {
         })}
       </div>
       <div className="eyebrow">Live campaigns</div>
-      <h2 style={{ marginTop: 8 }}>Back a design</h2>
+      <div className="section-head">
+        <h2 style={{ marginTop: 8 }}>Back a design</h2>
+        <Link href="/explore" className="button small secondary">See all designs →</Link>
+      </div>
       {live.length === 0 && <p className="muted">No live campaigns right now. Check back soon.</p>}
       <div className="grid">
         {live.map(({ c, name, art, lineArt }, i) => (

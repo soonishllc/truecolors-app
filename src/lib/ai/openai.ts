@@ -1,8 +1,22 @@
 import OpenAI, { toFile } from "openai";
+import sharp from "sharp";
 import { config } from "../config";
 import type { ImageProvider, Moderation } from "./provider";
 
 const SIZE = "1024x1024";
+
+// Style reference images are the same few store photos every time, so they're fetched once per process.
+const references = new Map<string, Promise<Buffer>>();
+function reference(url: string) {
+  if (!references.has(url)) {
+    references.set(url, (async () => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Couldn't fetch style reference ${url}: ${res.status}`);
+      return sharp(Buffer.from(await res.arrayBuffer())).png().toBuffer();
+    })());
+  }
+  return references.get(url)!;
+}
 
 export function openaiProvider(): ImageProvider {
   const { OPENAI_API_KEY, OPENAI_IMAGE_MODEL } = config();
@@ -37,7 +51,13 @@ export function openaiProvider(): ImageProvider {
 
   return {
     name: `openai:${OPENAI_IMAGE_MODEL}`,
-    async lineArt(prompt, userId) {
+    async lineArt(prompt, userId, refs) {
+      if (refs?.length) {
+        const images = await Promise.all(refs.map(async (url, i) => toFile(await reference(url), `style-${i}.png`, { type: "image/png" })));
+        return decode(
+          await client.images.edit({ model: OPENAI_IMAGE_MODEL, image: images, prompt, size: SIZE, output_format: "png", safety_identifier: userId }),
+        );
+      }
       return decode(
         await client.images.generate({
           model: OPENAI_IMAGE_MODEL,

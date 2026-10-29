@@ -11,8 +11,9 @@ import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, media, pledges } from "@/lib/db/schema";
-import { daysLeft, money, nextStretch } from "@/lib/format";
+import { ago, compact, daysLeft, money, nextStretch } from "@/lib/format";
 import { CREDIT_COST, FUNDING_GOAL } from "@/lib/rules";
+import { payoutMethod } from "@/lib/payouts/methods";
 import { designerEarnings } from "@/lib/royalties/ledger";
 import { siteImageUrl } from "@/lib/site-images";
 import { fileUrl } from "@/lib/storage";
@@ -20,14 +21,7 @@ import { fileUrl } from "@/lib/storage";
 export const dynamic = "force-dynamic";
 
 const SPARK_DAYS = 14;
-const SHOWN: Provider[] = ["instagram", "x", "google", "apple"];
-
-const ago = (d: Date, now = Date.now()) => {
-  const m = Math.round((now - d.getTime()) / 60_000);
-  if (m < 60) return `${Math.max(1, m)}m ago`;
-  if (m < 1440) return `${Math.round(m / 60)}h ago`;
-  return `${Math.round(m / 1440)}d ago`;
-};
+const SHOWN: Provider[] = ["instagram", "tiktok", "x", "google", "apple"];
 
 // What to tell a designer about a live campaign right now, if anything.
 function nudge(pledged: number, goal: number, days: number) {
@@ -80,6 +74,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
   const stats = await Promise.all(myCampaigns.map((c) => campaignStats(c.id)));
   const earnings = await designerEarnings(user.id);
   const accounts = await connectedAccounts(user.id);
+  const payout = await payoutMethod(user.id);
+  const reach = accounts.reduce((sum, a) => sum + (a.followers ?? 0), 0);
   const agreement = config().DESIGNER_AGREEMENT_VERSION;
   const ids = myCampaigns.map((c) => c.id);
   const counted = inArray(pledges.status, ["pledged", "charged", "charge_failed"]);
@@ -133,7 +129,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <h1>Hi, {firstName}<span className="sun-text">.</span></h1>
           <div className="row">
             <span className="pill-stat"><b>{user.credits}</b> credits</span>
-            <span className="pill-stat">Your code <b>{user.handle}</b></span>
+            <Link className="pill-stat" href={`/d/${user.handle}`}>Your page <b>/d/{user.handle}</b></Link>
             <a className="button small" href="#new">＋ New design</a>
           </div>
         </div>
@@ -246,7 +242,13 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
               <div className="two">
                 <label>Title<input name="title" required maxLength={60} placeholder="Dubai Marina Sunset" /></label>
                 <label>Style
-                  <select name="preset">{PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+                  <select name="preset">
+                    {[...new Set(PRESETS.map((p) => p.group))].map((g) => (
+                      <optgroup key={g} label={g}>
+                        {PRESETS.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                 </label>
               </div>
               <label>Your idea<textarea name="idea" required maxLength={600} placeholder="A dhow sailing past the Burj Al Arab at sunset, with palm trees" /></label>
@@ -312,11 +314,15 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
               <div><dt>Ready for next payout</dt><dd>{money(earnings.payable)}</dd></div>
               <div><dt>Paid</dt><dd>{money(earnings.paid)}</dd></div>
             </dl>
+            <Link href="/studio/payouts" className={payout ? "payout-line" : "payout-line missing"}>
+              {payout ? <>Paid by {payout.summary}</> : <>Add how you&apos;d like to be paid →</>}
+            </Link>
           </div>
 
           <div className="card rail-card">
             <div className="eyebrow">Your accounts</div>
-            <p className="small muted">Connect where your followers are, so you can sign in with them and share in a tap.</p>
+            {reach > 0 ? <p className="reach"><b>{compact(reach)}</b> <span className="small muted">followers across your accounts</span></p>
+              : <p className="small muted">Connect where your followers are: your reach shows here and on your public profile.</p>}
             <ul className="accounts">
               {SHOWN.map((p) => {
                 const acct = accounts.find((a) => a.provider === p);
@@ -324,7 +330,10 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
                 return (
                   <li key={p}>
                     <ProviderIcon provider={p} />
-                    <span>{providerLabel(p)}{acct?.username && <span className="muted"> @{acct.username}</span>}</span>
+                    <span>
+                      {providerLabel(p)}{acct?.username && <span className="muted"> @{acct.username}</span>}
+                      {acct?.followers != null && <span className="muted"> · {compact(acct.followers)}</span>}
+                    </span>
                     {acct ? <span className="badge status-funded">Connected</span>
                       : canConnect ? <a className="button small secondary" href={`/auth/${p}`}>Connect</a>
                       : <span className="small muted">Soon</span>}

@@ -176,6 +176,27 @@ export async function cancelOrder(orderId: string, staffNote: string) {
   ok(res.orderCancel, "orderCancel");
 }
 
+// A single-use code worth one tee, for a fan whose link brought in enough pre-orders.
+export async function createRewardCode(code: string, valueCents: number) {
+  const res = await admin<{ discountCodeBasicCreate: { userErrors: UserErrors } }>(
+    `mutation($input: DiscountCodeBasicInput!) {
+      discountCodeBasicCreate(basicCodeDiscount: $input) { userErrors { field message } }
+    }`,
+    {
+      input: {
+        title: `Fan reward ${code}`,
+        code,
+        startsAt: new Date().toISOString(),
+        usageLimit: 1,
+        appliesOncePerCustomer: true,
+        customerSelection: { all: true },
+        customerGets: { value: { discountAmount: { amount: dollars(valueCents), appliesOnEachItem: false } }, items: { all: true } },
+      },
+    },
+  );
+  ok(res.discountCodeBasicCreate, "discountCodeBasicCreate");
+}
+
 export function productUrl(handle: string, ref?: string) {
   const url = new URL(`${config().SHOPIFY_STOREFRONT_URL.replace(/\/$/, "")}/products/${handle}`);
   if (ref) url.searchParams.set("ref", ref);

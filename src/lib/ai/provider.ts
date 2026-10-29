@@ -7,7 +7,8 @@ export type Moderation = { flagged: boolean; categories: string[] };
 export interface ImageProvider {
   name: string;
   // Black line art on white, PNG.
-  lineArt(prompt: string, userId: string): Promise<Buffer>;
+  // refs: style reference images (URLs) to draw from, for presets based on the store's shirts.
+  lineArt(prompt: string, userId: string, refs?: string[]): Promise<Buffer>;
   // A designer's sketch (photo or scan) redrawn as line art like lineArt's.
   fromSketch(sketch: Buffer, prompt: string, userId: string): Promise<Buffer>;
   // Same line art coloured in, PNG, same size as the input.

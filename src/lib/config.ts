@@ -45,6 +45,16 @@ const schema = z.object({
   // Instagram API with Instagram Login: works for professional (creator or business) accounts only.
   INSTAGRAM_CLIENT_ID: z.string().optional(),
   INSTAGRAM_CLIENT_SECRET: z.string().optional(),
+  // TikTok Login Kit (developers.tiktok.com), with the user.info.basic, .profile and .stats scopes.
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+
+  // Email. With a Resend key, emails are sent; without one they're only logged (see Admin, Emails).
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("Truecolors Design <hello@truecolors.design>"),
+
+  // Encrypts designers' payout details. Production must set its own; changing it makes saved details unreadable.
+  PAYOUT_ENCRYPTION_KEY: z.string().optional(),
 
   CRON_SECRET: z.string().default("dev-cron-secret"),
   DEV_SHOW_LOGIN_LINKS: bool,

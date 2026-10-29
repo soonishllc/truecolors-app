@@ -77,7 +77,7 @@ export async function createDesign(
   const prompt = sketch ? sketchPrompt(p, input.idea) : lineArtPrompt(p, input.idea);
 
   const lineArt = await withCredits(userId, CREDIT_COST.line_art, async () => {
-    const raw = sketch ? await ai.fromSketch(sketch, prompt, userId) : await ai.lineArt(prompt, userId);
+    const raw = sketch ? await ai.fromSketch(sketch, prompt, userId) : await ai.lineArt(prompt, userId, p.refs);
     await checkImage(raw);
     return cleanLineArt(raw);
   });

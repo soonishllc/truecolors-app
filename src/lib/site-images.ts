@@ -13,14 +13,25 @@ const PHOTO_STYLE = [
 ];
 const LOGO = STORE_LOGO.replace("width=300", "width=1024");
 
-// The ink is the whole story, so every photo has to show it truthfully: no half-coloured prints in bright rooms.
+// Designs that have sold on the store, shown on the shirts in the pre-order photo. As campaigns get funded,
+// swap in their sun mockups and remake it: npm run site:images -- step-preorder
+const SOLD_DESIGNS = [
+  "https://www.truecolors.global/cdn/shop/files/habibi_4.png?width=1024",
+  "https://www.truecolors.global/cdn/shop/files/dunebashing_3_48b610ef-5c86-4f82-a4c4-9f81b799a2ab.png?width=1024",
+];
+
+// The ink is the whole story, so every photo has to show it truthfully: colour exactly where the sun falls.
+const INK =
+  "Truecolors prints use UV-reactive ink: wherever direct sunlight falls on a print it is fully coloured, and " +
+  "wherever it is out of direct sunlight (indoors, or in shade) it shows only grey and black line art with no colour " +
+  "at all. If the edge of a sunbeam or shadow crosses a shirt, the print is coloured on the sunlit side and grey on " +
+  "the shaded side, and the change follows that light edge exactly. A print in bright indoor light that isn't " +
+  "direct sun is still grey.";
 const STYLE =
   "Photorealistic lifestyle photo in the same style, natural light and warm colour grading as the reference photos " +
   "from the Truecolors clothing brand. Use new people and new shirt designs: do not copy the people or prints in the " +
-  "references, and give every shirt in the image its own different design. Truecolors prints use UV-reactive ink: " +
-  "out of direct sunlight (indoors, or in shade) a print shows only grey and black line art with no colour at all; " +
-  "in direct sunlight the same print is fully coloured. Never show a print that is part grey and part colour. " +
-  "No words, letters or watermarks anywhere in the image, apart from any logo the prompt asks for.";
+  "references. " + INK + " No words, letters or watermarks anywhere in the image, apart from any logo or lettering " +
+  "the prompt asks for.";
 
 // What the shirts look like on the store: each one a different kind of design, never the same shape twice.
 const PRINT_REALISM =
@@ -35,6 +46,8 @@ export type SiteImage = {
   refs?: string[];
   // Made by editing another site image instead of from the references, so the two match shot for shot.
   from?: string;
+  // Copy the prints from the reference images instead of inventing new ones.
+  ownPrints?: boolean;
   // Logos: drawn on solid black, which is then keyed out to a transparent PNG trimmed to its edges.
   cutout?: boolean;
 };
@@ -78,13 +91,14 @@ export const SITE_IMAGES: SiteImage[] = [
     id: "studio-hero",
     size: "1536x1024",
     prompt:
-      "Wide shot, calm empty space on the left for a headline. A calm design studio indoors. A designer sits at a " +
-      "wooden desk in the right half of the frame, drawing black-and-white line art of a city skyline on a tablet. The " +
-      "designer, the desk and a folded white tee with a grey line-art print on the desk are all in soft, even shade: " +
-      "no sunlight touches them at all. Further right, a metre or two away from the designer, a window lets in one " +
-      "narrow, sharply edged beam of direct sunlight that falls only on the windowsill, where a white tee lies flat. " +
-      "The whole tee is inside the bright patch of sunlight, edge to edge, and its print is fully coloured: the only " +
-      "colourful print in the room. The left half is a plain, softly lit wall.",
+      "Wide shot, calm empty space on the left for a headline. A calm design studio indoors. In the right half of " +
+      "the frame a designer sits at a wooden desk in soft, even shade, drawing on a tablet; no sunlight touches them. " +
+      "The designer wears a white tee printed with a city skyline at sunset; because they are in the shade, their " +
+      "print shows only grey and black line art. Behind them on the right is a window. A second white tee with exactly " +
+      "the same skyline print hangs on a hanger by the window, and a sharp-edged beam of direct sunlight falls " +
+      "diagonally across it: the sunlit part of that print glows in full sunset colour, while the part just outside " +
+      "the beam stays grey line art, the change following the edge of the light exactly. The two shirts are the same " +
+      "design, so it's obvious the sun is what colours it. The left half is a plain, softly lit wall.",
   },
   {
     id: "step-design",
@@ -99,30 +113,40 @@ export const SITE_IMAGES: SiteImage[] = [
   {
     id: "step-preorder",
     size: "1024x1024",
+    refs: [...SOLD_DESIGNS, PHOTO_STYLE[0]],
+    ownPrints: true,
     prompt:
       "Two friends at a café table outside in bright, direct midday sunlight with hard shadows, looking at a phone " +
-      "together and laughing; the phone screen faces away from the camera. Both wear white tees in full sun with " +
-      "fully coloured prints in two completely different styles, like the variety in the brand's range: one has a " +
-      "wide horizontal panorama of a city skyline at sunset across the chest; the other has a round emblem badge with " +
-      "a paint-splash edge around a desert dune buggy. Neither print is shaped like a surfboard. " + PRINT_REALISM,
+      "together and laughing; the phone screen faces away from the camera. Both wear white tees in full sun, so both " +
+      "prints are fully, vividly coloured. The friend on the left wears the HABIBI design from the first reference " +
+      "image: the word HABIBI in huge block capitals filled with Dubai skyline, palm and sea scenes, spread wide " +
+      "across the chest. The friend on the right wears the Dune Bashing design from the second reference image: a " +
+      "Dubai skyline and an SUV kicking up desert sand, with the script lettering \"I'd rather be Dune Bashing\" above " +
+      "it. Reproduce both designs and their lettering faithfully, in their sunlit full-colour version, rich and " +
+      "saturated. Use new people, not the models from the references. " + PRINT_REALISM,
   },
   {
     id: "step-print",
     size: "1024x1024",
     refs: [...PHOTO_STYLE, LOGO],
     prompt:
-      "A large, modern apparel factory floor, wide shot. In the centre, a big industrial automatic screen-printing " +
-      "press: a ten-arm rotary carousel, with ten pallet arms radiating from a central hub, white tees loaded on the " +
-      "pallets and print heads overhead, feeding a long conveyor dryer tunnel. Rows of production tables and stacked " +
-      "boxes behind. The windows are blacked out and the hall is lit by warm amber UV-filtered industrial lights, " +
-      "because UV-reactive ink must be kept out of sunlight. Three operators in black tees with the Truecolors logo " +
-      "from the last reference image printed small on the chest, reproduced exactly, work the press. Every printed " +
-      "white tee shows grey line-art prints only, with no colour, because there is no sunlight in the hall.",
+      "A professional screen-printing factory, wide shot. In the foreground, a big M&R-style automatic screen-printing " +
+      "press: a 12-station carousel with a central hub, a ring of printing heads holding mesh screens, a heavy-duty " +
+      "industrial steel frame, and red flash-cure units glowing orange-red between stations. Exactly two operators: " +
+      "one loads blank white tees onto the pallets on one side, and the other pulls finished printed tees off on the " +
+      "other side and lays them on the belt of a long conveyor dryer next to the press. Behind them: a wall rack of " +
+      "aluminium-framed mesh screens lined up side by side, pallets of blank tees in stock, and stacks of shipping " +
+      "boxes filled with folded printed shirts, taped and ready to go. The windows are blacked out and the hall is " +
+      "lit by warm amber UV-filtered lights, because UV-reactive ink must be kept out of sunlight. Both operators wear " +
+      "black tees with the Truecolors logo from the last reference image printed small on the chest, reproduced " +
+      "exactly. Every printed white tee shows grey line-art prints only, with no colour, because there is no sunlight.",
   },
 ];
 
 export function sitePrompt(img: SiteImage): string {
-  return img.from || img.cutout ? img.prompt : `${img.prompt}\n\n${STYLE}`;
+  if (img.from || img.cutout) return img.prompt;
+  if (img.ownPrints) return `${img.prompt}\n\nPhotorealistic lifestyle photo with natural light and warm colour grading. ${INK}`;
+  return `${img.prompt}\n\n${STYLE}`;
 }
 
 export function styleRefs(img: SiteImage): string[] {
