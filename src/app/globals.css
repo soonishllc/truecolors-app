@@ -89,6 +89,7 @@ strong { font-weight: 600; }
 .button:active, button:active { transform: translateY(0); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .button.small { padding: 7px 16px; font-size: 13px; }
+.button[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 button.secondary, .button.secondary { background: transparent; color: var(--ink); border-color: var(--line); }
 button.secondary:hover, .button.secondary:hover { border-color: var(--ink); box-shadow: none; }
 button.link { background: none; border: 0; color: inherit; padding: 0; font: inherit; }

@@ -110,7 +110,11 @@ export default async function CampaignPage({
                 {open && <> · <span className="countdown">{days} day{days === 1 ? "" : "s"} left</span></>}
                 {c.fundedAt && <> · <span className="good">Funded, going to print</span></>}
               </p>
-              {open && c.shopifyHandle && <a className="button" href={productUrl(c.shopifyHandle, ref)}>Pre-order now</a>}
+              {open && (c.shopifyHandle
+                ? <a className="button" href={productUrl(c.shopifyHandle, ref)}>Pre-order now</a>
+                // Launch always creates the store product, so only seeded demo campaigns land here.
+                : <><span className="button" aria-disabled="true">Pre-order now</span>
+                  <p className="small muted">Checkout opens once this campaign is linked to the store.</p></>)}
               <p className="small muted">
                 You&apos;re only charged once this design reaches {c.goal} pre-orders. If it doesn&apos;t, nobody pays. Shirts
                 ship about 3–4 weeks after the campaign closes.
