@@ -12,8 +12,10 @@ const SUN_S = 3;
 
 function run(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (!ffmpegPath) return reject(new Error("ffmpeg binary not found"));
-    const p = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+    // FFMPEG_PATH points at a system ffmpeg (the Docker image installs one).
+    const bin = process.env.FFMPEG_PATH || ffmpegPath;
+    if (!bin) return reject(new Error("ffmpeg binary not found"));
+    const p = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     p.stderr.on("data", (d) => (err += d));
     p.on("error", reject);

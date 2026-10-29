@@ -1,6 +1,4 @@
-import { get } from "@/lib/storage";
-
-const TYPES: Record<string, string> = { png: "image/png", mp4: "video/mp4", jpg: "image/jpeg" };
+import { contentType, get } from "@/lib/storage";
 
 // Files are named by random UUIDs, so a link is the only way to reach one.
 export async function GET(_req: Request, { params }: { params: Promise<{ key: string[] }> }) {
@@ -9,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ key: st
     const body = await get(key);
     return new Response(new Uint8Array(body), {
       headers: {
-        "Content-Type": TYPES[key.split(".").pop() ?? ""] ?? "application/octet-stream",
+        "Content-Type": contentType(key),
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });

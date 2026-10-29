@@ -506,7 +506,21 @@ export async function sendMilestones(c: Campaign, now: Date, log: TickLog) {
   }
 }
 
+// Only one tick at a time, so the cron job and the admin button can't charge the same order twice.
+// This holds because the site runs as a single server process (see render.yaml).
+let running: Promise<TickLog> | undefined;
+
 export async function tick(now = new Date()): Promise<TickLog> {
+  if (running) return ["Already running, skipped."];
+  running = runTick(now);
+  try {
+    return await running;
+  } finally {
+    running = undefined;
+  }
+}
+
+async function runTick(now: Date): Promise<TickLog> {
   const d = await db();
   const log: TickLog = [];
   const active = await d.select().from(campaigns).where(inArray(campaigns.status, ["live", "closing"]));

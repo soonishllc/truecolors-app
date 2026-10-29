@@ -1,0 +1,69 @@
+# Render blueprint: Dashboard → New → Blueprint, pick this repo. Secrets marked sync: false are asked for once.
+databases:
+  - name: truecolors-db
+    plan: basic-256mb
+    region: virginia
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: truecolors-design
+    runtime: docker
+    plan: standard
+    region: virginia
+    healthCheckPath: /api/health
+    # Keep one instance: the cron tick's no-overlap guard lives in the server process.
+    numInstances: 1
+    domains:
+      - truecolors.design
+      - www.truecolors.design
+    envVars:
+      - key: APP_URL
+        value: https://truecolors.design
+      - key: DATABASE_URL
+        fromDatabase: { name: truecolors-db, property: connectionString }
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: PAYOUT_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        value: kevin@probablyfine.ae
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: SHOPIFY_ADMIN_TOKEN
+        sync: false
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
+      - key: SHOPIFY_US_PUBLICATION_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DESIGNER_AGREEMENT_VERSION
+        sync: false
+
+  # Closes campaigns, charges funded ones, sends milestone emails and issues fan rewards.
+  - type: cron
+    name: truecolors-tick
+    runtime: node
+    plan: starter
+    region: virginia
+    schedule: "*/15 * * * *"
+    buildCommand: "true"
+    startCommand: node scripts/cron-tick.mjs
+    envVars:
+      - key: APP_URL
+        value: https://truecolors.design
+      - key: CRON_SECRET
+        fromService: { type: web, name: truecolors-design, envVarKey: CRON_SECRET }

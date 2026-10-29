@@ -13,6 +13,12 @@ const schema = z.object({
   // Leave empty to run on an embedded Postgres (PGlite) stored in .pglite/.
   DATABASE_URL: z.string().optional(),
   STORAGE_DIR: z.string().default("./storage"),
+  // S3-compatible file storage for production (Cloudflare R2: endpoint https://<account id>.r2.cloudflarestorage.com, region auto).
+  S3_BUCKET: z.string().optional(),
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default("auto"),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
 
   // "mock" draws placeholder art locally so the whole flow runs without keys.
   AI_PROVIDER: z.enum(["openai", "mock"]).default("mock"),
@@ -80,4 +86,20 @@ export function isAdminEmail(email: string): boolean {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean)
     .includes(email.toLowerCase());
+}
+
+// Run once when a production server starts: refuses to boot on settings that only make sense locally.
+export function productionProblems(c: Config = config()): string[] {
+  const problems: string[] = [];
+  if (!c.APP_URL.startsWith("https://")) problems.push("APP_URL must be the https:// address of the site");
+  if (!c.DATABASE_URL) problems.push("DATABASE_URL is required (the embedded database is for local use only)");
+  if (!c.S3_BUCKET) problems.push("S3_BUCKET is required (local disk is wiped on every deploy)");
+  if (c.S3_BUCKET && !(c.S3_ACCESS_KEY_ID && c.S3_SECRET_ACCESS_KEY)) problems.push("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required");
+  if (c.SESSION_SECRET.length < 32 || c.SESSION_SECRET.includes("change-me") || c.SESSION_SECRET.startsWith("dev-only"))
+    problems.push("SESSION_SECRET must be 32+ random characters");
+  if (c.CRON_SECRET.length < 32 || c.CRON_SECRET.includes("change-me") || c.CRON_SECRET.startsWith("dev-"))
+    problems.push("CRON_SECRET must be 32+ random characters");
+  if (!c.PAYOUT_ENCRYPTION_KEY || c.PAYOUT_ENCRYPTION_KEY.length < 32) problems.push("PAYOUT_ENCRYPTION_KEY must be 32+ random characters");
+  if (c.DEV_SHOW_LOGIN_LINKS) problems.push("DEV_SHOW_LOGIN_LINKS must be off");
+  return problems;
 }

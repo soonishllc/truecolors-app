@@ -1,0 +1,10 @@
+node_modules
+.next
+.pglite
+storage
+.env
+.env.local
+.git
+.claude
+tests
+*.tsbuildinfo

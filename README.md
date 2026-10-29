@@ -88,11 +88,26 @@ To see the studio dashboard with numbers in it, `npm run demo` (local database o
 - **OpenAI.** Set `AI_PROVIDER=openai` and `OPENAI_API_KEY`.
 - **Site photos and wordmark.** Run `npm run site:images` to make the Truecolors Design wordmark and the banner and "how it works" photos with the OpenAI image model, styled on the store's product photos and logo (7 images, one paid call each; the home banner is a shade and sun pair, made one from the other). They're saved in `public/site/`; commit them. To remake one, name it: `npm run site:images -- wordmark`. The prompts are in `src/lib/site-images.ts`. Until they exist, the pages use plain dark banners, numbered tiles and the store logo.
 - **Social sign-in.** Designers can sign in with Google, Apple, Instagram, TikTok or X, and connect those accounts in the studio. Each button switches on once its keys are in the environment (see `.env.example`); register `<APP_URL>/auth/<provider>/callback` as the redirect URL with each provider. Instagram sign-in only works for creator and business accounts. New people still need an invite code. The app keeps no tokens, so it can't post for designers; sharing is through their own link, one-tap posts and the downloadable reveal video.
-- **Hosting.**
-  - Postgres (`DATABASE_URL`).
-  - A public `APP_URL`, `https://truecolors.design`: Shopify fetches product images from it.
-  - Move file storage to S3-compatible storage (`src/lib/storage.ts`).
-  - A mail provider for login links (`sendLoginLink`).
+- **Hosting.** See [Deploying](#deploying).
+
+## Deploying
+
+The site runs on [Render](https://render.com) as one Docker web service, a managed Postgres database and a cron job, all defined in `render.yaml`. Files go to a Cloudflare R2 bucket. It needs a long-running server rather than serverless functions, because a design takes about a minute of image generation plus an ffmpeg video render.
+
+1. **R2 bucket.** In Cloudflare, go to R2, create a bucket (e.g. `truecolors-files`), then create an API token with Object Read & Write on that bucket. Note the endpoint `https://<account id>.r2.cloudflarestorage.com`. The bucket stays private: the site serves files through `/api/files`.
+2. **Push this repo to GitHub** (a private repo).
+3. **Render blueprint.** Dashboard → New → Blueprint → choose the repo. Render creates `truecolors-db`, the `truecolors-design` web service and the `truecolors-tick` cron job, and generates `SESSION_SECRET` and `CRON_SECRET`. It asks once for each secret marked `sync: false`:
+   - `PAYOUT_ENCRYPTION_KEY`: make one with `openssl rand -base64 32`, keep a copy in your password manager, and never change it.
+   - `OPENAI_API_KEY`, the four `S3_*` values, the Shopify keys and `RESEND_API_KEY`.
+   - `DESIGNER_AGREEMENT_VERSION`: leave blank until the agreement is signed.
+4. **Domain.** In the web service's Settings → Custom Domains, Render shows the DNS records for `truecolors.design` and `www`. Add them at the domain registrar; Render issues the certificate.
+5. **Check it.** `https://truecolors.design/api/health` returns `{"ok":true}`. The cron job's logs show `200` every 15 minutes.
+
+The server refuses to start in production if a setting is still a local default (http `APP_URL`, no database or bucket, short secrets, dev login links on). The startup log lists what to fix. Migrations run automatically when the server starts. To try a production build locally, run it with `ALLOW_LOCAL_PRODUCTION=true`.
+
+Keep the web service at one instance: the cron tick's no-overlap guard lives in the server process.
+
+Expected cost: about $25/month for the Standard web service (2 GB of memory, enough for image and video work), $6/month for Postgres and about $1/month for the cron job. R2 is free up to 10 GB.
 
 ## Not in Phase 1
 
