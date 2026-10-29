@@ -23,15 +23,16 @@ function run(args: string[]): Promise<void> {
   });
 }
 
-export async function revealVideo(shadeStory: Buffer, sunStory: Buffer): Promise<Buffer> {
+export async function revealVideo(shadeShot: Buffer, sunShot: Buffer): Promise<Buffer> {
   const dir = await mkdtemp(path.join(tmpdir(), "tc-reveal-"));
   try {
     const shade = path.join(dir, "shade.png");
     const sun = path.join(dir, "sun.png");
     const out = path.join(dir, "reveal.mp4");
-    await writeFile(shade, shadeStory);
-    await writeFile(sun, sunStory);
-    const scale = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=white,setsar=1,fps=30,format=yuv420p";
+    await writeFile(shade, shadeShot);
+    await writeFile(sun, sunShot);
+    // Fills the 9:16 frame, cropping the sides: a square flat lay becomes a close-up of the shirt's front.
+    const scale = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,format=yuv420p";
     await run([
       "-y",
       "-loop", "1", "-t", String(SHADE_S + SWEEP_S), "-i", shade,

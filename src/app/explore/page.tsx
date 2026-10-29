@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { campaigns, designs, pledges, users } from "@/lib/db/schema";
 import { daysLeft } from "@/lib/format";
 import { listChallenges, phase } from "@/lib/challenges";
+import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
   const term = q.q?.trim().slice(0, 60);
   const d = await db();
   const backed = sql<number>`coalesce((select sum(${pledges.quantity}) from ${pledges} where ${pledges.campaignId} = ${campaigns.id} and ${pledges.status} in ('pledged','charged','charge_failed')), 0)::int`;
-  const rows = await d
+  const rows = await onShirts(await d
     .select({ c: campaigns, designer: users.name, handle: users.handle, lineArt: designs.lineArtKey, art: designs.compositeKey, backed })
     .from(campaigns)
     .innerJoin(users, eq(users.id, campaigns.userId))
@@ -35,7 +36,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
     .where(and(
       inArray(campaigns.status, [...FILTERS[show].statuses]),
       term ? or(ilike(campaigns.title, `%${term}%`), ilike(users.name, `%${term}%`)) : undefined,
-    ));
+    )), (x) => x.c.designId);
   rows.sort((a, b) =>
     sort === "ending" ? (a.c.endsAt?.getTime() ?? Infinity) - (b.c.endsAt?.getTime() ?? Infinity)
     : sort === "popular" ? b.backed - a.backed

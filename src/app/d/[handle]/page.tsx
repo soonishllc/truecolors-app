@@ -10,6 +10,7 @@ import { db } from "@/lib/db/client";
 import { campaigns, designs, identities, users } from "@/lib/db/schema";
 import { designerTarget, waitlistCount } from "@/lib/fans";
 import { compact } from "@/lib/format";
+import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +38,12 @@ export default async function DesignerPage({ params }: { params: Promise<{ handl
   const designer = await load((await params).handle);
   if (!designer) notFound();
   const d = await db();
-  const list = await d
+  const list = await onShirts(await d
     .select({ c: campaigns, lineArt: designs.lineArtKey, art: designs.compositeKey })
     .from(campaigns)
     .innerJoin(designs, eq(designs.id, campaigns.designId))
     .where(and(eq(campaigns.userId, designer.id), inArray(campaigns.status, [...SHOWN])))
-    .orderBy(desc(campaigns.createdAt));
+    .orderBy(desc(campaigns.createdAt)), (x) => x.c.designId);
   const stats = await Promise.all(list.map((x) => campaignStats(x.c.id)));
   const socials = (await d.select().from(identities).where(eq(identities.userId, designer.id)))
     .filter((i) => i.username && PROFILE_URL[i.provider]);

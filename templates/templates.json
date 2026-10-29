@@ -1,0 +1,4 @@
+[
+  {"id": "flat-square", "label": "Flat front", "file": "flat-square.jpg", "width": 1080, "height": 1080, "print": {"x": 362, "y": 272, "w": 356, "h": 407}},
+  {"id": "split-square", "label": "Half shade, half sun", "file": "split-square.jpg", "width": 1080, "height": 1080, "print": {"x": 382, "y": 282, "w": 356, "h": 407}, "split": true}
+]

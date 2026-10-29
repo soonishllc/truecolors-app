@@ -8,6 +8,7 @@ import { config } from "@/lib/config";
 import { currentFan, fanFollowing, fanPreorders, fanVotes, referralStats } from "@/lib/fans";
 import { date, daysLeft } from "@/lib/format";
 import { REFERRALS_PER_REWARD } from "@/lib/rules";
+import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
 
   const q = await searchParams;
   const [orders, votes, following, referrals] = await Promise.all([
-    fanPreorders(fan), fanVotes(fan.id), fanFollowing(fan.email), referralStats(fan),
+    fanPreorders(fan).then((o) => onShirts(o, (x) => x.c.designId)), fanVotes(fan.id), fanFollowing(fan.email), referralStats(fan),
   ]);
   const backedBy = new Map(await Promise.all(
     [...new Set(orders.map((o) => o.c.id))].map(async (id) => [id, (await campaignStats(id)).pledged] as const),

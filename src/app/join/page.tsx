@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cancelSocialJoinAction, joinAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { ProviderIcon, SocialButtons } from "@/components/SocialButtons";
@@ -33,8 +34,10 @@ export default async function Join() {
         <label className="check">
           <input type="checkbox" name="agree" />
           <span>
-            I accept the designer agreement: I own or have the rights to what I create here, Truecolors gets an
-            exclusive licence to sell it as a shirt, and I earn 10% of net sales (15% through my own link).
+            I accept the <Link href="/designer-agreement" target="_blank">designer agreement</Link> and{" "}
+            <Link href="/terms" target="_blank">terms of use</Link>: I own or have the rights to what I create here,
+            Truecolors gets an exclusive licence to sell it as a shirt, and I earn 10% of net sales (15% through my own
+            link).
           </span>
         </label>
       </ActionForm>

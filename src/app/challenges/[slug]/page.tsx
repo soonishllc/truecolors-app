@@ -11,6 +11,7 @@ import { designs } from "@/lib/db/schema";
 import { currentFan } from "@/lib/fans";
 import { date, daysLeft } from "@/lib/format";
 import { ShareKit } from "@/components/ShareKit";
+import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export default async function ChallengePage({
   const p = phase(ch);
   const fan = await currentFan();
   const user = await currentUser();
-  const list = await entries(ch.id, fan?.id);
+  const list = await onShirts(await entries(ch.id, fan?.id), (e) => e.designId);
   const total = list.reduce((s, e) => s + e.votes, 0);
   const mine = user && p === "open"
     ? await (await db()).select().from(designs).where(and(eq(designs.userId, user.id), isNotNull(designs.compositeKey)))

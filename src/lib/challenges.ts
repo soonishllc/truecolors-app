@@ -78,6 +78,7 @@ export async function entries(challengeId: string, fanId?: string) {
   const rows = await d
     .select({
       id: challengeEntries.id,
+      designId: challengeEntries.designId,
       title: designs.title,
       lineArt: designs.lineArtKey,
       art: designs.compositeKey,

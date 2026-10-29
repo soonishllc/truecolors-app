@@ -63,18 +63,25 @@ strong { font-weight: 600; }
 .top nav { display: flex; gap: 22px; align-items: center; }
 .top nav a, .top nav button.link { text-decoration: none; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dark-ink); }
 .brand { text-decoration: none; }
-/* Store logo + ".design", read as the domain. The dot is a small sun. */
-.wordmark { display: inline-flex; align-items: baseline; gap: 1px; color: var(--dark-ink); vertical-align: middle; }
-.wordmark img { height: 26px; width: auto; display: block; align-self: center; }
-.wm-design { font-family: var(--font-display); font-size: 21px; font-weight: 500; letter-spacing: -0.03em; line-height: 1; display: inline-flex; align-items: baseline; }
-.wm-design i { width: 7px; height: 7px; border-radius: 50%; background: var(--sun); margin: 0 3px 0 2px; box-shadow: 0 0 10px #e8762a; }
-.wordmark-lockup { height: 46px; width: auto; display: block; }
-.foot .wordmark-lockup { height: 34px; }
+/* Store logo + ".design", read as the domain: light, lowercase, white, with an orange dot. */
+.wordmark { display: inline-flex; align-items: flex-end; gap: 3px; color: #fff; vertical-align: middle; }
+.wordmark img { height: 26px; width: auto; display: block; }
+.wm-design { font-family: var(--font-wordmark), sans-serif; font-size: 17px; font-weight: 300; letter-spacing: 0.02em; line-height: 1; padding-bottom: 1px; }
+.wm-dot { color: #f29a0c; }
 .foot .wordmark img { height: 20px; }
-.foot .wm-design { font-size: 16px; }
+.foot .wm-design { font-size: 13px; }
 .top .button { background: var(--dark-ink); color: var(--dark); border-color: var(--dark-ink); }
-.foot { background: var(--dark); color: #8a8780; padding: 32px 24px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
-.foot a { color: var(--dark-ink); text-decoration: none; }
+/* Footer laid out like the store's: gradient rule, logo and blurb, link columns, then the legal line. */
+.foot { background: var(--dark); color: #8a8780; padding: 0 24px 28px; font-size: 14px; }
+.foot::before { content: ""; display: block; height: 3px; margin-bottom: 36px; border-radius: 2px; background: linear-gradient(90deg, #c43fd3, #e5603f, #f29a0c, #f2e600); }
+.foot-grid { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: 28px 32px; max-width: 1180px; margin: 0 auto; }
+.foot-brand p { margin: 14px 0 0; line-height: 1.6; max-width: 34ch; }
+.foot nav { display: flex; flex-direction: column; gap: 10px; }
+.foot h3 { margin: 0 0 4px; font-family: var(--font-jetbrains-mono), monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dark-ink); }
+.foot a { color: #b9b6ae; text-decoration: none; }
+.foot a:hover { color: var(--dark-ink); }
+.foot-legal { max-width: 1180px; margin: 36px auto 0; padding-top: 18px; border-top: 1px solid #2c2b29; display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; font-size: 12px; }
+@media (max-width: 900px) { .foot-grid { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; } }
 
 .button, button { display: inline-block; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--bg); padding: 13px 26px; font-family: var(--font-display); font-size: 14.5px; font-weight: 500; line-height: 1.4; cursor: pointer; text-decoration: none; }
 .button, button { transition: transform 0.15s ease, box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease; }
@@ -406,7 +413,6 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 .mini-list li { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .mini-list li > span:first-of-type { flex: 1; }
 .mini-list img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
-.foot-links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 
 @media (max-width: 1000px) {
   .kpis { grid-template-columns: 1fr 1fr; }
@@ -423,7 +429,7 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .hero-bg img { object-position: 70% center; }
   .hero-bg::after { background: linear-gradient(rgba(23, 22, 20, 0.55), rgba(23, 22, 20, 0.88)); }
   .wordmark img { height: 22px; }
-  .wordmark-lockup { height: 38px; }
+  .wm-design { font-size: 14px; }
   .wm-design { font-size: 18px; }
   .steps { grid-template-columns: 1fr; }
   table { display: block; overflow-x: auto; }
@@ -449,3 +455,11 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Legal pages: a readable column of text. */
+.legal { max-width: 760px; margin: 0 auto; line-height: 1.7; }
+.legal h2 { margin: 36px 0 8px; font-size: 20px; }
+.legal ul, .legal ol { padding-left: 22px; }
+.legal li { margin: 6px 0; }
+.legal code { font-family: var(--font-jetbrains-mono), monospace; font-size: 13px; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line, #e6e2da); font-size: 14px; }

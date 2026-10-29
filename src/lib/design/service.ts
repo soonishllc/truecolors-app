@@ -164,17 +164,19 @@ export async function renderMedia(userId: string, designId: string) {
   const shadeArt = await get(design.lineArtKey!);
   const sunArt = await get(design.compositeKey);
   const rows: (typeof media.$inferInsert)[] = [];
-  let story: { shade?: Buffer; sun?: Buffer } = {};
+  // The reveal video is made from the first plain (not half-and-half) shot.
+  const revealFrom = templates().find((t) => !t.split)?.id;
+  const reveal: { shade?: Buffer; sun?: Buffer } = {};
 
   for (const t of templates()) {
     for (const view of t.split ? (["sun"] as const) : (["shade", "sun"] as const)) {
       const png = await renderMockup(t, shadeArt, sunArt, view);
       rows.push({ designId, kind: "mockup", template: t.id, view, key: await put("media", "png", png) });
-      if (t.height > t.width && !t.split) story = { ...story, [view]: png };
+      if (t.id === revealFrom) reveal[view] = png;
     }
   }
-  if (story.shade && story.sun) {
-    const mp4 = await revealVideo(story.shade, story.sun);
+  if (reveal.shade && reveal.sun) {
+    const mp4 = await revealVideo(reveal.shade, reveal.sun);
     rows.push({ designId, kind: "video", template: "reveal", view: "reveal", key: await put("media", "mp4", mp4) });
   }
 

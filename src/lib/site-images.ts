@@ -27,10 +27,17 @@ const INK =
   "at all. If the edge of a sunbeam or shadow crosses a shirt, the print is coloured on the sunlit side and grey on " +
   "the shaded side, and the change follows that light edge exactly. A print in bright indoor light that isn't " +
   "direct sun is still grey.";
+// Every shirt, worn, held, folded, on a machine or on a belt, is soft, light cotton: never stiff or board-like.
+const FABRIC =
+  "Every t-shirt in the image is thin, lightweight cotton jersey and behaves like it: it drapes, sags and wrinkles " +
+  "under its own weight, held shirts hang softly, shirts laid down lie relaxed with soft wrinkles and uneven edges, " +
+  "and folded shirts are soft, puffy bundles with rounded folds in slightly uneven stacks, never flat, stiff, " +
+  "rigid or paper-like.";
+
 const STYLE =
   "Photorealistic lifestyle photo in the same style, natural light and warm colour grading as the reference photos " +
   "from the Truecolors clothing brand. Use new people and new shirt designs: do not copy the people or prints in the " +
-  "references. " + INK + " No words, letters or watermarks anywhere in the image, apart from any logo or lettering " +
+  "references. " + INK + " " + FABRIC + " No words, letters or watermarks anywhere in the image, apart from any logo or lettering " +
   "the prompt asks for.";
 
 // What the shirts look like on the store: each one a different kind of design, never the same shape twice.
@@ -53,20 +60,6 @@ export type SiteImage = {
 };
 
 export const SITE_IMAGES: SiteImage[] = [
-  {
-    id: "wordmark",
-    size: "1536x1024",
-    refs: [LOGO],
-    cutout: true,
-    prompt:
-      "A logo lockup for Truecolors Design, the brand's design studio, on a pure solid black background. Top line: " +
-      "the Truecolors logo from the reference image reproduced exactly, same letterforms, same white italic serif " +
-      "\"true\" and the same diagonal-striped pink-to-orange-to-yellow gradient \"COLORS\". Directly underneath, " +
-      "centred and spanning the same width as the logo, the single word \"DESIGN\" in widely spaced, clean geometric " +
-      "capitals drawn as thin outline strokes, like line art: the strokes start white on the left and pick up the same " +
-      "pink-orange-yellow sunlight gradient towards the right, as if the sun is colouring them in. A thin gradient rule " +
-      "between the two lines. Flat vector logo, crisp edges, no shadow, no mockup, no other text, nothing else.",
-  },
   {
     id: "home-hero-sun",
     size: "1536x1024",
@@ -134,10 +127,12 @@ export const SITE_IMAGES: SiteImage[] = [
       "A professional screen-printing factory, wide shot. In the foreground, a big M&R-style automatic screen-printing " +
       "press: a 12-station carousel with a central hub, a ring of printing heads holding mesh screens, a heavy-duty " +
       "industrial steel frame, and red flash-cure units glowing orange-red between stations. Exactly two operators: " +
-      "one loads blank white tees onto the pallets on one side, and the other pulls finished printed tees off on the " +
-      "other side and lays them on the belt of a long conveyor dryer next to the press. Behind them: a wall rack of " +
-      "aluminium-framed mesh screens lined up side by side, pallets of blank tees in stock, and stacks of shipping " +
-      "boxes filled with folded printed shirts, taped and ready to go. The windows are blacked out and the hall is " +
+      "one loads blank white tees onto the pallets on one side, and the other stands at the entry of a long conveyor " +
+      "dryer next to the press, taking each printed tee off the press and laying it on the moving belt one at a time, " +
+      "perfectly flat, front up, in a single neat row with an even gap between shirts: nothing overlaps or bunches at " +
+      "the entry; only at the far exit do finished shirts gather. Behind them: a wall rack of aluminium-framed mesh " +
+      "screens lined up side by side, neat stacks of normal retail-folded tees (each about the size of a shoebox lid, " +
+      "in realistic proportion to the people), and shipping boxes, taped and ready to go. The windows are blacked out and the hall is " +
       "lit by warm amber UV-filtered lights, because UV-reactive ink must be kept out of sunlight. Both operators wear " +
       "black tees with the Truecolors logo from the last reference image printed small on the chest, reproduced " +
       "exactly. Every printed white tee shows grey line-art prints only, with no colour, because there is no sunlight.",
@@ -146,7 +141,7 @@ export const SITE_IMAGES: SiteImage[] = [
 
 export function sitePrompt(img: SiteImage): string {
   if (img.from || img.cutout) return img.prompt;
-  if (img.ownPrints) return `${img.prompt}\n\nPhotorealistic lifestyle photo with natural light and warm colour grading. ${INK}`;
+  if (img.ownPrints) return `${img.prompt}\n\nPhotorealistic lifestyle photo with natural light and warm colour grading. ${INK} ${FABRIC}`;
   return `${img.prompt}\n\n${STYLE}`;
 }
 

@@ -7,18 +7,19 @@ import { campaigns, designs, users } from "@/lib/db/schema";
 import { daysLeft, money } from "@/lib/format";
 import { FUNDING_GOAL, PRICE_CENTS } from "@/lib/rules";
 import { siteImageUrl } from "@/lib/site-images";
+import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const d = await db();
-  const live = await d
+  const live = await onShirts(await d
     .select({ c: campaigns, name: users.name, art: designs.compositeKey, lineArt: designs.lineArtKey })
     .from(campaigns)
     .innerJoin(users, eq(users.id, campaigns.userId))
     .innerJoin(designs, eq(designs.id, campaigns.designId))
-    .where(inArray(campaigns.status, ["live", "funded"]));
+    .where(inArray(campaigns.status, ["live", "funded"])), (x) => x.c.designId);
   const stats = await Promise.all(live.map((x) => campaignStats(x.c.id)));
   const steps = [
     { id: "step-design", title: "Designers create it", text: "Invited designers describe an idea or upload a sketch, and the AI studio turns it into print-ready colour-changing art." },

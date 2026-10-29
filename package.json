@@ -14,7 +14,9 @@
     "shopify:webhooks": "tsx scripts/register-webhooks.ts",
     "tick": "tsx scripts/tick.ts",
     "demo": "tsx --env-file=.env.local scripts/demo.ts",
-    "site:images": "tsx --env-file=.env.local scripts/site-images.ts"
+    "site:images": "tsx --env-file=.env.local scripts/site-images.ts",
+    "shirt:templates": "tsx --env-file=.env.local scripts/shirt-templates.ts",
+    "media:rebuild": "tsx --env-file=.env.local scripts/rebuild-media.ts"
   },
   "license": "ISC",
   "dependencies": {

@@ -52,9 +52,9 @@ describe("mockups and reveal video", () => {
       expect([meta.width, meta.height]).toEqual([t.width, t.height]);
       out[t.id] = png;
     }
-    const story = templates().find((t) => t.id === "flat-story")!;
-    const shade = await renderMockup(story, lineArt, sun, "shade");
-    const mp4 = await revealVideo(shade, out["flat-story"]);
+    const flat = templates().find((t) => t.id === "flat-square")!;
+    const shade = await renderMockup(flat, lineArt, sun, "shade");
+    const mp4 = await revealVideo(shade, out["flat-square"]);
     expect(mp4.subarray(4, 8).toString()).toBe("ftyp");
   });
 });

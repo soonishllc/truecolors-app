@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { COMPANY } from "./brand";
 import { config } from "./config";
 import { db } from "./db/client";
 import { emails } from "./db/schema";
@@ -8,7 +9,10 @@ import { emails } from "./db/schema";
 export async function sendEmail(input: { to: string; subject: string; body: string; key?: string }): Promise<boolean> {
   const { RESEND_API_KEY, EMAIL_FROM, APP_URL } = config();
   const d = await db();
-  const body = `${input.body}\n\n—\nTruecolors Design · ${APP_URL.replace(/^https?:\/\//, "")}`;
+  // Every email says who sent it, where we are, and how to stop emails (CAN-SPAM and the UAE PDPL).
+  const body =
+    `${input.body}\n\n—\nTruecolors Design · ${APP_URL.replace(/^https?:\/\//, "")}\n${COMPANY.name}, ${COMPANY.address}\n` +
+    `Don't want these emails? Reply "stop", or stop following designers at ${APP_URL}/me.`;
   const [row] = await d
     .insert(emails)
     .values({ key: input.key, to: input.to, subject: input.subject, body, provider: RESEND_API_KEY ? "resend" : "log" })

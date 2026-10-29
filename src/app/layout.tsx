@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Assistant, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Assistant, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
 import { Wordmark } from "@/components/Wordmark";
-import { BRAND } from "@/lib/brand";
+import { BRAND, COMPANY, CONTACT } from "@/lib/brand";
 import { config } from "@/lib/config";
 import "./globals.css";
 
@@ -11,6 +11,8 @@ import "./globals.css";
 const display = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-space-grotesk" });
 const body = Assistant({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-assistant" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-jetbrains-mono" });
+// Only for ".design" in the logo.
+const wordmark = Inter({ subsets: ["latin"], weight: ["300"], variable: "--font-wordmark" });
 
 export const metadata: Metadata = {
   title: BRAND,
@@ -20,7 +22,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${wordmark.variable}`}>
       <body>
         <header className="top">
           <Link href="/" className="brand" aria-label={BRAND}><Wordmark /></Link>
@@ -44,14 +46,42 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </header>
         <main>{children}</main>
         <footer className="foot">
-          <span><Wordmark /> · colour-shifting shirts, designed by our community</span>
-          <span className="foot-links">
-            <Link href="/explore">Explore</Link>
-            <Link href="/challenges">Challenges</Link>
-            <Link href="/me">My pre-orders</Link>
-            <Link href="/join">Designers: join with invite</Link>
-            <a href={config().SHOPIFY_STOREFRONT_URL}>Shop the store →</a>
-          </span>
+          <div className="foot-grid">
+            <div className="foot-brand">
+              <Wordmark />
+              <p>Shirts designed by our community that look grey in the shade and show their true colours in sunlight.</p>
+            </div>
+            <nav aria-label="Designs">
+              <h3>Designs</h3>
+              <Link href="/explore">Explore</Link>
+              <Link href="/challenges">Challenges</Link>
+              <Link href="/me">My pre-orders</Link>
+              <a href={config().SHOPIFY_STOREFRONT_URL}>Shop the store</a>
+            </nav>
+            <nav aria-label="Designers">
+              <h3>Designers</h3>
+              <Link href="/join">Join with invite</Link>
+              <Link href="/login">Log in</Link>
+              <Link href="/designer-agreement">Designer agreement</Link>
+            </nav>
+            <nav aria-label="Help">
+              <h3>Help</h3>
+              <Link href="/pre-orders">Pre-orders, shipping and returns</Link>
+              <Link href="/terms">Terms of use</Link>
+              <Link href="/privacy">Privacy policy</Link>
+            </nav>
+            <nav aria-label="Contact">
+              <h3>Contact</h3>
+              <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
+              <a href={CONTACT.whatsapp.href}>WhatsApp {CONTACT.whatsapp.label}</a>
+              <a href={CONTACT.instagram.href}>Instagram · {CONTACT.instagram.label}</a>
+              <a href={CONTACT.tiktok.href}>TikTok · {CONTACT.tiktok.label}</a>
+            </nav>
+          </div>
+          <div className="foot-legal">
+            <span>© {new Date().getFullYear()} {COMPANY.name}. All rights reserved.</span>
+            <span>{COMPANY.trademark}</span>
+          </div>
         </footer>
       </body>
     </html>

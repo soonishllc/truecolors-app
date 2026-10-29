@@ -282,6 +282,17 @@ async function chargePledges(items: Item[], amountCents: number | undefined, now
         nextChargeAt: new Date(now.getTime() + CHARGE_RETRY_EVERY_HOURS * HOUR),
       })
       .where(inArray(pledges.id, ids));
+    // Once per order, on the first failure, so the backer can sort out their card while we retry.
+    if (attempt === 1 && first.email) {
+      await sendEmail({
+        to: first.email, key: `charge-failed:${first.shopifyOrderId}`,
+        subject: `We couldn't charge your card for ${items[0].c.title}`,
+        body: `Good news: ${items[0].c.title} reached its goal and is going to print. We tried to charge the card you ` +
+          `used for order ${first.orderName}, but it didn't go through. We'll try again every ${CHARGE_RETRY_EVERY_HOURS} ` +
+          `hours for ${CHARGE_RETRY_HOURS / 24} days. If you've changed cards, reply to this email and we'll help, or your ` +
+          `pre-order will be cancelled and you won't be charged.`,
+      });
+    }
     return false;
   }
 
