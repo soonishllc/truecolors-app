@@ -84,7 +84,8 @@ export const SITE_IMAGES: SiteImage[] = [
     prompt:
       "The same photo: keep the person, pose, framing, camera angle and background exactly the same. Only change " +
       "this: the person is now standing completely inside the cool shadow of the café awning, so no direct sunlight " +
-      "touches them, and the print on their tee shows only its grey and black line art with no colour at all. The " +
+      "touches them, the print on their tee shows only its grey and black line art with no colour at all, and they " +
+      "have pushed the same sunglasses up to rest on top of their head, so their eyes are now visible. The " +
       "beach and palm trees behind them are still sunny. Photorealistic, no text.",
   },
   {
