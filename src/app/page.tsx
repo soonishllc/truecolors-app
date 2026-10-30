@@ -1,6 +1,7 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { HeroReveal } from "@/components/HeroReveal";
+import { TileSweep } from "@/components/TileSweep";
 import { campaignStats } from "@/lib/campaigns/service";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, users } from "@/lib/db/schema";
@@ -59,12 +60,13 @@ export default async function Home() {
       </div>
       {live.length === 0 && <p className="muted">No live campaigns right now. Check back soon.</p>}
       <div className="grid home-grid">
-        {live.map(({ c, name, art, lineArt }, i) => (
+        {live.map(({ c, name, art, lineArt, sweep }, i) => (
           <Link key={c.id} href={`/c/${c.slug}`} className="tile">
             {art && (
               <div className="tile-art">
                 {lineArt && <img className="art" src={fileUrl(lineArt)} alt="" />}
                 <img className="art tile-sun" src={fileUrl(art)} alt="" />
+                {sweep && <TileSweep src={fileUrl(sweep)} />}
               </div>
             )}
             <div>

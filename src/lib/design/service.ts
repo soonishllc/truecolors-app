@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, ne, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { colourPrompt, lineArtPrompt, preset, promptFlags, refinePrompt, sketchPrompt } from "../ai/presets";
 import { imageProvider } from "../ai/provider";
@@ -181,6 +181,7 @@ export async function renderMedia(userId: string, designId: string) {
   }
 
   const d = await db();
-  await d.delete(media).where(eq(media.designId, designId));
+  // Sweep clips show the same artwork, so they survive a re-render; new artwork clears them with everything else.
+  await d.delete(media).where(and(eq(media.designId, designId), ne(media.kind, "sweep")));
   await d.insert(media).values(rows);
 }

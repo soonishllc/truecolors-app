@@ -512,3 +512,7 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .sticky-buy .countdown { font-size: 11px; }
   .sticky-buy .button { background: var(--sun); border-color: transparent; color: #fff; padding: 11px 22px; flex: none; }
 }
+
+/* Sun-sweep clip over a tile: fades in once it's playing, holds on the full-colour last frame. */
+.tile-sweep { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; z-index: 1; }
+.tile-sweep.on { opacity: 1; }

@@ -7,6 +7,7 @@ import { daysLeft } from "@/lib/format";
 import { listChallenges, phase } from "@/lib/challenges";
 import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
+import { TileSweep } from "@/components/TileSweep";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Explore designs · Truecolors Design" };
@@ -88,7 +89,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
         <p className="muted">{term ? `Nothing matches “${term}”.` : show === "live" ? "No live campaigns right now. Check back soon." : "Nothing here yet."}</p>
       )}
       <div className="grid explore-grid">
-        {rows.map(({ c, designer, handle, lineArt, art, backed }) => {
+        {rows.map(({ c, designer, handle, lineArt, art, sweep, backed }) => {
           const days = daysLeft(c.endsAt);
           const pct = Math.min(100, (backed / c.goal) * 100);
           return (
@@ -96,6 +97,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
               <Link href={`/c/${c.slug}`} className="tile-art">
                 {lineArt && <img className="art" src={fileUrl(lineArt)} alt="" />}
                 {art && <img className="art tile-sun" src={fileUrl(art)} alt={c.title} />}
+                {sweep && <TileSweep src={fileUrl(sweep)} />}
                 {c.status === "live" && days <= 3 && <span className="corner-badge">Ends in {days}d</span>}
                 {c.editionSize && <span className="corner-badge">Edition of {c.editionSize}</span>}
               </Link>

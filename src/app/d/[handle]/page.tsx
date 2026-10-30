@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { waitlistAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { ProviderIcon } from "@/components/SocialButtons";
+import { TileSweep } from "@/components/TileSweep";
 import { campaignStats } from "@/lib/campaigns/service";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, identities, users } from "@/lib/db/schema";
@@ -79,11 +80,12 @@ export default async function DesignerPage({ params }: { params: Promise<{ handl
       <h2>Designs</h2>
       {list.length === 0 && <p className="muted">No designs launched yet. Follow to hear about the first one.</p>}
       <div className="grid">
-        {list.map(({ c, lineArt, art }, i) => (
+        {list.map(({ c, lineArt, art, sweep }, i) => (
           <Link key={c.id} href={`/c/${c.slug}`} className="tile">
             <div className="tile-art">
               {lineArt && <img className="art" src={fileUrl(lineArt)} alt="" />}
               {art && <img className="art tile-sun" src={fileUrl(art)} alt="" />}
+              {sweep && <TileSweep src={fileUrl(sweep)} />}
             </div>
             <div className="name">{c.title}</div>
             <div className="meta">

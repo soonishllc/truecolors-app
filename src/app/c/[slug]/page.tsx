@@ -8,6 +8,7 @@ import { Countdown } from "@/components/Countdown";
 import { ShadeSun } from "@/components/ShadeSun";
 import { ShareKit } from "@/components/ShareKit";
 import { StickyBuy } from "@/components/StickyBuy";
+import { TileSweep } from "@/components/TileSweep";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
@@ -66,6 +67,7 @@ export default async function CampaignPage({
   const referrals = fan && (await referralStats(fan));
   const video = files.find((m) => m.kind === "video");
   const mockups = files.filter((m) => m.kind === "mockup");
+  const sweep = files.find((m) => m.kind === "sweep");
   const pairShade = mockups.find((m) => m.template === "flat-square" && m.view === "shade");
   const pairSun = mockups.find((m) => m.template === "flat-square" && m.view === "sun");
   const target = nextStretch(stats.pledged, c.goal, c.stretchGoals) ?? stats.pledged;
@@ -84,7 +86,14 @@ export default async function CampaignPage({
   return (
     <>
       <div className="pair">
-        <div>{video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline /> : null}</div>
+        <div>
+          {sweep && pairShade ? (
+            <div className="tile-art hero-sweep">
+              <img className="art" src={fileUrl(pairShade.key)} alt={c.title} />
+              <TileSweep src={fileUrl(sweep.key)} inView />
+            </div>
+          ) : video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline /> : null}
+        </div>
         <div>
           <div className="eyebrow">{missed ? "Campaign ended" : "Pre-order campaign"}</div>
           <h1>{c.title}</h1>

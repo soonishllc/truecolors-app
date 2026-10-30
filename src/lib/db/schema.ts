@@ -103,7 +103,8 @@ export const generations = pgTable("generations", {
 export const media = pgTable("media", {
   id: id(),
   designId: uuid("design_id").notNull().references(() => designs.id),
-  kind: text("kind").$type<"mockup" | "video">().notNull(),
+  // "sweep": a short clip of sunlight crossing the flat-lay shirt, made outside the app (scripts/add-sweep.ts).
+  kind: text("kind").$type<"mockup" | "video" | "sweep">().notNull(),
   template: text("template").notNull(),
   view: text("view").$type<"shade" | "sun" | "reveal">().notNull(),
   key: text("key").notNull(),
