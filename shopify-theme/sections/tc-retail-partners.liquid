@@ -124,6 +124,11 @@
   .tcp-photo { display: block; width: 100%; height: auto; aspect-ratio: 2 / 3; object-fit: cover; transition: transform .6s ease; }
   .tcp-unit:hover .tcp-photo { transform: scale(1.03); }
   .tcp-unit-art { overflow: hidden; }
+  /* Press-for-sun clip: fades in over the render on hover (or when it scrolls into view on touch screens). */
+  .tcp-clip { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #dcdad7; opacity: 0; transition: opacity .45s ease; pointer-events: none; }
+  .tcp-unit.playing .tcp-clip { opacity: 1; }
+  .tcp-clip-hint { position: absolute; right: 14px; bottom: 14px; z-index: 2; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(35, 34, 32, .82); color: #fff; font: 500 13px var(--display); cursor: pointer; transition: opacity .3s ease; }
+  .tcp-unit.playing .tcp-clip-hint { opacity: 0; }
   .tcp-tag { position: absolute; top: 16px; left: 16px; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--dark); color: var(--dark-ink); padding: 5px 9px; border-radius: 2px; }
   .tcp-unit-body { padding: 24px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
   .tcp-unit-body > p { color: var(--muted); font-size: 16px; }
@@ -258,7 +263,8 @@
         <p class="tcp-lede">Every display has a working sun. Choose the one that fits your floor plan, or mix them across several outlets.</p>
       </div>
 
-      <div class="tcp-3d" data-tcp-viewer data-start="prism"
+      {%- assign tcp_screen = section.settings.screen_video.sources | where: 'mime_type', 'video/mp4' | first -%}
+      <div class="tcp-3d" data-tcp-viewer data-start="prism" data-screen="{{ tcp_screen.url }}"
         data-logo="{{ 'tc-logo.png' | asset_url }}"
         data-designs='{
           "habibi": { "sun": "{{ 'tc-flat-habibi-sun.jpg' | asset_url }}", "shade": "{{ 'tc-flat-habibi-shade.jpg' | asset_url }}" },
@@ -298,6 +304,8 @@
             {%- else -%}
               <img class="tcp-photo" src="{{ 'tc-display-tower.jpg' | asset_url }}" alt="Tower display with dimensions: stock by size on the front and a UV-lit gallery of ten designs on the side" width="800" height="1200" loading="lazy">
             {%- endif -%}
+            {%- assign tcp_clip = section.settings.tower_clip.sources | where: 'mime_type', 'video/mp4' | first -%}
+            {%- if tcp_clip -%}<video class="tcp-clip" muted playsinline preload="none" src="{{ tcp_clip.url }}" aria-hidden="true"></video><button type="button" class="tcp-clip-hint">☀ Press for sun</button>{%- endif -%}
           </div>
           <div class="tcp-unit-body">
             <h3>Tower</h3>
@@ -327,6 +335,8 @@
             {%- else -%}
               <img class="tcp-photo" src="{{ 'tc-display-sunbox.jpg' | asset_url }}" alt="Sunbox countertop display with dimensions: one Truecolors tee in a UV-lit window, with a Press for sun button" width="800" height="1200" loading="lazy">
             {%- endif -%}
+            {%- assign tcp_clip = section.settings.sunbox_clip.sources | where: 'mime_type', 'video/mp4' | first -%}
+            {%- if tcp_clip -%}<video class="tcp-clip" muted playsinline preload="none" src="{{ tcp_clip.url }}" aria-hidden="true"></video><button type="button" class="tcp-clip-hint">☀ Press for sun</button>{%- endif -%}
           </div>
           <div class="tcp-unit-body">
             <h3>Sunbox</h3>
@@ -349,6 +359,8 @@
             {%- else -%}
               <img class="tcp-photo" src="{{ 'tc-display-prism.jpg' | asset_url }}" alt="Prism three-sided display with dimensions: a screen on one face and a UV-lit demo tee on the next" width="800" height="1200" loading="lazy">
             {%- endif -%}
+            {%- assign tcp_clip = section.settings.prism_clip.sources | where: 'mime_type', 'video/mp4' | first -%}
+            {%- if tcp_clip -%}<video class="tcp-clip" muted playsinline preload="none" src="{{ tcp_clip.url }}" aria-hidden="true"></video><button type="button" class="tcp-clip-hint">☀ Press for sun</button>{%- endif -%}
           </div>
           <div class="tcp-unit-body">
             <h3>Prism</h3>
@@ -420,8 +432,9 @@
           </div>
         </div>
         <figure class="tcp-film">
-          {%- if section.settings.hero_video != blank -%}
-            {{ section.settings.hero_video | video_tag: autoplay: true, loop: true, muted: true, controls: false, playsinline: true, image_size: '720x', alt: 'A guest walks out of a boutique into the sun and their Truecolors tee colours up' }}
+          {%- assign tcp_walk = section.settings.walk_video.sources | where: 'mime_type', 'video/mp4' | first -%}
+          {%- if tcp_walk -%}
+            <video autoplay muted loop playsinline preload="metadata" poster="{{ 'tc-hero-shade.jpg' | asset_url }}" src="{{ tcp_walk.url }}" aria-label="A guest walks out of a boutique into the sun and his Truecolors tee colours up"></video>
           {%- else -%}
             {%- comment -%} Living photo: the same doorway in shade and in sun; the sunlight climbs the shirt and fades, on a loop. {%- endcomment -%}
             <img src="{{ 'tc-hero-shade.jpg' | asset_url }}" alt="A guest walks out of a boutique wearing the Fuhgeddaboudit tee; behind him the Truecolors Tower display" width="720" height="1280">
@@ -504,6 +517,28 @@
     }, { threshold: 0.5 });
     io.observe(box);
   })();
+
+  (function () {
+    // Press-for-sun clips: play from the start on hover or tap; on touch screens, once as the card scrolls into view.
+    var touch = matchMedia('(hover: none)').matches;
+    document.querySelectorAll('.tcp-unit').forEach(function (card) {
+      var v = card.querySelector('.tcp-clip');
+      if (!v) return;
+      var hide, pinned = false;
+      function play() { clearTimeout(hide); card.classList.add('playing'); v.currentTime = 0; v.play().catch(function () {}); }
+      function stop() { pinned = false; card.classList.remove('playing'); v.pause(); }
+      v.addEventListener('ended', function () { hide = setTimeout(stop, 1500); });
+      // A click plays the clip through; a hover plays only while the pointer stays on the card.
+      card.querySelector('.tcp-clip-hint').addEventListener('click', function () { pinned = true; play(); });
+      if (!touch) {
+        card.addEventListener('mouseenter', function () { if (!pinned) play(); });
+        card.addEventListener('mouseleave', function () { if (!pinned) stop(); });
+        return;
+      }
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); play(); } }, { threshold: 0.6 });
+      io.observe(card);
+    });
+  })();
 </script>
 
 {% schema %}
@@ -512,7 +547,11 @@
   "tag": "section",
   "class": "tcp-section",
   "settings": [
-    { "type": "video", "id": "hero_video", "label": "Walk-out video (§05)", "info": "Optional portrait 9:16 clip. Without it §05 shows the shade-to-sun photo loop." },
+    { "type": "video", "id": "walk_video", "label": "Walk-out video (§05)", "info": "walk-video.mp4. Without it §05 shows the shade-to-sun photo loop." },
+    { "type": "video", "id": "screen_video", "label": "Prism screen loop (3D viewer)", "info": "screen-video.mp4. Without it the 3D screen draws its own sweep." },
+    { "type": "video", "id": "sunbox_clip", "label": "Sunbox press-for-sun clip", "info": "sunbox-clip.mp4, plays over the card render." },
+    { "type": "video", "id": "prism_clip", "label": "Prism press-for-sun clip", "info": "prism-clip.mp4, plays over the card render." },
+    { "type": "video", "id": "tower_clip", "label": "Tower press-for-sun clip", "info": "tower-clip.mp4, plays over the card render." },
     { "type": "image_picker", "id": "sunbox_image", "label": "Sunbox render", "info": "Optional. Overrides the theme asset tc-display-sunbox.jpg (2:3 portrait)." },
     { "type": "image_picker", "id": "prism_image", "label": "Prism render", "info": "Optional. Overrides the theme asset tc-display-prism.jpg (2:3 portrait)." },
     { "type": "image_picker", "id": "tower_image", "label": "Tower render", "info": "Optional. Overrides the theme asset tc-display-tower.jpg (2:3 portrait)." }

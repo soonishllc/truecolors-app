@@ -19,6 +19,20 @@ def asset(m):
     f = theme / "assets" / m.group(1)
     return f"../shopify-theme/assets/{m.group(1)}?v={int(f.stat().st_mtime)}" if f.exists() else STORE_ASSETS + m.group(1)
 src = re.sub(r"\{\{ '([^']+)' \| asset_url \}\}", asset, src)
+# Video settings: the preview stands in local files from shopify-theme/files/ (walk_video -> walk-video.mp4).
+def video_url(setting):
+    f = theme / "files" / (setting.replace("_", "-") + ".mp4")
+    return f"../shopify-theme/files/{f.name}?v={int(f.stat().st_mtime)}" if f.exists() else ""
+def resolve_video(m):
+    var, setting, rest = m.group(1), m.group(2), m.group(3)
+    url = video_url(setting)
+    def branch(b):
+        yes, _, no = b.group(1).partition("{%- else -%}")
+        return yes.replace("{{ %s.url }}" % var, url) if url else no
+    rest = re.sub(r"\{%%- if %s -%%\}(.*?)\{%%- endif -%%\}" % var, branch, rest, count=1, flags=re.S)
+    return rest.replace("{{ %s.url }}" % var, url)
+src = re.sub(r"\{%- assign (\w+) = section\.settings\.(\w+)\.sources \| where: 'mime_type', 'video/mp4' \| first -%\}(.*?)(?=\{%- assign \w+ = section\.settings|\Z)",
+             resolve_video, src, flags=re.S)
 # Nothing is uploaded in the preview: keep each setting's theme-asset fallback.
 src = re.sub(r"\{%- if section\.settings\.\w+ != blank -%\}.*?\{%- else -%\}(.*?)\{%- endif -%\}", r"\1", src, flags=re.S)
 if "{%" in src or "{{" in src:

@@ -257,7 +257,8 @@ async function start(root) {
     const g = new THREE.Group();
     const screenCanvas = document.createElement('canvas');
     screenCanvas.width = 540; screenCanvas.height = 960;
-    screenTex = new THREE.CanvasTexture(screenCanvas);
+    // The screen plays the screen-loop video when the page provides one, else draws its own sweep on a canvas.
+    screenTex = screenVideo ? new THREE.VideoTexture(screenVideo) : new THREE.CanvasTexture(screenCanvas);
     screenTex.colorSpace = THREE.SRGBColorSpace;
     screenTex.userData.canvas = screenCanvas;
     for (let k = 0; k < 3; k++) {
@@ -389,6 +390,9 @@ async function start(root) {
   }
 
   const builders = { sunbox, prism, tower };
+  const screenVideo = root.dataset.screen ? Object.assign(document.createElement('video'), {
+    src: root.dataset.screen, muted: true, loop: true, playsInline: true, crossOrigin: 'anonymous' }) : null;
+  screenVideo?.play().catch(() => {});
   let current = null;
 
   function show(name) {
@@ -482,7 +486,7 @@ async function start(root) {
       st.led.emissiveIntensity = 0.05 + (st.target ? 1 : st.level) * 3.2;
       st.uv.intensity = st.level * st.uvMax;
     }
-    if (screenTex) drawScreen(now);
+    if (screenTex && !screenVideo) drawScreen(now);
     controls.update();
     renderer.render(scene, camera);
   }
