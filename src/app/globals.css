@@ -483,3 +483,32 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 .legal li { margin: 6px 0; }
 .legal code { font-family: var(--font-jetbrains-mono), monospace; font-size: 13px; }
 .legal-nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line, #e6e2da); font-size: 14px; }
+
+/* ---- Campaign buy box: countdown, promises, garment details, phone buy bar ---- */
+.countdown.urgent { color: #e8762a; font-weight: 600; }
+.to-go { font-weight: 600; }
+.promise { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; font-size: 14px; }
+.promise li { position: relative; padding-left: 24px; color: var(--muted); }
+.promise li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--good); font-weight: 700; }
+.promise b { color: var(--ink); font-weight: 600; }
+.garment { margin-top: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 14px; }
+.garment summary { cursor: pointer; padding: 12px 0; font-weight: 500; list-style: none; display: flex; justify-content: space-between; }
+.garment summary::-webkit-details-marker { display: none; }
+.garment summary::after { content: "+"; font-size: 18px; line-height: 1; color: var(--muted); }
+.garment[open] summary::after { content: "–"; }
+.garment ul { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--muted); }
+.garment b { display: block; color: var(--ink); font-weight: 600; }
+.garment + .share-buttons { margin-top: 18px; }
+.size-chart { width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 13px; }
+.size-chart th, .size-chart td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+.size-chart th:first-child { text-align: left; }
+.sticky-buy { display: none; }
+@media (max-width: 720px) {
+  .sticky-buy { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--dark); color: var(--dark-ink); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3); transform: translateY(110%); transition: transform 0.25s ease; }
+  .sticky-buy.on { transform: none; }
+  body:has(.sticky-buy) .foot { padding-bottom: 96px; }
+  .sticky-buy > div { display: grid; gap: 2px; min-width: 0; }
+  .sticky-buy .small { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sticky-buy .countdown { font-size: 11px; }
+  .sticky-buy .button { background: var(--sun); border-color: transparent; color: #fff; padding: 11px 22px; flex: none; }
+}

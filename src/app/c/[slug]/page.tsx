@@ -4,15 +4,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fanEmailAction, waitlistAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { Countdown } from "@/components/Countdown";
 import { ShadeSun } from "@/components/ShadeSun";
 import { ShareKit } from "@/components/ShareKit";
+import { StickyBuy } from "@/components/StickyBuy";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, media, pledges, users } from "@/lib/db/schema";
 import { campaignTarget, currentFan, designerTarget, referralStats, waitlistCount } from "@/lib/fans";
-import { ago, daysLeft, money, nextStretch } from "@/lib/format";
-import { REFERRALS_PER_REWARD, STRETCH_REWARDS } from "@/lib/rules";
+import { ago, money, nextStretch } from "@/lib/format";
+import { GARMENT, REFERRALS_PER_REWARD, RETURN_WINDOW_DAYS, SIZES, STRETCH_REWARDS } from "@/lib/rules";
 import { productUrl } from "@/lib/shopify/campaigns";
 import { fileUrl } from "@/lib/storage";
 
@@ -72,7 +74,8 @@ export default async function CampaignPage({
   const open = c.status === "live";
   const missed = c.status === "missed";
   const goals = [c.goal, ...c.stretchGoals];
-  const days = daysLeft(c.endsAt);
+  const toGo = c.goal - stats.pledged;
+  const buyUrl = c.shopifyHandle ? productUrl(c.shopifyHandle, ref) : undefined;
   // Shares keep whichever link brought this visitor, so the designer or fan still gets the credit.
   const shareUrl = `${pageUrl}?ref=${ref}`;
   const share = encodeURIComponent(`${c.title}: a shirt that changes colour in the sun ${shareUrl}`);
@@ -107,18 +110,44 @@ export default async function CampaignPage({
               <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
               <p>
                 <strong>{stats.pledged} of {target}</strong> pre-orders
-                {open && <> · <span className="countdown">{days} day{days === 1 ? "" : "s"} left</span></>}
+                {open && !c.fundedAt && toGo > 0 && <> · <span className="to-go">{toGo} to go</span></>}
+                {open && c.endsAt && <> · <Countdown endsAt={c.endsAt.toISOString()} /></>}
                 {c.fundedAt && <> · <span className="good">Funded, going to print</span></>}
               </p>
-              {open && (c.shopifyHandle
-                ? <a className="button" href={productUrl(c.shopifyHandle, ref)}>Pre-order now</a>
-                // Launch always creates the store product, so only seeded demo campaigns land here.
-                : <><span className="button" aria-disabled="true">Pre-order now</span>
-                  <p className="small muted">Checkout opens once this campaign is linked to the store.</p></>)}
-              <p className="small muted">
-                You&apos;re only charged once this design reaches {c.goal} pre-orders. If it doesn&apos;t, nobody pays. Shirts
-                ship about 3–4 weeks after the campaign closes.
-              </p>
+              <div id="buy">
+                {open && (buyUrl
+                  ? <a className="button" href={buyUrl}>Pre-order now</a>
+                  // Launch always creates the store product, so only seeded demo campaigns land here.
+                  : <><span className="button" aria-disabled="true">Pre-order now</span>
+                    <p className="small muted">Checkout opens once this campaign is linked to the store.</p></>)}
+              </div>
+              <ul className="promise">
+                {c.fundedAt
+                  ? <li><b>Funded.</b> Pre-orders are charged now and go straight to print.</li>
+                  : <li><b>No risk.</b> You&apos;re only charged if it reaches {c.goal}. If it doesn&apos;t, nobody pays.</li>}
+                <li><b>Numbered edition.</b> Ships about 3–4 weeks after the campaign closes, with tracking.</li>
+                <li><b>Returns.</b> Within {RETURN_WINDOW_DAYS} days of delivery. <Link href="/pre-orders">How pre-orders work</Link></li>
+              </ul>
+              <details className="garment">
+                <summary>Size, fabric &amp; care</summary>
+                <ul>
+                  <li><b>Sizes</b> {SIZES.join(", ")}, unisex.</li>
+                  {GARMENT.fabric && <li><b>Fabric</b> {GARMENT.fabric}</li>}
+                  {GARMENT.fit && <li><b>Fit</b> {GARMENT.fit}</li>}
+                  <li><b>The colour change</b> Grey line art indoors and in shade. In direct sun the print turns full colour in seconds, and fades back once you&apos;re out of the sun. On cloudy days it still changes, just lighter; most glass blocks the UV.</li>
+                  <li><b>Care</b> Wash inside out in cold water and hang to dry out of direct sun. Don&apos;t bleach, tumble dry or iron the print.</li>
+                </ul>
+                {GARMENT.sizeChart && (
+                  <table className="size-chart">
+                    <thead><tr><th>Size</th>{SIZES.map((s) => <th key={s}>{s}</th>)}</tr></thead>
+                    <tbody>
+                      {GARMENT.sizeChart.map((row) => (
+                        <tr key={row.label}><th>{row.label}</th>{SIZES.map((s) => <td key={s}>{row[s]}</td>)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </details>
               <div className="share-buttons">
                 <a className="chip" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${share}`}>WhatsApp</a>
                 <a className="chip" target="_blank" rel="noreferrer" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}>Facebook</a>
@@ -221,6 +250,12 @@ export default async function CampaignPage({
           <input name="email" type="email" required placeholder="you@example.com" aria-label="Email" />
         </ActionForm>
       </section>
+
+      {open && (
+        <StickyBuy watch="buy" href={buyUrl} price={money(c.priceCents, c.currency)} progress={`${stats.pledged} of ${target}`}>
+          {c.endsAt && <Countdown endsAt={c.endsAt.toISOString()} />}
+        </StickyBuy>
+      )}
     </>
   );
 }

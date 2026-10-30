@@ -3,6 +3,14 @@
 export const SIZES = ["S", "M", "L", "XL"] as const;
 export type Size = (typeof SIZES)[number];
 
+// Shown under "Size, fabric & care" on campaign pages. Each line is hidden until it's filled in, so only
+// confirmed details from the blank-tee supplier go live. Size chart rows: { label: "Chest (in)", S: "36", ... }.
+export const GARMENT: {
+  fabric?: string;
+  fit?: string;
+  sizeChart?: ({ label: string } & Record<Size, string>)[];
+} = {};
+
 export const MARKET = "US" as const;
 export const CURRENCY = "USD" as const;
 
