@@ -276,8 +276,11 @@ async function start(root) {
       } else {
         const dname = k === 1 ? 'habibi' : 'newyork';
         const st = demoWindow(f, 0, mm(800), mm(420), mm(560), mm(80), [{ design: dname, w: mm(440), h: mm(440), y: -mm(10) }]);
-        button(f, st, 0, mm(700));
-        f.add(plane(mm(200), mm(36), lit(textTex(200, 36, [{ text: 'PRESS FOR SUN', y: 0.5, size: 0.075, font: '"JetBrains Mono", monospace', color: '#d8d4cd' }]), 0.8), 0, mm(640), 0.0008));
+        // Button beside the window at its mid-height (1080 mm): natural reach, out of kicking range.
+        button(f, st, mm(255), mm(1080));
+        const lbl = plane(mm(200), mm(36), lit(textTex(200, 36, [{ text: 'PRESS FOR SUN', y: 0.5, size: 0.075, font: '"JetBrains Mono", monospace', color: '#d8d4cd' }]), 0.8), mm(255), mm(1080) - mm(140), 0.0008);
+        lbl.rotation.z = Math.PI / 2;
+        f.add(lbl);
         f.add(plane(mm(460), mm(240), lit(textTex(460, 240, [
           { text: k === 1 ? 'HABIBI' : "FUHGEDDABOUD'IT", y: 0.36, size: k === 1 ? 0.12 : 0.085, weight: 500 },
           { text: 'GREY IN THE SHADE · COLOUR IN THE SUN', y: 0.66, size: 0.036, font: '"JetBrains Mono", monospace', color: '#a49f97' }]), 0.75), 0, mm(390), 0.0008));
@@ -319,6 +322,7 @@ async function start(root) {
       cubbies.push({ row: r, x: mm(-508 + SIDE + c * (cw + 18) + cw / 2), y: mm(118 + r * 216), w: mm(cw), h: mm(198) });
     }
     // Front and back are the same stock face: header, S–XL rail and 28 openings into through-cubbies.
+    let frontFace;
     [1, -1].forEach((dir) => {
       const f = new THREE.Group();
       f.position.z = dir * D / 2;
@@ -329,6 +333,7 @@ async function start(root) {
       f.add(plane(mm(1016 - 2 * SIDE), mm(40), lit(textTex(1016 - 2 * SIDE, 40, ['S', 'M', 'L', 'XL'].map((t, i) => (
         { text: t, x: (i * (cw + 18) + cw / 2) / (1016 - 2 * SIDE), y: 0.5, size: 0.017, font: '"JetBrains Mono", monospace', color: '#d8d4cd' })), '#1b1a18'), 0.8), 0, mm(1650), 0.0008));
       g.add(f);
+      if (dir > 0) frontFace = f;
     });
     // Through-cubbies: open both ends, with a low lip in the middle so each side keeps its own stack.
     const tubeD = D - 2 * T;
@@ -379,8 +384,12 @@ async function start(root) {
       header(side, D, H, mm(129));
       side.add(plane(D, mm(100), M.plinth, 0, mm(50), 0.0008));
       const st = demoWindow(side, gal.x, gal.y, gal.w, gal.h, gal.d, [{ design: 'gallery', w: gal.w, h: gal.h }]);
-      button(side, st, 0, mm(400));
-      side.add(plane(mm(200), mm(36), lit(textTex(200, 36, [{ text: 'PRESS FOR SUN', y: 0.5, size: 0.075, font: '"JetBrains Mono", monospace', color: '#d8d4cd' }]), 0.8), 0, mm(340), 0.0008));
+      // Its button: on the front corner post next to this gallery, at 1050 mm (natural reach, not kick height).
+      const bx = sideSign * mm(508 - 35);
+      button(frontFace, st, bx, mm(1050));
+      const lbl = plane(mm(200), mm(36), lit(textTex(200, 36, [{ text: 'PRESS FOR SUN', y: 0.5, size: 0.075, font: '"JetBrains Mono", monospace', color: '#d8d4cd' }]), 0.8), bx, mm(1050) - mm(140), 0.0008);
+      lbl.rotation.z = Math.PI / 2;
+      frontFace.add(lbl);
       g.add(side);
     });
     const sh = shell(W, H, D - 2 * T, false, false);

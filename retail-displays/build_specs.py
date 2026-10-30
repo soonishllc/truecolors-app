@@ -257,15 +257,14 @@ def draw_prism():
     pl.sun_strip(0, 1646, 600, 4)
     pl.rect(90, 800, 420, 560, fill=GLASS, stroke=colors.HexColor("#55534f"), sw=1.2)
     pl.tee(300, 1080, 360, 470)
-    pl.circle(300, 700, 15, fill=SUN[2], stroke=None)
-    pl.circle(300, 700, 8, fill=colors.HexColor("#ffd36b"), stroke=None)
-    pl.text(300, 640, "PRESS FOR SUN", size=4.6, color=OFF)
+    pl.circle(555, 1080, 15, fill=SUN[2], stroke=None)
+    pl.circle(555, 1080, 8, fill=colors.HexColor("#ffd36b"), stroke=None)
     pl.rect(70, 160, 460, 400, fill=None, stroke=colors.HexColor("#55534f"), dash=[3, 2])
     pl.text(300, 360, "DESIGN NAME PANEL", size=4.6, color=OFF)
     pl.dim_h(90, 510, -90, "420 aperture")
     pl.dim_v(800, 1360, 640, "560", side=-1)
     pl.dim_v(0, 800, 640, "800", side=-1)
-    pl.dim_v(0, 700, 760, "700 ⌀ btn", side=-1)
+    pl.dim_v(0, 1080, 760, "1080 ⌀ btn", side=-1)
 
     # Plan
     pl.at(400, 300, 0.15)
@@ -309,6 +308,9 @@ def draw_tower():
     pl.dim_h(0, w, -120, "1016")
     pl.dim_v(0, h, -100, "1829")
     pl.dim_v(118, 316, w + 60, "198", side=-1)
+    for bx in (side / 2, w - side / 2):
+        pl.circle(bx, 1050, 15, fill=SUN[2], stroke=None)
+    pl.callout(w - side / 2, 1050, w + 60, 1250, "Button 1050 AFF")
     pl.dim_h(side, side + cw, 70, f"{cw:.0f}")
 
     pl.at(320, 40, s)
@@ -321,13 +323,11 @@ def draw_tower():
     for r in range(5):
         for c in range(2):
             pl.tee(gx + 122 + c * 226, gy + gh - 120 - r * 228, 190, 200)
-    pl.circle(d / 2, 400, 18, fill=SUN[2], stroke=None)
     pl.dim_h(0, d, -120, "559")
     pl.dim_v(gy, gy + gh, d + 50, "1140", side=-1)
     pl.dim_h(gx, gx + gw, gy - 60, "470")
     pl.callout(gx + gw - 10, gy + gh - 40, d + 150, 1600, "UV-filter glazing, hinged")
     pl.callout(gx + 10, gy + 600, d + 150, 1150, "10 face-out tees, 60 deep")
-    pl.callout(d / 2, 400, d + 150, 420, "Press for sun, 400 AFF")
     return pl.d
 
 
@@ -552,7 +552,7 @@ def build():
         "Ships as two modules: body (0–1646) and crown (1646–1850), located with dowels and fixed with M8 bolts from inside. The crown has a plug-and-socket for the header LEDs.",
         "Face A: screen on a VESA 200 × 200 bracket fixed to the spine; cut the aperture to the chosen screen's bezel +2 mm. The lower graphic panel (300–770) is the lockable access door to the electronics bay (PSU, strip, timers).",
         "Faces B and C: the glazing frame (420 × 560 aperture, 5 mm UV-filter acrylic) is hinged on one side with a cam lock and interlock on the other. Shirt board sits ~80 mm behind the glazing on spine brackets. Use an adult S/M tee with sleeves folded behind, or a youth L laid flat.",
-        "Buttons at 700 mm above floor (within accessible reach range). Screen centre at about 1240 mm (eye level).",
+        "Each demo face has its button in the 90 mm margin beside the window, centred at 1080 mm above floor: natural reach, and well above kicking height. Screen centre at about 1240 mm (eye level).",
         "Vent the screen bay at the top of face A and through the crown. Mass target 80–90 kg."])
     s += [P("Prism bill of materials (per unit)", h3),
           table([["Qty", "Item", "Specification", "Est. USD"],
@@ -588,7 +588,7 @@ def build():
         "Carcass 18 mm MR MDF, 1016 × 559 × 1829, open front and back. Four columns (S, M, L, XL) by seven rows of through-cubbies, clear about 206 × 198 × 523, with a 22 mm high centre lip on each shelf so the front and back stacks stay separate; 70 mm side zones house the galleries.",
         "Front and back faces are identical: header lightbox, S–XL label rail, 28 openings. Place as an island, or against a wall (restock from the front; the back openings simply face the wall).",
         "Side galleries (both sides): aperture 470 × 1140 at 520–1660, 60 mm deep, off-white back. Ten folded tees face-out on 2 × 5 clear acrylic ledges (about 200 × 210 each).",
-        "Each gallery: 5 mm UV-filter acrylic in a hinged frame (piano hinge, cam lock, interlock), UV-A strips down both long edges, one Ø30 button at 400 mm above floor with its own timer.",
+        "Each gallery: 5 mm UV-filter acrylic in a hinged frame (piano hinge, cam lock, interlock), UV-A strips down both long edges, its own timer, and one Ø30 button on the front corner post beside the gallery (the 70 mm stile) at 1050 mm above floor: natural reach, visible from the front, and out of kicking range. On island sites a second pair can go on the back corner posts.",
         "Header lightbox wraps all four sides (129 high), gradient strip below. Size labels on a 40 mm rail above the cubbies, front and back.",
         "No rear door: electronics (PSU, timers, mains strip) live in the header box behind a lockable lift-off top panel, with mains entering through the plinth.",
         "Ships flat-packed: carcass, header and shelf kit with cam fittings. Four M10 levellers; anti-tip wall strap included."])
@@ -616,6 +616,7 @@ def build():
                  ["Placement", "Two runs, along the top and bottom inside the glazing frame, in 45° aluminium angle aimed at the shirt. No PMMA/PC diffuser over the LEDs (it blocks UV)."],
                  ["Glazing", "UV-filtering acrylic between guest and LEDs. The guest sees the colour change, not the UV."],
                  ["Behaviour", "Press: UV on for 20 s (adjustable 10–60 s), then off. Presses during a cycle are ignored. Button ring LED on whenever the unit is ready."],
+                 ["Button height", "Every press-for-sun button sits at natural reach, 1000–1100 mm above the floor (the Sunbox's sits on a counter at about the same height). Never low enough to be kicked: buttons near the floor become a repair job."],
                  ["Interlock", "NC micro-switch on every door or glazing frame that opens onto the cavity, wired in series with the LED supply. Door open = UV off."],
                  ["Performance", "Print visibly coloured within 10 s of pressing, full colour by 20 s, measured on a Truecolors demo shirt at 20–25 °C. Confirm on prototype."],
                  ["Eye safety", "Aim for the Exempt group under IEC 62471 at any viewing position. Fit a \"UV-A inside: switch off before servicing\" label inside every access door."],
