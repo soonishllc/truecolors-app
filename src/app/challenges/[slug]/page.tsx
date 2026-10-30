@@ -105,12 +105,20 @@ export default async function ChallengePage({
                     </button>
                   </form>
                 </div>
+                {e.campaignSlug && (
+                  <Link href={`/c/${e.campaignSlug}`} className="button entry-buy">
+                    {e.campaignLive ? "Pre-order this design" : "See the campaign"}
+                  </Link>
+                )}
               </div>
             </div>
             <div className="entry-row">
               <div>
                 <a href={`#entry-${e.id}`} className="name entry-name">{e.title}</a>
                 <div className="meta">by <Link href={`/d/${e.handle}`}>{e.designer}</Link></div>
+                {e.campaignSlug && (
+                  <Link href={`/c/${e.campaignSlug}`} className="entry-campaign">{e.campaignLive ? "Pre-order →" : "See campaign →"}</Link>
+                )}
               </div>
               <form action={voteAction}>
                 <input type="hidden" name="entryId" value={e.id} />

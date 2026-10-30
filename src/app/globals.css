@@ -539,3 +539,6 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 @media (max-width: 720px) {
   .hero-bg video { width: 100%; max-width: none; aspect-ratio: auto; object-position: 80% 0%; -webkit-mask-image: none; mask-image: none; }
 }
+.entry-buy { text-align: center; }
+.entry-campaign { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--gold-text); text-decoration: none; }
+.entry-campaign:hover { text-decoration: underline; }

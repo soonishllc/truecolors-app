@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./db/client";
-import { challengeEntries, challenges, designs, users, votes } from "./db/schema";
+import { campaigns, challengeEntries, challenges, designs, users, votes } from "./db/schema";
 import { UserError } from "./design/service";
 import { CHALLENGE_ENTRIES_PER_DESIGNER } from "./rules";
 
@@ -85,6 +85,10 @@ export async function entries(challengeId: string, fanId?: string) {
       designer: users.name,
       handle: users.handle,
       votes: sql<number>`(select count(*) from ${votes} where ${votes.entryId} = ${challengeEntries.id})::int`,
+      // The design's public campaign, if it has one, so fans can go straight to it.
+      campaignSlug: sql<string | null>`(select ${campaigns.slug} from ${campaigns} where ${campaigns.designId} = ${challengeEntries.designId}
+        and ${campaigns.status} in ('live', 'closing', 'funded', 'in_production', 'shipped') order by ${campaigns.createdAt} desc limit 1)`,
+      campaignLive: sql<boolean>`exists (select 1 from ${campaigns} where ${campaigns.designId} = ${challengeEntries.designId} and ${campaigns.status} = 'live')`,
       mine: fanId
         ? sql<boolean>`exists (select 1 from ${votes} where ${votes.entryId} = ${challengeEntries.id} and ${votes.fanId} = ${fanId})`
         : sql<boolean>`false`,
