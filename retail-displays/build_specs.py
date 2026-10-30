@@ -308,9 +308,6 @@ def draw_tower():
     pl.dim_h(0, w, -120, "1016")
     pl.dim_v(0, h, -100, "1829")
     pl.dim_v(118, 316, w + 60, "198", side=-1)
-    for bx in (side / 2, w - side / 2):
-        pl.circle(bx, 1050, 15, fill=SUN[2], stroke=None)
-    pl.callout(w - side / 2, 1050, w + 60, 1250, "Button 1050 AFF")
     pl.dim_h(side, side + cw, 70, f"{cw:.0f}")
 
     pl.at(320, 40, s)
@@ -318,14 +315,16 @@ def draw_tower():
     pl.rect(0, 0, d, h, fill=colors.HexColor("#2b2a27"), stroke=INK)
     logo_bar(pl, 0, 1700, d, 129)
     pl.sun_strip(0, 1696, d, 4)
-    gx, gy, gw, gh = (d - 470) / 2, 520, 470, 1140
+    gx, gy, gw, gh = (d - 450) / 2, 520, 450, 1140
     pl.rect(gx, gy, gw, gh, fill=GLASS, stroke=colors.HexColor("#55534f"), sw=1)
     for r in range(5):
         for c in range(2):
             pl.tee(gx + 122 + c * 226, gy + gh - 120 - r * 228, 190, 200)
     pl.dim_h(0, d, -120, "559")
     pl.dim_v(gy, gy + gh, d + 50, "1140", side=-1)
-    pl.dim_h(gx, gx + gw, gy - 60, "470")
+    pl.dim_h(gx, gx + gw, gy - 60, "450")
+    pl.circle(gx / 2, 1050, 18, fill=SUN[2], stroke=None)
+    pl.callout(gx / 2, 1050, -30, 1250, "Button 1050 AFF", anchor="end")
     pl.callout(gx + gw - 10, gy + gh - 40, d + 150, 1600, "UV-filter glazing, hinged")
     pl.callout(gx + 10, gy + 600, d + 150, 1150, "10 face-out tees, 60 deep")
     return pl.d
@@ -587,18 +586,18 @@ def build():
     s += [P("Construction", h3)] + bullets([
         "Carcass 18 mm MR MDF, 1016 × 559 × 1829, open front and back. Four columns (S, M, L, XL) by seven rows of through-cubbies, clear about 206 × 198 × 523, with a 22 mm high centre lip on each shelf so the front and back stacks stay separate; 70 mm side zones house the galleries.",
         "Front and back faces are identical: header lightbox, S–XL label rail, 28 openings. Place as an island, or against a wall (restock from the front; the back openings simply face the wall).",
-        "Side galleries (both sides): aperture 470 × 1140 at 520–1660, 60 mm deep, off-white back. Ten folded tees face-out on 2 × 5 clear acrylic ledges (about 200 × 210 each).",
-        "Each gallery: 5 mm UV-filter acrylic in a hinged frame (piano hinge, cam lock, interlock), UV-A strips down both long edges, its own timer, and one Ø30 button on the front corner post beside the gallery (the 70 mm stile) at 1050 mm above floor: natural reach, visible from the front, and out of kicking range. On island sites a second pair can go on the back corner posts.",
+        "Side galleries (both sides): aperture 450 × 1140, centred, leaving an even 54.5 mm frame each side of the glass at 520–1660, 60 mm deep, off-white back. Ten folded tees face-out on 2 × 5 clear acrylic ledges (about 200 × 210 each).",
+        "Each gallery: 5 mm UV-filter acrylic in a hinged frame (piano hinge, cam lock, interlock), UV-A strips down both long edges, its own timer, and one Ø35 button (46 mm bezel) centred in the frame beside the glass on the front edge, 1050 mm above floor: natural reach, visible from front or back, and out of kicking range.",
         "Header lightbox wraps all four sides (129 high), gradient strip below. Size labels on a 40 mm rail above the cubbies, front and back.",
         "No rear door: electronics (PSU, timers, mains strip) live in the header box behind a lockable lift-off top panel, with mains entering through the plinth.",
         "Ships flat-packed: carcass, header and shelf kit with cam fittings. Four M10 levellers; anti-tip wall strap included."])
     s += [P("Tower bill of materials (per unit)", h3),
           table([["Qty", "Item", "Specification", "Est. USD"],
                  ["1", "Cabinet", "18 mm MR MDF, lacquered, 28 through-cubbies with centre lips, two gallery bays, per drawing", "Fabricator"],
-                 ["2", "Glazing", "486 × 1156 × 5 mm UV-filtering acrylic, in hinged frames", "Fabricator"],
+                 ["2", "Glazing", "466 × 1156 × 5 mm UV-filtering acrylic, in hinged frames", "Fabricator"],
                  ["20", "Gallery ledges", "Clear 3 mm acrylic ledge, 200 wide, with front lip", "Fabricator"],
                  ["4.6 m", "UV-A LED strip", "12 V, 365 nm, 60 LED/m: 2 × 1140 mm per gallery (both long edges)", "60–140"],
-                 ["2", "Push button, timer, interlock", "As Sunbox, one set per gallery", "30–80"],
+                 ["2", "Push button, timer, interlock", "Ø35 anti-vandal button with 12 V ring LED, timer and interlock as Sunbox; one set per gallery", "30–80"],
                  ["1", "PSU + mains", "12 V 100 W enclosed PSU, IEC fused inlet, 3 m cord", "40–70"],
                  ["1", "Header LEDs", "12 V, 4000 K", "5–12"],
                                   ["1", "Graphics set", "Four-sided header, gradient strip, size labels front and back", "Printer"]],

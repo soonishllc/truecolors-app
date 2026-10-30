@@ -20,11 +20,11 @@ EDITS = {
     "tower": (
         "Edit this exact product render. Keep the cabinet, camera, framing, lighting, background, logo header, rail, "
         "cubbies, folded stock, the side gallery and everything else exactly the same, pixel-aligned. Only move the round "
-        "orange illuminated push button: remove it from the low side panel below the gallery, filling that spot with the "
-        "same plain matt charcoal panel, and place the identical button, the same small size (3 cm across), on the narrow "
-        "vertical charcoal strip at the front-left corner of the cabinet, between the side gallery and the first column of "
-        "cubbies, at about 105 cm above the floor (a little above the cabinet's mid-height), with tiny white text PRESS "
-        "FOR SUN set vertically beside it. Photorealistic."),
+        "orange illuminated push button: remove it from the vertical strip at the front-left corner (fill that spot with "
+        "the same plain matt charcoal), and place the identical button, the same small size (3 cm across), on the left "
+        "side panel in the narrow charcoal margin right beside the gallery glass, on the front edge of the gallery, at "
+        "about 105 cm above the floor (a little above the cabinet's mid-height), with tiny white text PRESS FOR SUN set "
+        "vertically beside it. Photorealistic."),
 }
 
 
@@ -36,7 +36,8 @@ def main():
         backup = OUT / f"{name}-low-button.png"
         if not backup.exists():
             backup.write_bytes(src.read_bytes())
-        r = client.images.edit(model=model, image=[("render.png", backup.read_bytes(), "image/png")],
+        # Edit the current render, so moves build on each other; the very first version stays in the backup.
+        r = client.images.edit(model=model, image=[("render.png", src.read_bytes(), "image/png")],
                                prompt=EDITS[name], size="1024x1536", quality="high")
         src.write_bytes(base64.b64decode(r.data[0].b64_json))
         print("wrote", name, flush=True)

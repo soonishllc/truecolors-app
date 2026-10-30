@@ -200,11 +200,11 @@ async function start(root) {
   }
 
   // Orange illuminated button with a bezel; clicking it lights its station.
-  function button(g, st, x, y) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(mm(19), mm(3.5), 16, 48), M.alu);
+  function button(g, st, x, y, r = 15) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(mm(r + 4), mm(3.5), 16, 48), M.alu);
     ring.position.set(x, y, mm(2));
     g.add(ring);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(mm(15), mm(15), mm(10), 40),
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(mm(r), mm(r), mm(10), 40),
       new THREE.MeshStandardMaterial({ color: 0xf29a0c, emissive: 0xff8a00, emissiveIntensity: 0.5, roughness: 0.35 }));
     cap.rotation.x = Math.PI / 2;
     cap.position.set(x, y, mm(5));
@@ -322,7 +322,6 @@ async function start(root) {
       cubbies.push({ row: r, x: mm(-508 + SIDE + c * (cw + 18) + cw / 2), y: mm(118 + r * 216), w: mm(cw), h: mm(198) });
     }
     // Front and back are the same stock face: header, S–XL rail and 28 openings into through-cubbies.
-    let frontFace;
     [1, -1].forEach((dir) => {
       const f = new THREE.Group();
       f.position.z = dir * D / 2;
@@ -333,7 +332,6 @@ async function start(root) {
       f.add(plane(mm(1016 - 2 * SIDE), mm(40), lit(textTex(1016 - 2 * SIDE, 40, ['S', 'M', 'L', 'XL'].map((t, i) => (
         { text: t, x: (i * (cw + 18) + cw / 2) / (1016 - 2 * SIDE), y: 0.5, size: 0.017, font: '"JetBrains Mono", monospace', color: '#d8d4cd' })), '#1b1a18'), 0.8), 0, mm(1650), 0.0008));
       g.add(f);
-      if (dir > 0) frontFace = f;
     });
     // Through-cubbies: open both ends, with a low lip in the middle so each side keeps its own stack.
     const tubeD = D - 2 * T;
@@ -375,7 +373,8 @@ async function start(root) {
       }
     }
     // Side galleries: ten face-out tees behind UV glass on each side (the render's own gallery), lit by their button.
-    const gal = { x: 0, y: mm(520), w: mm(470), h: mm(1140), d: mm(60) };
+    // Gallery centred on the side, so the glass has an even 54.5 mm frame on both edges.
+    const gal = { x: 0, y: mm(520), w: mm(450), h: mm(1140), d: mm(60) };
     [-1, 1].forEach((sideSign) => {
       const side = new THREE.Group();
       side.position.x = sideSign * W / 2;
@@ -384,12 +383,13 @@ async function start(root) {
       header(side, D, H, mm(129));
       side.add(plane(D, mm(100), M.plinth, 0, mm(50), 0.0008));
       const st = demoWindow(side, gal.x, gal.y, gal.w, gal.h, gal.d, [{ design: 'gallery', w: gal.w, h: gal.h }]);
-      // Its button: on the front corner post next to this gallery, at 1050 mm (natural reach, not kick height).
-      const bx = sideSign * mm(508 - 35);
-      button(frontFace, st, bx, mm(1050));
+      // Its button: on the side panel right beside the gallery glass, front edge, at 1050 mm (natural reach).
+      // Centred in the frame beside the glass: Ø35 cap, 46 mm bezel, as in the render.
+      const bx = -mm(225 + 54.5 / 2);
+      button(side, st, bx, mm(1050), 17.5);
       const lbl = plane(mm(200), mm(36), lit(textTex(200, 36, [{ text: 'PRESS FOR SUN', y: 0.5, size: 0.075, font: '"JetBrains Mono", monospace', color: '#d8d4cd' }]), 0.8), bx, mm(1050) - mm(140), 0.0008);
       lbl.rotation.z = Math.PI / 2;
-      frontFace.add(lbl);
+      side.add(lbl);
       g.add(side);
     });
     const sh = shell(W, H, D - 2 * T, false, false);

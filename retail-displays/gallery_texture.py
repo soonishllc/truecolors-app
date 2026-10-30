@@ -9,8 +9,8 @@ import numpy as np
 
 HERE = Path(__file__).parent
 OUT = HERE.parent / "shopify-theme" / "assets"
-CORNERS = [(100, 290), (331, 252), (331, 1292), (100, 1202)]  # top-left, top-right, bottom-right, bottom-left
-W, H = 470, 1140  # gallery aperture in mm, so the texture keeps its proportions
+CORNERS = [(116, 294), (331, 254), (331, 1290), (116, 1207)]  # top-left, top-right, bottom-right, bottom-left
+W, H = 450, 1140  # gallery aperture in mm, so the texture keeps its proportions
 
 img = cv2.imread(str(HERE / "renders" / "tower.png"))
 size = (W, H)
