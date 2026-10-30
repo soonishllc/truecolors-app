@@ -4,8 +4,12 @@ import { describe, expect, it } from "vitest";
 import { mockProvider } from "../src/lib/ai/mock";
 import { cleanLineArt, composite, countColours, printFiles } from "../src/lib/design/layers";
 import { renderMockup, templates } from "../src/lib/media/mockups";
-import { revealVideo } from "../src/lib/media/video";
+import { fadeVideo, revealVideo } from "../src/lib/media/video";
+import { PRINT } from "../src/lib/rules";
 import { verifyWebhook } from "../src/lib/shopify/webhooks";
+
+// The H.264 profile in an MP4's avcC box: 100 is High (plays everywhere); 244 is High 4:4:4, which iPhones can't play.
+const h264Profile = (mp4: Buffer) => mp4[mp4.indexOf("avcC") + 5];
 
 async function art() {
   const lineArt = await cleanLineArt(await mockProvider.lineArt("palm trees at sunset", "u1"));
@@ -29,9 +33,29 @@ describe("shade and sun layers", () => {
     expect(lines).toBeGreaterThan(1000);
   });
 
-  it("makes print files within Cancún's limits at 300 dpi", async () => {
+  it("keeps colour inside the drawing, with an optional slim backdrop", async () => {
     const { lineArt, colour } = await art();
-    const files = await printFiles(lineArt, colour);
+    // The AI painted the whole background red.
+    const flooded = await sharp(colour).flatten({ background: "#ff0000" }).composite([{ input: Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="red"/></svg>'), blend: "dest-over" }]).png().toBuffer();
+    const corner = async (png: Buffer) => [...(await sharp(png).extract({ left: 4, top: 4, width: 1, height: 1 }).removeAlpha().raw().toBuffer())];
+    expect(await corner(await composite(lineArt, flooded, 0))).toEqual([255, 255, 255]);
+    expect(await corner(await composite(lineArt, flooded, 0.025))).toEqual([255, 255, 255]);
+  });
+
+  it("keeps the painted shading in full-colour print files", async () => {
+    const { lineArt, colour } = await art();
+    const shaded = await sharp(colour).blur(12).png().toBuffer();
+    const files = await printFiles(lineArt, shaded);
+    expect(PRINT.fullColour).toBe(true);
+    expect(files.report.ok).toBe(true);
+    expect(files.report.colours).toBeGreaterThan(7);
+  });
+
+  it("makes spot-colour print files within Cancún's limits at 300 dpi", async () => {
+    const { lineArt, colour } = await art();
+    PRINT.fullColour = false;
+    const files = await printFiles(lineArt, colour).finally(() => (PRINT.fullColour = true));
     expect(files.report.ok).toBe(true);
     expect(files.report.colours).toBeLessThanOrEqual(7);
     expect(files.report.widthPx).toBeLessThanOrEqual(14 * 300);
@@ -56,6 +80,8 @@ describe("mockups and reveal video", () => {
     const shade = await renderMockup(flat, lineArt, sun, "shade");
     const mp4 = await revealVideo(shade, out["flat-square"]);
     expect(mp4.subarray(4, 8).toString()).toBe("ftyp");
+    expect(h264Profile(mp4)).toBe(100);
+    expect(h264Profile(await fadeVideo(shade, out["flat-square"]))).toBe(100);
   });
 });
 

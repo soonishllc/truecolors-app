@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { enterChallengeAction, fanEmailAction, voteAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { ShadeSun } from "@/components/ShadeSun";
 import { currentUser } from "@/lib/auth/session";
 import { challengeBySlug, entries, phase } from "@/lib/challenges";
 import { config } from "@/lib/config";
@@ -78,14 +79,37 @@ export default async function ChallengePage({
       <div className="grid entries">
         {list.map((e, i) => (
           <div key={e.id} className={`entry${p === "closed" && i === 0 && e.votes > 0 ? " winner" : ""}`}>
-            <div className="tile-art">
+            <a href={`#entry-${e.id}`} className="tile-art" aria-label={`See ${e.title} up close`}>
               {e.lineArt && <img className="art" src={fileUrl(e.lineArt)} alt="" />}
               {e.art && <img className="art tile-sun" src={fileUrl(e.art)} alt="" />}
               {p === "closed" && i === 0 && e.votes > 0 && <span className="winner-badge">☀ Winner</span>}
+            </a>
+            {/* Opens over the page when its link is followed (CSS :target), so it works without any script. */}
+            <div id={`entry-${e.id}`} className="entry-zoom" role="dialog" aria-label={e.title}>
+              <a href="#" className="entry-zoom-backdrop" aria-label="Close" />
+              <div className="entry-zoom-card">
+                <a href="#" className="entry-zoom-close" aria-label="Close">×</a>
+                {e.lineArt && e.art
+                  ? <ShadeSun shade={fileUrl(e.lineArt)} sun={fileUrl(e.art)} alt={e.title} />
+                  : e.art && <img className="art" src={fileUrl(e.art)} alt={e.title} />}
+                <div className="entry-row">
+                  <div>
+                    <div className="name">{e.title}</div>
+                    <div className="meta">by <Link href={`/d/${e.handle}`}>{e.designer}</Link></div>
+                  </div>
+                  <form action={voteAction}>
+                    <input type="hidden" name="entryId" value={e.id} />
+                    <input type="hidden" name="slug" value={ch.slug} />
+                    <button className={`vote${e.mine ? " on" : ""}`} disabled={p === "closed"} aria-pressed={e.mine} aria-label={`Vote for ${e.title}`}>
+                      <span aria-hidden="true">{e.mine ? "♥" : "♡"}</span> {e.votes}
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
             <div className="entry-row">
               <div>
-                <div className="name">{e.title}</div>
+                <a href={`#entry-${e.id}`} className="name entry-name">{e.title}</a>
                 <div className="meta">by <Link href={`/d/${e.handle}`}>{e.designer}</Link></div>
               </div>
               <form action={voteAction}>

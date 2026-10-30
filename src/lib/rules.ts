@@ -51,6 +51,9 @@ export const CREDIT_COST = { line_art: 1, colour: 1, refine: 1 } as const;
 
 // Cancún print limits. The black line art counts as one colour until Cancún says otherwise.
 export const PRINT = {
+  // The sun layer prints in full tone (shading and gradients), as on the shirts already made in Cancún, so the
+  // colour image isn't reduced to spot colours. Set to false to go back to at most maxColours flat inks.
+  fullColour: true,
   maxColours: 7,
   lineArtCountsAsColour: true,
   widthIn: 14,

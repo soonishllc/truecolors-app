@@ -9,6 +9,8 @@ export type Preset = {
   text?: boolean;
   // Drawn from the store's best-selling shirts as style references instead of from words alone.
   refs?: string[];
+  // Painted backdrop around the drawing, as a fraction of its width; 0 keeps colour strictly inside the drawing.
+  backdrop?: number;
 };
 
 const STORE = "https://www.truecolors.global/cdn/shop/files";
@@ -30,7 +32,7 @@ export const PRESETS: Preset[] = [
   { id: "beach", label: "Beach", group: "Places", style: "sunny beach scene, palm trees, waves and sun, relaxed holiday mood" },
   { id: "lettering", label: "Lettering", group: "Words", style: "bold hand lettering as the main subject, short phrase, decorative flourishes", text: true },
   {
-    id: "letter-fill", label: "Scene-filled letters", group: "Words", text: true,
+    id: "letter-fill", label: "Scene-filled letters", group: "Words", text: true, backdrop: 0,
     style: "one word in huge block capitals spread across the chest, each letter filled with a different detailed scene, like the HABIBI shirt",
   },
   { id: "phrase", label: "Famous phrase", group: "Words", style: "a well-known saying or proverb set as a typographic poster with small illustrated accents; public-domain sayings only, no song lyrics or brand slogans", text: true },
@@ -51,6 +53,12 @@ export function preset(id: string): Preset {
   return p;
 }
 
+// Matches the shirts already printed: detailed illustration, not colouring-book outlines.
+const LINE_STYLE =
+  "Detailed, confident black ink illustration like a premium illustrated t-shirt, not a colouring book: varied line " +
+  "weights, crisp outlines with fine interior detail, and depth built only from black hatching and stippling. Every " +
+  "mark is solid black on a plain white background: no grey tones, washes, colour or filled areas.";
+
 const lettering = (p: Preset) =>
   p.text
     ? "Lettering is part of the design: use the exact words from the idea, spelled correctly, as bold outlined letters."
@@ -61,8 +69,7 @@ export function lineArtPrompt(p: Preset, idea: string): string {
     `Black ink line art for a t-shirt chest print: ${idea}.`,
     `Style: ${p.style}.`,
     p.refs ? "Match the style of the reference shirts, but make a new design: don't copy their subjects or words." : "",
-    "Pure black lines on a plain white background. No shading, no grey, no colour, no fills.",
-    "Bold, clean outlines at least 2 pt thick, closed shapes ready to be coloured in.",
+    LINE_STYLE,
     `Centered, fills the frame, no shirt, no mockup. ${lettering(p)}`,
   ].filter(Boolean).join(" ");
 }
@@ -73,18 +80,29 @@ export function sketchPrompt(p: Preset, idea: string): string {
     `Redraw this hand-drawn sketch as black ink line art for a t-shirt chest print: ${idea}.`,
     "Keep the sketch's subject, composition and character; clean up and complete the drawing, don't replace it.",
     `Style: ${p.style}.`,
-    "Pure black lines on a plain white background. No shading, no grey, no colour, no fills.",
-    "Bold, clean outlines at least 2 pt thick, closed shapes ready to be coloured in.",
+    LINE_STYLE,
     `Centered, fills the frame, no shirt, no mockup, no paper texture. ${p.text ? lettering(p) : "No text unless the sketch has it."}`,
   ].join(" ");
 }
 
-export function colourPrompt(idea: string, maxFillColours: number): string {
+// Full colour: painted like the real shirts in the reference photos. Spot colour: flat fills the printer can separate.
+export function colourPrompt(idea: string, maxFillColours: number | null, withRefs = false, backdrop = true): string {
+  if (maxFillColours) {
+    return [
+      `Colour in this line art for a t-shirt print: ${idea}.`,
+      `Use flat solid fills only, at most ${maxFillColours} bright colours, no gradients or shading.`,
+      "Keep every black line exactly where it is. Keep the background plain white.",
+    ].join(" ");
+  }
   return [
-    `Colour in this line art for a t-shirt print: ${idea}.`,
-    `Use flat solid fills only, at most ${maxFillColours} bright colours, no gradients or shading.`,
-    "Keep every black line exactly where it is. Keep the background plain white.",
-  ].join(" ");
+    `Paint the first image, black line art for a t-shirt print, in full colour: ${idea}.`,
+    withRefs ? "The other images are photos of real printed shirts: match their painting style and warm, sunlit palette, not their subject." : "",
+    "Rich painterly colour with shading, gradients, highlights and depth, like a premium illustrated tee.",
+    backdrop
+      ? "Behind the drawing, paint a slim backdrop (sky, landscape or glow) that hugs its outline closely, with rough, torn edges; no big block of colour around it."
+      : "Colour only inside the drawing's outlines (for lettering, only inside each letter); everything outside them stays plain white, with no backdrop.",
+    "Keep every black line exactly where it is and keep the drawing's composition. Everywhere else, keep the background plain white.",
+  ].filter(Boolean).join(" ");
 }
 
 export function refinePrompt(instruction: string): string {

@@ -8,6 +8,9 @@ import { PRINT } from "../rules";
 // The colour image comes from an AI edit of the line art, so it can drift a little. We never trust its
 // lines: the original line art is always laid back on top, and line pixels are cut out of the colour layer.
 
+// Default backdrop margin around a drawing, as a fraction of its width (see colourArea).
+export const BACKDROP = 0.04;
+
 const LINE_THRESHOLD = 110; // grey value below this counts as line
 const WHITE_THRESHOLD = 235; // all channels above this count as bare shirt (no ink)
 
@@ -118,17 +121,60 @@ export function fillColourLimit(): number {
   return PRINT.maxColours - (PRINT.lineArtCountsAsColour ? 1 : 0);
 }
 
+// Where colour may go: inside the drawing's outer outline (flood-filled in from the image edges, with the lines
+// thickened a little first so small gaps don't let it leak), plus a backdrop margin around it. `backdrop` is the
+// margin as a fraction of the width: 0 keeps colour strictly inside the drawing.
+async function colourArea(line: Raw, backdrop: number): Promise<Buffer> {
+  // Worked out at up to 1600 px wide (print files are ~4200) and scaled back up.
+  const scale = Math.min(1, 1600 / line.width);
+  const w = Math.round(line.width * scale);
+  const h = Math.round(line.height * scale);
+  const alpha = Buffer.alloc(line.width * line.height);
+  for (let k = 0; k < alpha.length; k++) alpha[k] = line.data[k * 4 + 3];
+  const thick = await sharp(alpha, { raw: { width: line.width, height: line.height, channels: 1 } })
+    .resize(w, h).blur(1.5).extractChannel(0).raw().toBuffer();
+  const outside = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  let top = 0;
+  const push = (k: number) => { if (!outside[k] && thick[k] < 40) { outside[k] = 1; stack[top++] = k; } };
+  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+  while (top) {
+    const k = stack[--top];
+    const x = k % w;
+    if (x > 0) push(k - 1);
+    if (x < w - 1) push(k + 1);
+    if (k >= w) push(k - w);
+    if (k < w * (h - 1)) push(k + w);
+  }
+  let area = sharp(Buffer.from(outside.map((o) => (o ? 0 : 255))), { raw: { width: w, height: h, channels: 1 } });
+  // Grow the area by the margin: blur it out and keep anything the blur reaches.
+  if (backdrop > 0) area = sharp(await area.blur(Math.max(0.3, (backdrop * w) / 2)).threshold(8).extractChannel(0).raw().toBuffer(), { raw: { width: w, height: h, channels: 1 } });
+  return area.resize(line.width, line.height).threshold(128).extractChannel(0).raw().toBuffer();
+}
+
+async function limitColour(fill: Raw, line: Raw, backdrop: number): Promise<Raw> {
+  const area = await colourArea(line, backdrop);
+  const out = Buffer.from(fill.data);
+  for (let k = 0; k < area.length; k++) if (!area[k]) out[k * 4] = out[k * 4 + 1] = out[k * 4 + 2] = out[k * 4 + 3] = 0;
+  return { ...fill, data: out };
+}
+
+// Spot-colour printing gets flat inks; full-colour printing keeps the painted shading.
+const inks = (fill: Raw) => (PRINT.fullColour ? fill : quantise(fill, fillColourLimit()));
+
 // Black line art on white, cleaned up. Used for the shade view and as the AI colouring input.
 export async function cleanLineArt(png: Buffer): Promise<Buffer> {
   const line = lineMask(await rgba(png));
   return sharp(await toPng(line)).flatten({ background: "#ffffff" }).png().toBuffer();
 }
 
-// The sun view: colour fill with the original line art on top, at the line art's size.
-export async function composite(lineArtPng: Buffer, colourPng: Buffer): Promise<Buffer> {
+// The sun view: colour fill with the original line art on top, at the line art's size. `backdrop`: see colourArea.
+export async function composite(lineArtPng: Buffer, colourPng: Buffer, backdrop = BACKDROP): Promise<Buffer> {
   const line = await rgba(lineArtPng);
   const colour = await rgba(colourPng, line.width, line.height);
-  const fill = quantise(colourFill(colour, lineMask(line)), fillColourLimit());
+  const mask = lineMask(line);
+  const fill = inks(await limitColour(colourFill(colour, mask), mask, backdrop));
   return sharp(await toPng(fill))
     .flatten({ background: "#ffffff" })
     .composite([{ input: await toPng(lineMask(line)) }])
@@ -139,7 +185,7 @@ export async function composite(lineArtPng: Buffer, colourPng: Buffer): Promise<
 export type PrintFiles = { line: Buffer; colour: Buffer; report: PrintReport };
 
 // Print-ready layers at the full print area, transparent where there is no ink.
-export async function printFiles(lineArtPng: Buffer, colourPng: Buffer): Promise<PrintFiles> {
+export async function printFiles(lineArtPng: Buffer, colourPng: Buffer, backdrop = BACKDROP): Promise<PrintFiles> {
   const boxW = PRINT.widthIn * PRINT.dpi;
   const boxH = PRINT.heightIn * PRINT.dpi;
   const meta = await sharp(lineArtPng).metadata();
@@ -149,12 +195,12 @@ export async function printFiles(lineArtPng: Buffer, colourPng: Buffer): Promise
 
   const line = lineMask(await rgba(lineArtPng, width, height));
   const colour = await rgba(colourPng, width, height);
-  const fill = quantise(colourFill(colour, line), fillColourLimit());
+  const fill = inks(await limitColour(colourFill(colour, line), line, backdrop));
 
   const fillColours = countColours(fill);
   const colours = fillColours + (PRINT.lineArtCountsAsColour ? 1 : 0);
   const problems: string[] = [];
-  if (colours > PRINT.maxColours) problems.push(`${colours} colours; Cancún prints at most ${PRINT.maxColours}.`);
+  if (!PRINT.fullColour && colours > PRINT.maxColours) problems.push(`${colours} colours; Cancún prints at most ${PRINT.maxColours}.`);
   if (fillColours === 0) problems.push("The colour layer is empty, so nothing changes in the sun.");
   if (scale > 4.5) problems.push("The artwork is small for the print area; check edges are still sharp.");
 

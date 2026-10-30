@@ -103,8 +103,9 @@ export const generations = pgTable("generations", {
 export const media = pgTable("media", {
   id: id(),
   designId: uuid("design_id").notNull().references(() => designs.id),
-  // "sweep": a short clip of sunlight crossing the flat-lay shirt, made outside the app (scripts/add-sweep.ts).
-  kind: text("kind").$type<"mockup" | "video" | "sweep">().notNull(),
+  // "sweep": the card animation, the flat lay fading from shade to sun (made by renderMedia); "worn": someone
+  // wearing it walking into the sun, made outside the app and attached with scripts/add-sweep.ts --worn.
+  kind: text("kind").$type<"mockup" | "video" | "sweep" | "worn">().notNull(),
   template: text("template").notNull(),
   view: text("view").$type<"shade" | "sun" | "reveal">().notNull(),
   key: text("key").notNull(),

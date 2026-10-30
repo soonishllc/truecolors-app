@@ -7,7 +7,7 @@ import { db } from "@/lib/db/client";
 import { campaigns, designs, users } from "@/lib/db/schema";
 import { daysLeft, money } from "@/lib/format";
 import { FUNDING_GOAL, PRICE_CENTS } from "@/lib/rules";
-import { siteImageUrl } from "@/lib/site-images";
+import { siteImageUrl, siteVideoUrl } from "@/lib/site-images";
 import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 
@@ -27,12 +27,12 @@ export default async function Home() {
   const steps = [
     { id: "step-design", title: "Designers create it", text: "Invited designers describe an idea or upload a sketch, and the AI studio turns it into print-ready colour-changing art." },
     { id: "step-preorder", title: "Fans pre-order", text: `Pre-order for ${money(PRICE_CENTS)}. Nobody is charged unless the design reaches ${FUNDING_GOAL}.` },
-    { id: "step-print", title: `We print at ${FUNDING_GOAL}`, text: "Funded designs are printed and shipped in batches, and the designer earns on every sale." },
+    { id: "step-print", title: `We print at ${FUNDING_GOAL}`, text: "Funded designs are printed and shipped in batches, and the designer earns on every sale.", once: true },
   ];
 
   return (
     <>
-      <HeroReveal sun={siteImageUrl("home-hero-sun")} shade={siteImageUrl("home-hero-shade")}>
+      <HeroReveal sun={siteImageUrl("home-hero-sun")} shade={siteImageUrl("home-hero-shade")} video="/site/home-hero.mp4">
         <div className="eyebrow">truecolors.design</div>
         <h1>Designed by you.<br /><span className="sun-text">Funded by fans.</span></h1>
         <p>
@@ -44,9 +44,15 @@ export default async function Home() {
       <div className="steps">
         {steps.map((st, i) => {
           const img = siteImageUrl(st.id);
+          const clip = siteVideoUrl(st.id);
           return (
             <div key={st.id}>
-              {img ? <img className="art" src={img} alt="" /> : <div className="art step-fallback"><span className="sun-text">{i + 1}</span></div>}
+              {clip && img && st.once ? (
+                // An action shot: plays once each time it scrolls into view and holds its last frame, instead of
+                // looping back to the start mid-action.
+                <div className="tile-art"><img className="art" src={img} alt="" /><TileSweep src={clip} inView /></div>
+              ) : clip ? <video className="art" src={clip} poster={img} autoPlay muted loop playsInline preload="metadata" aria-hidden="true" />
+                : img ? <img className="art" src={img} alt="" /> : <div className="art step-fallback"><span className="sun-text">{i + 1}</span></div>}
               <h3>{i + 1}. {st.title}</h3>
               <p className="muted small">{st.text}</p>
             </div>

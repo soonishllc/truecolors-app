@@ -1,16 +1,21 @@
 import { and, eq, gte, ne, sql } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import sharp from "sharp";
 import { colourPrompt, lineArtPrompt, preset, promptFlags, refinePrompt, sketchPrompt } from "../ai/presets";
 import { imageProvider } from "../ai/provider";
 import { db } from "../db/client";
 import { designs, generations, media, users } from "../db/schema";
 import { renderMockup, templates } from "../media/mockups";
-import { revealVideo } from "../media/video";
-import { CREDIT_COST } from "../rules";
+import { fadeVideo, revealVideo } from "../media/video";
+import { CREDIT_COST, PRINT } from "../rules";
 import { get, put } from "../storage";
-import { cleanLineArt, composite, fillColourLimit, printFiles } from "./layers";
+import { BACKDROP, cleanLineArt, composite, fillColourLimit, printFiles } from "./layers";
 
 export class UserError extends Error {}
+
+// Photos of real Truecolors shirts in the sun, shown to the AI as the colour style to match.
+const STYLE_REFS = [path.join(process.cwd(), "templates", "style", "camel-sun.jpg")];
 
 async function spendCredits(userId: string, amount: number) {
   const d = await db();
@@ -130,17 +135,38 @@ export async function refineDesign(userId: string, designId: string, instruction
 export async function colourDesign(userId: string, designId: string) {
   const design = await ownedDesign(designId, userId);
   const ai = imageProvider();
-  const prompt = colourPrompt(design.prompt, fillColourLimit());
+  const refs = PRINT.fullColour ? STYLE_REFS.map((f) => readFileSync(f)) : [];
+  const backdrop = preset(design.preset).backdrop ?? BACKDROP;
+  const prompt = colourPrompt(design.prompt, PRINT.fullColour ? null : fillColourLimit(), refs.length > 0, backdrop > 0);
   const lineArt = await get(design.lineArtKey!);
   const colour = await withCredits(userId, CREDIT_COST.colour, async () => {
-    const raw = await ai.colour(lineArt, prompt, userId);
+    const raw = await ai.colour(lineArt, prompt, userId, refs);
     await checkImage(raw);
     return raw;
   });
-  const sun = await composite(lineArt, colour);
-  const print = await printFiles(lineArt, colour);
-  const [colourKey, compositeKey, printLineKey, printColourKey] = await Promise.all([
-    put("designs", "png", colour),
+  const colourKey = await put("designs", "png", colour);
+  const report = await layDown(designId, lineArt, colour, colourKey, backdrop);
+  const d = await db();
+  await d.insert(generations).values({
+    designId, userId, kind: "colour", prompt, provider: ai.name, credits: CREDIT_COST.colour, outputKey: colourKey,
+  });
+  return report;
+}
+
+// Trims the stored colour to the design's outline and backdrop again and remakes the sun view and print files.
+// Free: no AI. Mockups need renderMedia afterwards.
+export async function recomposeDesign(userId: string, designId: string) {
+  const design = await ownedDesign(designId, userId);
+  if (!design.colourKey) throw new UserError("Colour the design first.");
+  const lineArt = await get(design.lineArtKey!);
+  return layDown(designId, lineArt, await get(design.colourKey), design.colourKey, preset(design.preset).backdrop ?? BACKDROP);
+}
+
+// The sun view and print files from line art and colour; saves them and drops the media made from the old ones.
+async function layDown(designId: string, lineArt: Buffer, colour: Buffer, colourKey: string, backdrop: number) {
+  const sun = await composite(lineArt, colour, backdrop);
+  const print = await printFiles(lineArt, colour, backdrop);
+  const [compositeKey, printLineKey, printColourKey] = await Promise.all([
     put("designs", "png", sun),
     put("print", "png", print.line),
     put("print", "png", print.colour),
@@ -151,9 +177,6 @@ export async function colourDesign(userId: string, designId: string) {
     .update(designs)
     .set({ colourKey, compositeKey, printLineKey, printColourKey, printReport: print.report, updatedAt: new Date() })
     .where(eq(designs.id, designId));
-  await d.insert(generations).values({
-    designId, userId, kind: "colour", prompt, provider: ai.name, credits: CREDIT_COST.colour, outputKey: colourKey,
-  });
   return print.report;
 }
 
@@ -167,13 +190,20 @@ export async function renderMedia(userId: string, designId: string) {
   // The reveal video is made from the first plain (not half-and-half) shot.
   const revealFrom = templates().find((t) => !t.split)?.id;
   const reveal: { shade?: Buffer; sun?: Buffer } = {};
+  const flat: { shade?: Buffer; sun?: Buffer } = {};
 
   for (const t of templates()) {
     for (const view of t.split ? (["sun"] as const) : (["shade", "sun"] as const)) {
       const png = await renderMockup(t, shadeArt, sunArt, view);
       rows.push({ designId, kind: "mockup", template: t.id, view, key: await put("media", "png", png) });
       if (t.id === revealFrom) reveal[view] = png;
+      if (t.id === "flat-square") flat[view] = png;
     }
+  }
+  // The card animation: the flat lay fading from shade to sun.
+  if (flat.shade && flat.sun) {
+    const mp4 = await fadeVideo(flat.shade, flat.sun);
+    rows.push({ designId, kind: "sweep", template: "flat-square", view: "sun", key: await put("media", "mp4", mp4) });
   }
   if (reveal.shade && reveal.sun) {
     const mp4 = await revealVideo(reveal.shade, reveal.sun);
@@ -181,7 +211,7 @@ export async function renderMedia(userId: string, designId: string) {
   }
 
   const d = await db();
-  // Sweep clips show the same artwork, so they survive a re-render; new artwork clears them with everything else.
-  await d.delete(media).where(and(eq(media.designId, designId), ne(media.kind, "sweep")));
+  // Worn clips show the same artwork, so they survive a re-render; new artwork clears them with everything else.
+  await d.delete(media).where(and(eq(media.designId, designId), ne(media.kind, "worn")));
   await d.insert(media).values(rows);
 }

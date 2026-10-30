@@ -118,8 +118,12 @@ async function sunMask(t: Template, photo: Buffer): Promise<Buffer> {
   return sharp(mask, { raw: { width: info.width, height: info.height, channels: 1 } }).blur(4).toColourspace("b-w").png().toBuffer();
 }
 
+// UV ink in real sun prints a little softer than the file on screen (see templates/style/camel-sun.jpg).
+const asInk = (art: Buffer) => sharp(art).modulate({ saturation: 0.9 }).png().toBuffer();
+
 export async function renderMockup(t: Template, shadeArt: Buffer, sunArt: Buffer, view: "shade" | "sun"): Promise<Buffer> {
   const photo = await base(t);
+  sunArt = await asInk(sunArt);
   const shade = await sharp(photo).composite(await placed(t, photo, shadeArt)).png().toBuffer();
   if (!t.split && view === "shade") return shade;
   const sun = await sharp(photo).composite(await placed(t, photo, sunArt)).png().toBuffer();

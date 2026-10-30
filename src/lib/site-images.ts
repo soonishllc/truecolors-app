@@ -156,3 +156,8 @@ export const siteImageFile = (id: string) =>
 export function siteImageUrl(id: string): string | undefined {
   return existsSync(path.join(SITE_DIR, siteImageFile(id))) ? `/site/${siteImageFile(id)}` : undefined;
 }
+
+// A short looping clip of the same scene (made with Higgsfield from the photo), where one exists.
+export function siteVideoUrl(id: string): string | undefined {
+  return existsSync(path.join(SITE_DIR, `${id}.mp4`)) ? `/site/${id}.mp4` : undefined;
+}

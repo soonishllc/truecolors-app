@@ -12,7 +12,8 @@ export interface ImageProvider {
   // A designer's sketch (photo or scan) redrawn as line art like lineArt's.
   fromSketch(sketch: Buffer, prompt: string, userId: string): Promise<Buffer>;
   // Same line art coloured in, PNG, same size as the input.
-  colour(lineArt: Buffer, prompt: string, userId: string): Promise<Buffer>;
+  // refs: photos of real printed shirts, as a style guide for the colour.
+  colour(lineArt: Buffer, prompt: string, userId: string, refs?: Buffer[]): Promise<Buffer>;
   refine(lineArt: Buffer, prompt: string, userId: string): Promise<Buffer>;
   moderateText(text: string): Promise<Moderation>;
   moderateImage(png: Buffer): Promise<Moderation>;

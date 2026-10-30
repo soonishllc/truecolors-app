@@ -164,7 +164,7 @@ th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--lin
 /* With a generated photo: the photo sits on the right and fades into the dark band behind the headline. */
 .hero.photo { position: relative; overflow: hidden; min-height: 560px; display: flex; flex-direction: column; justify-content: center; }
 .hero-content { position: relative; z-index: 1; }
-.hero-bg, .hero-bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
+.hero-bg, .hero-bg img, .hero-bg video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
 .hero-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(23, 22, 20, 0.94) 0%, rgba(23, 22, 20, 0.7) 40%, rgba(23, 22, 20, 0) 75%); }
 /* The sunlight sweeps in from the top-right corner, where the sun would be. */
 .hero-sun { clip-path: circle(0% at 92% 4%); transition: clip-path 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -189,8 +189,8 @@ th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--lin
 .compare input[type="range"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
 
 .steps { display: grid; gap: 24px; grid-template-columns: repeat(3, 1fr); margin: 12px 0 64px; }
-.steps img.art, .step-fallback { aspect-ratio: 1; object-fit: cover; transition: transform 0.4s ease; }
-.steps > div:hover img.art { transform: scale(1.02); }
+.steps .art, .step-fallback { aspect-ratio: 1; width: 100%; object-fit: cover; transition: transform 0.4s ease; }
+.steps > div:hover .art { transform: scale(1.02); }
 .step-fallback { display: grid; place-items: center; background: var(--dark); font-family: var(--font-display); font-size: 96px; line-height: 1; }
 .steps h3 { font-size: 20px; letter-spacing: -0.02em; margin: 16px 0 4px; }
 .steps p { margin: 0; }
@@ -446,7 +446,7 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .top nav { gap: 14px; }
   .hero { padding-top: 48px; padding-bottom: 40px; }
   .hero.photo { min-height: 460px; }
-  .hero-bg img { object-position: 70% center; }
+  .hero-bg img, .hero-bg video { object-position: 70% center; }
   .hero-bg::after { background: linear-gradient(rgba(23, 22, 20, 0.55), rgba(23, 22, 20, 0.88)); }
   .wordmark img { height: 22px; }
   .wm-design { font-size: 14px; }
@@ -520,4 +520,22 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
    the clip never plays, so the colour wipe stays. */
 @media (prefers-reduced-motion: no-preference) {
   .tile-art:has(> .tile-sweep) > .tile-sun { clip-path: circle(0% at 85% 15%) !important; animation: none !important; transition: none; }
+}
+.art.worn { aspect-ratio: 3 / 4; object-fit: cover; }
+
+/* Challenge entry close-up: opened by its #entry-… link, closed by the backdrop or × (plain links, no script). */
+.entry .tile-art { display: block; cursor: zoom-in; }
+.entry-name { color: inherit; text-decoration: none; }
+.entry-name:hover { text-decoration: underline; }
+.entry-zoom { display: none; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; padding: 16px; }
+.entry-zoom:target { display: flex; }
+.entry-zoom-backdrop { position: absolute; inset: 0; background: rgba(15, 14, 13, 0.78); }
+.entry-zoom-card { position: relative; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--bg); color: var(--ink); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
+.entry-zoom-close { position: absolute; top: 6px; right: 12px; z-index: 3; font-size: 28px; line-height: 1; text-decoration: none; color: var(--ink); }
+
+/* Hero video: on wide screens it sits in the right part of the banner (a 4:3 clip stretched full width would crop
+   off his head), fading into the dark side; on phones it fills the banner, anchored near the top. */
+.hero-bg video { left: auto; right: 0; width: auto; max-width: 70%; aspect-ratio: 4 / 3; object-position: 50% 0%; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 30%); mask-image: linear-gradient(90deg, transparent 0, #000 30%); }
+@media (max-width: 720px) {
+  .hero-bg video { width: 100%; max-width: none; aspect-ratio: auto; object-position: 80% 0%; -webkit-mask-image: none; mask-image: none; }
 }

@@ -16,6 +16,7 @@
     "demo": "tsx --env-file=.env.local scripts/demo.ts",
     "site:images": "tsx --env-file=.env.local scripts/site-images.ts",
     "shirt:templates": "tsx --env-file=.env.local scripts/shirt-templates.ts",
+    "designs:restyle": "tsx --env-file=.env.local scripts/restyle-designs.ts",
     "sweep:add": "tsx --env-file=.env.local scripts/add-sweep.ts",
     "media:rebuild": "tsx --env-file=.env.local scripts/rebuild-media.ts"
   },

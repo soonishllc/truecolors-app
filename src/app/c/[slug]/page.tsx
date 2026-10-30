@@ -68,6 +68,7 @@ export default async function CampaignPage({
   const video = files.find((m) => m.kind === "video");
   const mockups = files.filter((m) => m.kind === "mockup");
   const sweep = files.find((m) => m.kind === "sweep");
+  const worn = files.find((m) => m.kind === "worn");
   const pairShade = mockups.find((m) => m.template === "flat-square" && m.view === "shade");
   const pairSun = mockups.find((m) => m.template === "flat-square" && m.view === "sun");
   const target = nextStretch(stats.pledged, c.goal, c.stretchGoals) ?? stats.pledged;
@@ -87,7 +88,9 @@ export default async function CampaignPage({
     <>
       <div className="pair">
         <div>
-          {sweep && pairShade ? (
+          {worn ? (
+            <video className="art worn" src={fileUrl(worn.key)} autoPlay muted loop playsInline aria-label={`${c.title}, worn in the sun`} />
+          ) : sweep && pairShade ? (
             <div className="tile-art hero-sweep">
               <img className="art" src={fileUrl(pairShade.key)} alt={c.title} />
               <TileSweep src={fileUrl(sweep.key)} inView />

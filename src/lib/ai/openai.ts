@@ -70,7 +70,16 @@ export function openaiProvider(): ImageProvider {
       );
     },
     fromSketch: edit,
-    colour: edit,
+    async colour(lineArt, prompt, userId, refs) {
+      if (!refs?.length) return edit(lineArt, prompt, userId);
+      const images = [
+        await toFile(lineArt, "line-art.png", { type: "image/png" }),
+        ...(await Promise.all(refs.map((r, i) => toFile(r, `real-shirt-${i}.jpg`, { type: "image/jpeg" })))),
+      ];
+      return decode(
+        await client.images.edit({ model: OPENAI_IMAGE_MODEL, image: images, prompt, size: SIZE, output_format: "png", safety_identifier: userId }),
+      );
+    },
     refine: edit,
     async moderateText(text) {
       return moderation(
