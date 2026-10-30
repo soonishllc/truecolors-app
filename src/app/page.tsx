@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { HeroReveal } from "@/components/HeroReveal";
 import { campaignStats } from "@/lib/campaigns/service";
@@ -19,7 +19,9 @@ export default async function Home() {
     .from(campaigns)
     .innerJoin(users, eq(users.id, campaigns.userId))
     .innerJoin(designs, eq(designs.id, campaigns.designId))
-    .where(inArray(campaigns.status, ["live", "funded"])), (x) => x.c.designId);
+    .where(inArray(campaigns.status, ["live", "funded"]))
+    .orderBy(desc(campaigns.startsAt))
+    .limit(6), (x) => x.c.designId);
   const stats = await Promise.all(live.map((x) => campaignStats(x.c.id)));
   const steps = [
     { id: "step-design", title: "Designers create it", text: "Invited designers describe an idea or upload a sketch, and the AI studio turns it into print-ready colour-changing art." },
@@ -56,7 +58,7 @@ export default async function Home() {
         <Link href="/explore" className="button small secondary">See all designs →</Link>
       </div>
       {live.length === 0 && <p className="muted">No live campaigns right now. Check back soon.</p>}
-      <div className="grid">
+      <div className="grid home-grid">
         {live.map(({ c, name, art, lineArt }, i) => (
           <Link key={c.id} href={`/c/${c.slug}`} className="tile">
             {art && (
