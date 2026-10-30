@@ -514,5 +514,10 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 }
 
 /* Sun-sweep clip over a tile: fades in once it's playing, holds on the full-colour last frame. */
-.tile-sweep { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; z-index: 1; }
+.tile-sweep { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.15s ease; pointer-events: none; z-index: 1; }
 .tile-sweep.on { opacity: 1; }
+/* A tile with a clip stays grey until the clip plays, instead of flashing the colour photo first. Without motion,
+   the clip never plays, so the colour wipe stays. */
+@media (prefers-reduced-motion: no-preference) {
+  .tile-art:has(> .tile-sweep) > .tile-sun { clip-path: circle(0% at 85% 15%) !important; animation: none !important; transition: none; }
+}
