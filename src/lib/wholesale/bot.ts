@@ -24,7 +24,9 @@ How to answer:
 - Write short WhatsApp messages: a few lines, plain text, no markdown headings or tables.
 - Take prices, stock, terms and order details only from your tools. If a tool doesn't give you something, say the team will confirm it rather than guessing.
 - Stockists can order with you: build the basket from get_catalog SKUs, price it with quote_order, show them the quote, and only after they clearly confirm it and choose card or bank transfer, place it with place_order. Send the payment link or bank details exactly as the tool returns them.
-- You can't change or cancel orders or arrange display restocks yet. For those, and for anything else you can't answer, use hand_to_person.
+- Display partners report what they sold, by design and size, in text or as a photo of their till report. Read the numbers, record them with report_sales, read the result back to them, and only confirm it with confirm_sales_report once they agree. If a photo is unclear, ask rather than guess.
+- When a display partner asks for more stock, use request_restock: it proposes topping the display back up, and the team approves it. Restocks pause while a period's sales report is overdue.
+- You can't change or cancel orders. For that, and for anything else you can't answer, use hand_to_person.
 - If someone new wants to stock Truecolors or take a display, find out their name, business, city and type of venue, then save them with record_lead and tell them the wholesale team will be in touch.`;
 
 function describeSender(s: Sender): string {
@@ -38,18 +40,23 @@ function describeSender(s: Sender): string {
   );
 }
 
-// The ticket so far as a conversation: the customer's messages as user turns, ours and the team's as assistant.
+// The ticket so far as a conversation: the customer's messages (and any photos) as user turns, ours and the
+// team's as assistant turns.
 function history(ticket: Ticket): Anthropic.Beta.BetaMessageParam[] {
-  const turns: Anthropic.Beta.BetaMessageParam[] = [];
+  const turns: { role: "user" | "assistant"; blocks: Anthropic.Beta.BetaContentBlockParam[] }[] = [];
   for (const m of ticket.messages) {
-    if (!m.body) continue;
     const role = m.fromAgent ? "assistant" : "user";
+    const blocks: Anthropic.Beta.BetaContentBlockParam[] = [
+      ...(role === "user" ? m.images.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })) : []),
+      ...(m.body ? [{ type: "text" as const, text: m.body }] : []),
+    ];
+    if (!blocks.length) continue;
     const prev = turns.at(-1);
-    if (prev?.role === role) prev.content = `${prev.content}\n\n${m.body}`;
-    else turns.push({ role, content: m.body });
+    if (prev?.role === role) prev.blocks.push(...blocks);
+    else turns.push({ role, blocks });
   }
   while (turns[0]?.role === "assistant") turns.shift();
-  return turns;
+  return turns.map((t) => ({ role: t.role, content: t.blocks }));
 }
 
 async function converse(sender: Sender, ticket: Ticket, state: RunState): Promise<string | undefined> {

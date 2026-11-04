@@ -17,7 +17,10 @@ import { eq, sql } from "drizzle-orm";
 import { currentFan, joinWaitlist, leaveWaitlist, sendFanLink, signOutFan } from "@/lib/fans";
 import { createChallenge, enterChallenge, toggleVote } from "@/lib/challenges";
 import { savePayoutMethod } from "@/lib/payouts/methods";
-import { activateWholesaler, addContact, addOutlet, createWholesaler } from "@/lib/wholesale/accounts";
+import { activateWholesaler, addContact, addOutlet, createWholesaler, updateOutletSettings } from "@/lib/wholesale/accounts";
+import {
+  confirmSalesReport, decideRestock, invoiceSettlement, markRestockSent, markSettlementPaid, recordStockCount, reportSales, requestRestock,
+} from "@/lib/wholesale/consignment";
 import { handBackToBot } from "@/lib/wholesale/bot";
 import { markBankTransferPaid, placeOrder, quoteOrder, shipOrder } from "@/lib/wholesale/orders";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
@@ -227,6 +230,7 @@ export async function addOutletAction(_: FormState, f: FormData): Promise<FormSt
     addOutlet({
       wholesalerId: text(f, "wholesalerId"), name: text(f, "name"), city: text(f, "city"), country: text(f, "country"),
       shopifyLocationId: text(f, "shopifyLocationId"), supplyRoute: text(f, "supplyRoute"),
+      parPerSku: Number(text(f, "parPerSku") || 6), settlementDays: Number(text(f, "settlementDays") || 15),
     }),
   );
   revalidatePath("/admin/wholesale");
@@ -255,12 +259,110 @@ export async function retryShippingAction(f: FormData) {
   revalidatePath("/admin/wholesale");
 }
 
+export async function outletSettingsAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await updateOutletSettings({
+      outletId: text(f, "outletId"), parPerSku: Number(text(f, "parPerSku")), settlementDays: Number(text(f, "settlementDays")),
+      shopifyLocationId: text(f, "shopifyLocationId"),
+    });
+    return { message: "Saved." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function decideRestockAction(f: FormData) {
+  await requireAdmin();
+  await decideRestock(text(f, "restockId"), text(f, "decision") === "approve");
+  revalidatePath("/admin/wholesale");
+}
+
+export async function sendRestockAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await markRestockSent(text(f, "restockId"));
+    return { message: "Stock moved onto the display." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function invoiceSettlementAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await invoiceSettlement(text(f, "settlementId"));
+    return { message: "Invoiced and emailed." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function settlementPaidAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await markSettlementPaid(text(f, "settlementId"));
+    return { message: "Marked paid." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+// Counts are typed one per line: "TC-HAB-WHT-M 4". Anything on the display that isn't listed was not found.
+export async function stockCountAction(_: FormState, f: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const counted = text(f, "counts")
+    .split(/\n+/)
+    .map((line) => line.trim().split(/[\s,=:]+/))
+    .filter((parts) => parts[0])
+    .map(([sku, qty]) => ({ sku, quantity: Number(qty) }));
+  const res = await attempt(async () => {
+    const c = await recordStockCount(text(f, "outletId"), counted, admin.email);
+    return { message: c.missingUnits ? `${c.missingUnits} shirts missing; they go on the next settlement.` : "Count matches what was expected." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
 // ---- Wholesaler portal --------------------------------------------------------------------------------
 
 async function portalStockist() {
   const me = await currentWholesaler();
   if (!("wholesaler" in me) || !me.wholesaler) redirect("/wholesale");
   return me.wholesaler;
+}
+
+async function portalOutlet(outletId: string) {
+  const me = await currentWholesaler();
+  if (!("wholesaler" in me) || !me.wholesaler) redirect("/wholesale");
+  const outlet = me.outlets.find((o) => o.id === outletId);
+  if (!outlet) redirect("/wholesale");
+  return { contact: me.contact, outlet };
+}
+
+export async function portalRestockAction(_: FormState, f: FormData): Promise<FormState> {
+  const { contact, outlet } = await portalOutlet(text(f, "outletId"));
+  const res = await attempt(async () => {
+    const r = await requestRestock(outlet.id, contact.id, text(f, "note"));
+    return { message: `Restock of ${r.units} shirts requested. We'll confirm when it's on its way.` };
+  });
+  revalidatePath("/wholesale");
+  return res;
+}
+
+// Submitting the form is the partner confirming their numbers, so the report is confirmed straight away.
+export async function portalSalesAction(_: FormState, f: FormData): Promise<FormState> {
+  const { outlet } = await portalOutlet(text(f, "outletId"));
+  const lines = [...f.entries()]
+    .filter(([k, v]) => k.startsWith("qty:") && String(v).trim() !== "")
+    .map(([k, v]) => ({ sku: k.slice(4), quantity: Number(v) }));
+  const res = await attempt(async () => {
+    const draft = await reportSales(outlet.id, lines, "portal");
+    await confirmSalesReport(outlet.id, draft.ref);
+    return { message: `Thanks: ${draft.units} shirts recorded (${draft.ref}).` };
+  });
+  revalidatePath("/wholesale");
+  return res;
 }
 
 export async function portalQuoteAction(_: FormState, f: FormData): Promise<FormState> {

@@ -6,7 +6,8 @@ import {
   PARTNER_MSRP_MULTIPLE, PARTNER_PRICE, SETTLEMENT_DAYS, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS,
 } from "../rules";
 import { wholesaleOps } from "./ops";
-import { placeOrder, quoteOrder, summary } from "./orders";
+import { confirmSalesReport, outletSummary, reportSales, requestRestock } from "./consignment";
+import { placeOrder, quoteOrder, showMoney, summary } from "./orders";
 
 // The bot's tools. Every one takes the sender from the verified WhatsApp number, never from the model, so
 // a wholesaler only ever sees their own orders and stock. Stockists can quote and place orders; a placed
@@ -210,12 +211,104 @@ const placeOrderTool: Tool = {
   },
 };
 
+// Display partners name the outlet when they have more than one.
+function outletOf(sender: Sender, name: unknown) {
+  if (sender.outlets.length === 1) return sender.outlets[0];
+  const wanted = String(name ?? "").trim().toLowerCase();
+  const match = sender.outlets.find((o) => o.name.toLowerCase() === wanted) ?? sender.outlets.find((o) => wanted && o.name.toLowerCase().includes(wanted));
+  if (!match) throw new Error(`Which outlet? ${sender.outlets.map((o) => o.name).join(", ") || "none set up yet"}`);
+  return match;
+}
+
+const outletParam = { outlet: { type: "string", description: "The outlet's name; empty if they have only one." } };
+
+async function attempt(fn: () => Promise<unknown>) {
+  try {
+    return await fn();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+const requestRestockTool: Tool = {
+  def: {
+    name: "request_restock",
+    description:
+      "Asks the team to restock a display partner's outlet. It proposes topping every design and size back up to the " +
+      "outlet's usual level and returns the proposal; the team approves and sends it.",
+    input_schema: schema({ ...outletParam, note: { type: "string", description: "Anything the partner asked for; empty if nothing." } }, ["outlet", "note"]),
+    strict: true,
+  },
+  run: (input, sender) =>
+    attempt(async () => {
+      const r = await requestRestock(outletOf(sender, input.outlet).id, sender.contact?.id ?? null, String(input.note ?? ""));
+      return { requested: true, shirts: r.units, lines: r.lines.map((l) => `${l.quantity} × ${l.title} ${l.size}`), note: "The team approves restocks and confirms when they're sent." };
+    }),
+};
+
+const reportSalesTool: Tool = {
+  def: {
+    name: "report_sales",
+    description:
+      "Records what a display partner sold on their own till, by SKU (from get_catalog or get_display_stock) and quantity. " +
+      "Returns a draft report with a reference and what they'll owe; read it back and confirm it with confirm_sales_report once they agree.",
+    input_schema: schema(
+      { ...outletParam, lines: { type: "array", items: schema({ sku: { type: "string" }, quantity: { type: "integer" } }, ["sku", "quantity"]) } },
+      ["outlet", "lines"],
+    ),
+    strict: true,
+  },
+  run: (input, sender) =>
+    attempt(async () => {
+      const r = await reportSales(outletOf(sender, input.outlet).id, input.lines as { sku: string; quantity: number }[], "whatsapp");
+      return { report: r.ref, shirts: r.units, lines: r.lines.map((l) => `${l.quantity} × ${l.title} ${l.size}`), status: "draft, not confirmed yet" };
+    }),
+};
+
+const confirmSalesTool: Tool = {
+  def: {
+    name: "confirm_sales_report",
+    description: "Confirms a sales report the partner has agreed is right. Only call it after they say yes.",
+    input_schema: schema({ ...outletParam, report: { type: "string", description: "The report reference, like S-7F3K2." } }, ["outlet", "report"]),
+    strict: true,
+  },
+  run: (input, sender) =>
+    attempt(async () => {
+      const r = await confirmSalesReport(outletOf(sender, input.outlet).id, String(input.report));
+      return { confirmed: r.ref, shirts: r.units };
+    }),
+};
+
+const getSettlementTool: Tool = {
+  def: {
+    name: "get_settlement",
+    description:
+      "Shows a display partner's current period for an outlet: shirts sold so far, what they owe so far, when the period " +
+      "ends, whether restocks are paused, and their recent settlements with payment links.",
+    input_schema: schema(outletParam, ["outlet"]),
+    strict: true,
+  },
+  run: (input, sender) =>
+    attempt(async () => {
+      const s = await outletSummary(outletOf(sender, input.outlet).id);
+      return {
+        outlet: s.outlet.name, periodEnds: s.periodEnds.toDateString(), soldThisPeriod: s.soldThisPeriod,
+        owedSoFar: s.owedSoFar === undefined ? "price to be confirmed by the team" : showMoney(s.owedSoFar, s.currency),
+        restocksPaused: s.restocksPaused, salesReportDue: s.overdue,
+        settlements: s.settlements.map((x) => ({
+          period: `${x.periodStart.toDateString()} to ${x.periodEnd.toDateString()}`, shirts: x.reportedUnits + x.missingUnits,
+          amount: x.amount ? showMoney(x.amount, x.currency) : "being checked", status: x.status, payUrl: x.payUrl ?? undefined,
+        })),
+      };
+    }),
+};
+
 const handToPerson: Tool = {
   def: {
     name: "hand_to_person",
     description:
       "Passes the chat to the Truecolors wholesale team. Use it for anything you can't answer or do with your tools: " +
-      "changing or cancelling an order, payment problems, restocks, complaints, custom designs, contract terms, or when they ask for a person. " +
+      "changing or cancelling an order, payment problems, complaints, custom designs, contract terms, or when they ask for a person. " +
       "After calling it, tell them a team member will reply here.",
     input_schema: schema({ reason: { type: "string", description: "One line for the team: what they need." } }, ["reason"]),
     strict: true,
@@ -234,7 +327,7 @@ export function toolsFor(sender: Sender): Tool[] {
   return [
     getCatalog, getOrders,
     ...(w.stockist ? [quoteOrderTool, placeOrderTool] : []),
-    ...(w.displayPartner ? [getDisplayStock] : []),
+    ...(w.displayPartner ? [getDisplayStock, reportSalesTool, confirmSalesTool, getSettlementTool, requestRestockTool] : []),
     handToPerson,
   ];
 }

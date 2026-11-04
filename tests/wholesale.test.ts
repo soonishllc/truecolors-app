@@ -14,6 +14,8 @@ const { freshDb } = await import("./helpers");
 const { quoteOrder, placeOrder, recordWholesaleShopifyOrder, markBankTransferPaid, shipOrder } = await import("../src/lib/wholesale/orders");
 const { wholesaleOrders, emails } = await import("../src/lib/db/schema");
 const { cartons, shipmentRequest } = await import("../src/lib/fedex/client");
+const consignment = await import("../src/lib/wholesale/consignment");
+const { outlets, restocks, salesReports, settlements } = await import("../src/lib/db/schema");
 
 type Ticket = import("../src/lib/gorgias/client").Ticket;
 type Msg = Ticket["messages"][number];
@@ -25,10 +27,10 @@ const PHONE = "971501234567";
 let seq = 1;
 const customer = (body: string, phone = PHONE): Msg => ({
   id: String(seq++), fromAgent: false, via: "whatsapp", body, customerPhone: phone,
-  ourAddress: "+15558763944", integrationId: 7, createdAt: new Date(Date.UTC(2026, 10, 4, 10, 0, seq)).toISOString(),
+  ourAddress: "+15558763944", integrationId: 7, images: [], createdAt: new Date(Date.UTC(2026, 10, 4, 10, 0, seq)).toISOString(),
 });
 const agent = (body: string): Msg => ({
-  id: String(seq++), fromAgent: true, via: "helpdesk", body, createdAt: new Date(Date.UTC(2026, 10, 4, 10, 0, seq)).toISOString(),
+  id: String(seq++), fromAgent: true, via: "helpdesk", body, images: [], createdAt: new Date(Date.UTC(2026, 10, 4, 10, 0, seq)).toISOString(),
 });
 
 const message = (content: unknown[], stop_reason: string) =>
@@ -49,6 +51,17 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
     shipments: [] as Parameters<WholesaleOps["bookShipment"]>[0][],
     fulfilled: [] as { orderId: string; tracking: string }[],
     fedexDown: false,
+    // Stock by location id, then SKU. A location with nothing set holds 6 Habibi M.
+    stock: new Map<string, Map<string, number>>(),
+    adjustments: [] as { inventoryItemId: string; locationId: string; delta: number }[],
+    invoices: [] as Parameters<WholesaleOps["createInvoiceDraftOrder"]>[0][],
+    completed: [] as { id: string; pending: boolean }[],
+  };
+  const skuOf: Record<string, string> = { "inv-M": "TC-HAB-WHT-M", "inv-L": "TC-HAB-WHT-L" };
+  const sizeOf = (sku: string) => sku.split("-").at(-1)!;
+  const at = (id: string) => {
+    if (!seen.stock.has(id)) seen.stock.set(id, new Map([["TC-HAB-WHT-M", 6]]));
+    return seen.stock.get(id)!;
   };
   useWholesaleOps({
     getTicket: async () => ticket,
@@ -63,15 +76,27 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
       {
         title: "Habibi", handle: "habibi", retailPrice: "36.00", currency: "USD",
         sizes: [
-          { size: "M", sku: "TC-HAB-WHT-M", variantId: "gid://shopify/ProductVariant/1", available: 40 },
-          { size: "L", sku: "TC-HAB-WHT-L", variantId: "gid://shopify/ProductVariant/2", available: 200 },
+          { size: "M", sku: "TC-HAB-WHT-M", variantId: "gid://shopify/ProductVariant/1", inventoryItemId: "inv-M", available: 40 },
+          { size: "L", sku: "TC-HAB-WHT-L", variantId: "gid://shopify/ProductVariant/2", inventoryItemId: "inv-L", available: 200 },
         ],
       },
     ],
     customerOrders: async () => [],
     locationStock: async (id) => {
       seen.stockAsked.push(id);
-      return [{ product: "Habibi", size: "M", sku: "TC-HAB-WHT-M", available: 6 }];
+      return [...at(id)].map(([sku, available]) => ({ product: "Habibi", size: sizeOf(sku), sku, available }));
+    },
+    adjustStock: async (changes) => {
+      for (const c of changes) {
+        seen.adjustments.push(c);
+        const here = at(c.locationId);
+        const sku = skuOf[c.inventoryItemId];
+        here.set(sku, (here.get(sku) ?? 0) + c.delta);
+      }
+    },
+    createInvoiceDraftOrder: async (input) => {
+      seen.invoices.push(input);
+      return { id: "gid://shopify/DraftOrder/77", name: "#D77", invoiceUrl: "https://shop.example/invoices/settle" };
     },
     // AED retail is 135 in the UAE market; USD 36 elsewhere.
     variantPrices: async (ids, country) =>
@@ -80,7 +105,8 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
       seen.drafts.push(input);
       return { id: "gid://shopify/DraftOrder/9", name: "#D9", invoiceUrl: "https://shop.example/invoices/abc" };
     },
-    completeDraftAsPending: async (id) => {
+    completeDraftAsPending: async (id, pending = true) => {
+      seen.completed.push({ id, pending });
       seen.pending.push(id);
       return { orderId: "5001", orderName: "#5001" };
     },
@@ -151,7 +177,9 @@ describe("wholesale bot", () => {
     const seen = fakes(ticket, [call("get_display_stock"), text("You have 6 Habibi in M at the lobby shop.")]);
     await handleTicket("101");
 
-    expect(toolNames(seen.calls[0])).toEqual(["get_catalog", "get_display_stock", "get_orders", "hand_to_person"]);
+    expect(toolNames(seen.calls[0])).toEqual([
+      "confirm_sales_report", "get_catalog", "get_display_stock", "get_orders", "get_settlement", "hand_to_person", "report_sales", "request_restock",
+    ]);
     expect(toolNames(seen.calls[0])).not.toContain("quote_order");
     expect(seen.stockAsked).toEqual(["42"]);
     expect(seen.calls[0].system).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining("Omar (owner) at Marina Resort Boutique") })]));
@@ -445,5 +473,154 @@ describe("FedEx shipment request", () => {
   it("leaves customs out of shipments within Mexico", () => {
     const req = shipmentRequest({ shipTo: { ...shipTo, country: "MX" }, units: 30, currency: "MXN", customsValue: "4500.00", reference: "#1", date: new Date() });
     expect(req.requestedShipment.customsClearanceDetail).toBeUndefined();
+  });
+});
+
+describe("display partners", () => {
+  const none: Ticket = { id: "0", channel: "whatsapp", messages: [] };
+  const DAY = 86_400_000;
+  const start = new Date("2026-11-01T08:00:00Z");
+
+  async function partner(currency = "MXN") {
+    const w = await createWholesaler({
+      name: "Hotel Playa", currency, shopifyCustomerId: "321", stockist: false, displayPartner: true,
+      contactName: "Lucía", phone: PHONE, email: "lucia@playa.example",
+    });
+    await addOutlet({
+      wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42", supplyRoute: "cancun", parPerSku: 6,
+    });
+    const d = await db();
+    const [o] = await d.update(outlets).set({ periodStart: start }).where(eq(outlets.wholesalerId, w.id)).returning();
+    return { w, o };
+  }
+  const outletRow = async (id: string) => (await (await db()).select().from(outlets).where(eq(outlets.id, id)))[0];
+  const settlementRows = async () => (await db()).select().from(settlements);
+
+  beforeEach(() => {
+    process.env.WHOLESALE_LOCATION_ID = "900";
+    resetConfig();
+  });
+
+  it("proposes a restock up to the usual level, and moves the stock once the team sends it", async () => {
+    const seen = fakes(none, []);
+    seen.stock.set("42", new Map([["TC-HAB-WHT-M", 2], ["TC-HAB-WHT-L", 6]]));
+    seen.stock.set("900", new Map([["TC-HAB-WHT-M", 100], ["TC-HAB-WHT-L", 100]]));
+    const { o } = await partner();
+
+    const r = await consignment.requestRestock(o.id, null);
+    expect(r.lines.map((l) => [l.sku, l.quantity])).toEqual([["TC-HAB-WHT-M", 4]]);
+    await expect(consignment.markRestockSent(r.id)).rejects.toThrow(/approved/);
+    await consignment.decideRestock(r.id, true);
+    await consignment.markRestockSent(r.id);
+
+    expect(seen.stock.get("42")!.get("TC-HAB-WHT-M")).toBe(6);
+    expect(seen.stock.get("900")!.get("TC-HAB-WHT-M")).toBe(96);
+    expect((await (await db()).select().from(restocks))[0].status).toBe("sent");
+  });
+
+  it("reads a till photo into a draft report and only takes the stock off once the partner confirms", async () => {
+    const { o } = await partner();
+    const photo = { ...customer("Here's this week's till"), images: ["https://uploads.gorgias.example/till.jpg"] };
+    const ticket: Ticket = { id: "300", channel: "whatsapp", messages: [photo] };
+    const seen = fakes(ticket, [
+      call("report_sales", { outlet: "", lines: [{ sku: "TC-HAB-WHT-M", quantity: 4 }] }),
+      text("I read 4 Habibi M. Is that right?"),
+    ]);
+    await handleTicket("300");
+
+    const first = seen.calls[0].messages[0].content as Anthropic.Beta.BetaContentBlockParam[];
+    expect(first[0]).toEqual({ type: "image", source: { type: "url", url: "https://uploads.gorgias.example/till.jpg" } });
+    expect(seen.adjustments).toEqual([]);
+    const [draft] = await (await db()).select().from(salesReports);
+    expect(draft).toMatchObject({ status: "draft", units: 4, source: "whatsapp" });
+
+    ticket.messages.push({ ...agent("I read 4 Habibi M. Is that right?"), via: "api" }, customer("Yes"));
+    const script = [call("confirm_sales_report", { outlet: "", report: draft.ref }), text("Thanks, recorded.")];
+    useWholesaleOps({ ...(await import("../src/lib/wholesale/ops")).wholesaleOps(), converse: async () => script.shift()! });
+    await handleTicket("300");
+    expect(seen.stock.get("42")!.get("TC-HAB-WHT-M")).toBe(2);
+    expect((await (await db()).select().from(salesReports))[0].status).toBe("confirmed");
+    expect(o.id).toBeTruthy();
+  });
+
+  it("won't record more sales than the display holds", async () => {
+    fakes(none, []);
+    const { o } = await partner();
+    await expect(consignment.reportSales(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 9 }], "portal")).rejects.toThrow(/6 on the display/);
+  });
+
+  it("settles a period at the partner price, invoices it in Shopify and records the card payment", async () => {
+    const seen = fakes(none, []);
+    const { o } = await partner();
+    const r = await consignment.reportSales(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 4 }], "portal");
+    await consignment.confirmSalesReport(o.id, r.ref, new Date(start.getTime() + 10 * DAY));
+    expect(await settlementRows()).toEqual([]);
+
+    const log: string[] = [];
+    await consignment.runSettlements(new Date(start.getTime() + 15 * DAY + 1000), log);
+    const [s] = await settlementRows();
+    expect(s).toMatchObject({ status: "review", reportedUnits: 4, missingUnits: 0, currency: "MXN", unitPrice: "150.00", amount: "600.00" });
+    expect((await outletRow(o.id)).periodStart).toEqual(new Date(start.getTime() + 15 * DAY));
+
+    await consignment.invoiceSettlement(s.id);
+    expect(seen.invoices[0]).toMatchObject({
+      shopifyCustomerId: "321", currency: "MXN", tags: ["consignment-settlement", `consignment-settlement:${s.id}`],
+      lines: [{ title: "Habibi M, sold at Lobby shop", quantity: 4, unit: "150.00" }],
+    });
+    await consignment.recordSettlementPayment({
+      id: 1, name: "#6001", currency: "MXN", line_items: [], tags: `consignment-settlement, consignment-settlement:${s.id}`, financial_status: "paid",
+    });
+    expect((await settlementRows())[0].status).toBe("paid");
+  });
+
+  it("pauses restocks and reminds twice when no report comes, then settles missing shirts from the team's count", async () => {
+    const seen = fakes(none, []);
+    const { o } = await partner();
+    const after = (days: number) => new Date(start.getTime() + days * DAY + 1000);
+
+    const log: string[] = [];
+    await consignment.runSettlements(after(15), log);
+    await consignment.runSettlements(after(15.5), log);
+    await consignment.runSettlements(after(16), log);
+    await consignment.runSettlements(after(17), log);
+    expect(log).toEqual([
+      "Lobby shop: sales reminder 1 sent", "Lobby shop: sales reminder 2 sent", "Lobby shop: no sales report, needs a visit to count",
+    ]);
+    const emailed = (await (await db()).select().from(emails)).filter((e) => e.subject.startsWith("Truecolors sales for Lobby shop"));
+    expect(emailed).toHaveLength(2);
+    await expect(consignment.requestRestock(o.id, null)).rejects.toThrow(/paused/);
+
+    // On the visit, 1 of the 6 shirts is there.
+    await consignment.recordStockCount(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 1 }], "kevin@probablyfine.ae", after(17));
+    expect(seen.stock.get("42")!.get("TC-HAB-WHT-M")).toBe(1);
+    const [s] = await settlementRows();
+    expect(s).toMatchObject({ reportedUnits: 0, missingUnits: 5, amount: "750.00", status: "review" });
+    expect(await outletRow(o.id)).toMatchObject({ overdueSince: null, remindersSent: 0 });
+  });
+
+  it("holds a settlement for review when the partner price isn't set for its currency", async () => {
+    fakes(none, []);
+    const { o } = await partner("AED");
+    const r = await consignment.reportSales(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 2 }], "portal");
+    await consignment.confirmSalesReport(o.id, r.ref, new Date(start.getTime() + 16 * DAY));
+    const [s] = await settlementRows();
+    expect(s).toMatchObject({ status: "review", amount: null, problem: "No partner price set for AED yet (rules.ts)." });
+    await expect(consignment.invoiceSettlement(s.id)).rejects.toThrow(/No partner price/);
+  });
+
+  it("closes a period with nothing sold without an invoice, and marks bank transfers paid", async () => {
+    const seen = fakes(none, []);
+    const { o } = await partner();
+    const zero = await consignment.reportSales(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 0 }], "portal");
+    await consignment.confirmSalesReport(o.id, zero.ref, new Date(start.getTime() + 15 * DAY + 1000));
+    expect((await settlementRows())[0]).toMatchObject({ status: "paid", amount: "0.00" });
+    expect(seen.invoices).toEqual([]);
+
+    const sold = await consignment.reportSales(o.id, [{ sku: "TC-HAB-WHT-M", quantity: 1 }], "portal");
+    await consignment.confirmSalesReport(o.id, sold.ref, new Date(start.getTime() + 31 * DAY));
+    const open = (await settlementRows()).find((x) => x.status === "review")!;
+    await consignment.invoiceSettlement(open.id);
+    await consignment.markSettlementPaid(open.id);
+    expect(seen.completed).toEqual([{ id: "gid://shopify/DraftOrder/77", pending: false }]);
   });
 });

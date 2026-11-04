@@ -160,7 +160,7 @@ export function summary(o: WholesaleOrder): string {
 }
 
 // Emails every contact at the wholesaler who has an email. The key makes each notice go out once.
-async function notify(w: Wholesaler, key: string, subject: string, paragraphs: string[]) {
+export async function notify(w: Wholesaler, key: string, subject: string, paragraphs: string[]) {
   const d = await db();
   const contacts = await d.select().from(wholesaleContacts).where(eq(wholesaleContacts.wholesalerId, w.id));
   for (const c of contacts.filter((c) => c.email)) {

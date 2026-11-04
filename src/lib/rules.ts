@@ -94,6 +94,9 @@ export const PARTNER_PRICE: Partial<Record<WholesaleCurrency, number>> = { MXN: 
 export const PARTNER_MSRP_MULTIPLE = 2;
 
 export const SETTLEMENT_DAYS = 15;
+// Once a period ends without a sales report: a reminder a day, this many times, then the team visits to count.
+export const SETTLEMENT_REMINDERS = 2;
+export const REMINDER_HOURS = 24;
 
 export function wholesaleDiscountBps(units: number): number | undefined {
   return WHOLESALE_TIERS.filter((t) => units >= t.fromUnits).at(-1)?.discountBps;

@@ -36,6 +36,13 @@
       "when": 1793805017743,
       "tag": "0004_wholesale_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793805407322,
+      "tag": "0005_consignment",
+      "breakpoints": true
     }
   ]
 }

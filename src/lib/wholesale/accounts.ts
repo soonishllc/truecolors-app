@@ -86,10 +86,19 @@ export async function activateWholesaler(input: { wholesalerId: string; currency
     .where(eq(wholesalers.id, input.wholesalerId));
 }
 
+function checkOutletSettings(parPerSku: number, settlementDays: number) {
+  if (!Number.isInteger(parPerSku) || parPerSku < 1) throw new UserError("The usual stock per design and size is a whole number, 1 or more.");
+  if (settlementDays !== 15 && settlementDays !== 7) throw new UserError("Settle every 15 days, or weekly for busy outlets.");
+}
+
 export async function addOutlet(input: {
   wholesalerId: string; name: string; city: string; country: string; shopifyLocationId: string; supplyRoute: string;
+  parPerSku?: number; settlementDays?: number;
 }) {
   if (!input.name || !input.city || !input.country) throw new UserError("Enter the outlet's name, city and country.");
+  const parPerSku = input.parPerSku ?? 6;
+  const settlementDays = input.settlementDays ?? 15;
+  checkOutletSettings(parPerSku, settlementDays);
   if (!(ROUTES as readonly string[]).includes(input.supplyRoute)) throw new UserError("Pick where restocks come from.");
   const d = await db();
   const [w] = await d.select().from(wholesalers).where(eq(wholesalers.id, input.wholesalerId));
@@ -98,7 +107,20 @@ export async function addOutlet(input: {
     wholesalerId: w.id, name: input.name, city: input.city, country: input.country,
     shopifyLocationId: input.shopifyLocationId.replace(/\D/g, "") || null,
     supplyRoute: input.supplyRoute as (typeof ROUTES)[number],
+    parPerSku, settlementDays,
   });
+}
+
+export async function updateOutletSettings(input: { outletId: string; parPerSku: number; settlementDays: number; shopifyLocationId: string }) {
+  checkOutletSettings(input.parPerSku, input.settlementDays);
+  const d = await db();
+  await d
+    .update(outlets)
+    .set({
+      parPerSku: input.parPerSku, settlementDays: input.settlementDays,
+      ...(input.shopifyLocationId && { shopifyLocationId: input.shopifyLocationId.replace(/\D/g, "") }),
+    })
+    .where(eq(outlets.id, input.outletId));
 }
 
 export async function wholesaleOverview() {

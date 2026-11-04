@@ -1,6 +1,9 @@
+import { portalRestockAction, portalSalesAction } from "@/app/actions";
+import { ActionForm } from "@/components/ActionForm";
 import { CONTACT } from "@/lib/brand";
 import { date, money } from "@/lib/format";
 import { customerOrders, locationStock, type OrderSummary, type StockLine } from "@/lib/shopify/wholesale";
+import { outletSummary } from "@/lib/wholesale/consignment";
 import { ordersFor, showMoney } from "@/lib/wholesale/orders";
 import { currentWholesaler, portalSignInReady } from "@/lib/wholesale/portal-auth";
 
@@ -66,6 +69,7 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
         me.outlets.map(async (o) => ({
           outlet: o,
           lines: o.shopifyLocationId ? await attempt(() => locationStock(o.shopifyLocationId!)) : [],
+          summary: await outletSummary(o.id),
         })),
       )
     : [];
@@ -118,10 +122,63 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
         <>
           <h2>Your displays</h2>
           {stock.length === 0 && <p className="muted">No outlets set up yet.</p>}
-          {stock.map(({ outlet, lines }) => (
-            <div key={outlet.id} className="card">
+          {stock.map(({ outlet, lines, summary: s }) => (
+            <div key={outlet.id} className="card stack">
               <h3>{outlet.name} · {outlet.city}</h3>
+              <p className="small">
+                This period ends {date(s.periodEnds)}. Sold so far: {s.soldThisPeriod} shirts
+                {s.owedSoFar !== undefined && <>, {showMoney(s.owedSoFar, s.currency)} owed so far</>}.
+                {s.overdue && <strong> Please send your sales for the period that ended.</strong>}
+              </p>
+              {s.restocksPaused && <p className="notice small">Restocks are paused until the last period&apos;s sales are in.</p>}
               <Stock lines={lines} />
+
+              {lines && lines.length > 0 && (
+                <details>
+                  <summary>Report sales</summary>
+                  <ActionForm action={portalSalesAction} submit="Confirm these sales" pendingText="Recording…">
+                    <input type="hidden" name="outletId" value={outlet.id} />
+                    <table>
+                      <thead><tr><th>Design</th><th>Size</th><th>Sold</th></tr></thead>
+                      <tbody>
+                        {lines.filter((l) => l.available > 0).map((l) => (
+                          <tr key={l.sku}>
+                            <td>{l.product}</td><td>{l.size}</td>
+                            <td><input name={`qty:${l.sku}`} type="number" min={0} max={l.available} placeholder="0" style={{ width: 72 }} aria-label={`${l.product} ${l.size} sold`} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </ActionForm>
+                </details>
+              )}
+
+              {s.openRestock ? (
+                <p className="small muted">Restock of {s.openRestock.units} shirts {s.openRestock.status === "approved" ? "approved, being prepared" : "requested"}.</p>
+              ) : (
+                !s.restocksPaused && (
+                  <ActionForm action={portalRestockAction} className="row" submit="Request a restock">
+                    <input type="hidden" name="outletId" value={outlet.id} />
+                    <input name="note" placeholder="Anything we should know (optional)" />
+                  </ActionForm>
+                )
+              )}
+
+              {s.settlements.length > 0 && (
+                <table>
+                  <thead><tr><th>Period</th><th>Shirts</th><th>Amount</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {s.settlements.map((x) => (
+                      <tr key={x.id}>
+                        <td>{date(x.periodStart)} – {date(x.periodEnd)}</td>
+                        <td>{x.reportedUnits + x.missingUnits}</td>
+                        <td>{x.amount ? showMoney(x.amount, x.currency) : "being checked"}</td>
+                        <td>{x.status === "invoiced" && x.payUrl ? <a href={x.payUrl}>Pay now</a> : x.status === "paid" ? "paid" : "being checked"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           ))}
         </>

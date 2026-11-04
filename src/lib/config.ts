@@ -74,6 +74,9 @@ const schema = z.object({
   WHOLESALE_COLLECTION_HANDLE: z.string().default("wholesale-catalog"),
   // The Shopify location of the Cancún hub, which stockist orders ship from. Blank = stock across all locations.
   WHOLESALE_LOCATION_ID: z.string().optional(),
+  // Where display restocks come from, by region: Quiqup (UAE, GCC) and Shipdudes (US, Canada, islands).
+  QUIQUP_LOCATION_ID: z.string().optional(),
+  SHIPDUDES_LOCATION_ID: z.string().optional(),
   // Wholesaler portal sign-in: a confidential client from Shopify's Customer Account API settings, with
   // APP_URL/wholesale/callback as its callback URL.
   SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: z.string().optional(),

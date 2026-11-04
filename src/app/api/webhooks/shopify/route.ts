@@ -6,13 +6,15 @@ import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { webhookEvents } from "@/lib/db/schema";
 import { verifyWebhook, type OrderPayload } from "@/lib/shopify/webhooks";
+import { recordSettlementPayment } from "@/lib/wholesale/consignment";
 import { recordWholesaleShopifyOrder } from "@/lib/wholesale/orders";
 
 const HANDLERS: Record<string, (body: never) => Promise<void>> = {
-  // Campaign pre-orders and wholesale orders both arrive here; each handler ignores the other's orders.
+  // Campaign pre-orders, wholesale orders and settlement payments all arrive here; each handler ignores the rest.
   "orders/create": async (order: OrderPayload) => {
     await recordOrder(order);
     await recordWholesaleShopifyOrder(order);
+    await recordSettlementPayment(order);
   },
   "orders/cancelled": recordCancelledOrder,
   "refunds/create": recordRefund,

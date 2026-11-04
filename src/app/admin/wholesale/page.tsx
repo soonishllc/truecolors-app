@@ -1,14 +1,16 @@
 import Link from "next/link";
 import {
   activateWholesalerAction, addContactAction, addOutletAction, createWholesalerAction, handBackToBotAction,
-  markWholesalePaidAction, retryShippingAction,
+  markWholesalePaidAction, retryShippingAction, decideRestockAction, sendRestockAction, invoiceSettlementAction,
+  settlementPaidAction, stockCountAction, outletSettingsAction,
 } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth/session";
-import { ago } from "@/lib/format";
+import { ago, date } from "@/lib/format";
 import { WHOLESALE_CURRENCIES } from "@/lib/rules";
 import { fileUrl } from "@/lib/storage";
 import { wholesaleOverview } from "@/lib/wholesale/accounts";
+import { consignmentQueue } from "@/lib/wholesale/consignment";
 import { adminOrders, showMoney } from "@/lib/wholesale/orders";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +36,8 @@ export default async function WholesaleAdmin() {
   await requireAdmin();
   const { wholesalers, chats } = await wholesaleOverview();
   const orders = (await adminOrders()).filter(({ o }) => o.status !== "quoted");
+  const queue = await consignmentQueue();
+  const allOutlets = wholesalers.flatMap(({ w, outlets }) => outlets.map((o) => ({ o, w })));
   const leads = wholesalers.filter(({ w }) => w.status === "lead");
   const active = wholesalers.filter(({ w }) => w.status === "active");
 
@@ -77,6 +81,96 @@ export default async function WholesaleAdmin() {
           ))}
         </tbody>
       </table>
+
+      <h2>Displays</h2>
+      {queue.overdue.length > 0 && (
+        <p className="notice">
+          Sales reports overdue, restocks paused:{" "}
+          {queue.overdue.map(({ outlet, wholesaler }) => `${outlet.name} (${wholesaler.name}, ${outlet.remindersSent} reminders${outlet.remindersSent >= 2 ? ", needs a visit" : ""})`).join("; ")}
+        </p>
+      )}
+
+      <h3>Restocks ({queue.restocks.length})</h3>
+      {queue.restocks.length === 0 && <p className="muted">None waiting.</p>}
+      <table>
+        <tbody>
+          {queue.restocks.map(({ r, outlet, wholesaler }) => (
+            <tr key={r.id}>
+              <td><strong>{outlet.name}</strong><br /><span className="small muted">{wholesaler.name} · from {outlet.supplyRoute}</span></td>
+              <td className="small">{r.lines.map((l) => <div key={l.sku}>{l.quantity} × {l.title} {l.size}</div>)}{r.note && <div className="muted">“{r.note}”</div>}</td>
+              <td>{r.units} shirts<br /><span className="badge">{r.status}</span></td>
+              <td>
+                {r.status === "requested" ? (
+                  <form action={decideRestockAction} className="row">
+                    <input type="hidden" name="restockId" value={r.id} />
+                    <button name="decision" value="approve">Approve</button>
+                    <button name="decision" value="decline" className="secondary">Decline</button>
+                  </form>
+                ) : (
+                  <ActionForm action={sendRestockAction} className="row" submit="Mark sent">
+                    <input type="hidden" name="restockId" value={r.id} />
+                  </ActionForm>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h3>Settlements ({queue.settlements.length})</h3>
+      {queue.settlements.length === 0 && <p className="muted">None waiting.</p>}
+      <table>
+        <tbody>
+          {queue.settlements.map(({ s, outlet, wholesaler }) => (
+            <tr key={s.id}>
+              <td><strong>{outlet.name}</strong><br /><span className="small muted">{wholesaler.name} · {date(s.periodStart)} – {date(s.periodEnd)}</span></td>
+              <td>
+                {s.reportedUnits} reported{s.missingUnits > 0 && <>, <span className="warn">{s.missingUnits} missing at count</span></>}
+                <br />{s.amount ? showMoney(s.amount, s.currency) : <span className="warn">{s.problem}</span>}
+              </td>
+              <td><span className="badge">{s.status}</span></td>
+              <td>
+                {s.status === "review" && (
+                  <ActionForm action={invoiceSettlementAction} className="row" submit="Send invoice">
+                    <input type="hidden" name="settlementId" value={s.id} />
+                  </ActionForm>
+                )}
+                {s.status === "invoiced" && (
+                  <ActionForm action={settlementPaidAction} className="row" submit="Transfer received">
+                    <input type="hidden" name="settlementId" value={s.id} />
+                  </ActionForm>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="pair">
+        <div>
+          <h3>Record a stock count</h3>
+          <ActionForm action={stockCountAction} submit="Save count">
+            <label>Outlet
+              <select name="outletId">{allOutlets.map(({ o, w }) => <option key={o.id} value={o.id}>{o.name} ({w.name})</option>)}</select>
+            </label>
+            <label>What&apos;s on the display, one per line: SKU and quantity
+              <textarea name="counts" rows={6} placeholder={"TC-HAB-WHT-M 4\nTC-HAB-WHT-L 6"} />
+            </label>
+            <p className="small muted">Anything on the display that isn&apos;t listed counts as not found.</p>
+          </ActionForm>
+        </div>
+        <div>
+          <h3>Outlet settings</h3>
+          <ActionForm action={outletSettingsAction} submit="Save">
+            <label>Outlet
+              <select name="outletId">{allOutlets.map(({ o, w }) => <option key={o.id} value={o.id}>{o.name} ({w.name}) · {o.parPerSku} per size, {o.settlementDays} days</option>)}</select>
+            </label>
+            <label>Usual stock per design and size<input name="parPerSku" type="number" min={1} defaultValue={6} /></label>
+            <label>Settle every<select name="settlementDays"><option value="15">15 days</option><option value="7">week (busy outlets)</option></select></label>
+            <label>Shopify location ID (leave blank to keep)<input name="shopifyLocationId" /></label>
+          </ActionForm>
+        </div>
+      </div>
 
       <h2>WhatsApp chats</h2>
       {chats.length === 0 && <p className="muted">No chats yet.</p>}
@@ -173,6 +267,8 @@ export default async function WholesaleAdmin() {
             <label>City<input name="city" required /></label>
             <label>Country<input name="country" required /></label>
             <label>Shopify location ID<input name="shopifyLocationId" /></label>
+            <label>Usual stock per design and size<input name="parPerSku" type="number" min={1} defaultValue={6} /></label>
+            <label>Settle every<select name="settlementDays"><option value="15">15 days</option><option value="7">week (busy outlets)</option></select></label>
             <label>Restocks come from
               <select name="supplyRoute">
                 <option value="quiqup">Quiqup (UAE, GCC)</option>

@@ -10,7 +10,7 @@ export type CatalogItem = {
   handle: string;
   retailPrice: string;
   currency: string;
-  sizes: { size: string; sku: string; variantId: string; available: number }[];
+  sizes: { size: string; sku: string; variantId: string; inventoryItemId: string; available: number }[];
 };
 
 export type OrderSummary = {
@@ -36,7 +36,9 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
             title: string;
             handle: string;
             status: string;
-            variants: { nodes: { id: string; title: string; sku: string | null; price: string; inventoryQuantity: number | null }[] };
+            variants: {
+              nodes: { id: string; title: string; sku: string | null; price: string; inventoryQuantity: number | null; inventoryItem: { id: string } }[];
+            };
           }[];
         };
       }[];
@@ -46,7 +48,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
       shop { currencyCode }
       collections(first: 1, query: $q) {
         nodes { products(first: 100) { nodes { title handle status
-          variants(first: 20) { nodes { id title sku price inventoryQuantity } } } } }
+          variants(first: 20) { nodes { id title sku price inventoryQuantity inventoryItem { id } } } } } }
       }
     }`,
     { q: `handle:${config().WHOLESALE_COLLECTION_HANDLE}` },
@@ -60,7 +62,8 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
       retailPrice: p.variants.nodes[0]?.price ?? "",
       currency: data.shop.currencyCode,
       sizes: p.variants.nodes.map((v) => ({
-        size: v.title, sku: v.sku ?? "", variantId: v.id, available: Math.max(0, v.inventoryQuantity ?? 0),
+        size: v.title, sku: v.sku ?? "", variantId: v.id, inventoryItemId: v.inventoryItem.id,
+        available: Math.max(0, v.inventoryQuantity ?? 0),
       })),
     }));
 }
@@ -185,15 +188,16 @@ export async function createWholesaleDraftOrder(input: {
   return ok(res.draftOrderCreate, "draftOrderCreate").draftOrder!;
 }
 
-// Turns a draft into an order awaiting payment, for stockists paying by bank transfer.
-export async function completeDraftAsPending(draftOrderId: string): Promise<{ orderId: string; orderName: string }> {
+// Turns a draft into an order: awaiting payment for stockists paying by bank transfer, or already paid
+// when the team records a transfer against an invoice.
+export async function completeDraftAsPending(draftOrderId: string, paymentPending = true): Promise<{ orderId: string; orderName: string }> {
   const res = await admin<{
     draftOrderComplete: { draftOrder: { order: { id: string; name: string } | null } | null; userErrors: UserErrors };
   }>(
-    `mutation($id: ID!) {
-      draftOrderComplete(id: $id, paymentPending: true) { draftOrder { order { id name } } userErrors { field message } }
+    `mutation($id: ID!, $pending: Boolean) {
+      draftOrderComplete(id: $id, paymentPending: $pending) { draftOrder { order { id name } } userErrors { field message } }
     }`,
-    { id: draftOrderId },
+    { id: draftOrderId, pending: paymentPending },
   );
   const order = ok(res.draftOrderComplete, "draftOrderComplete").draftOrder?.order;
   if (!order) throw new Error(`Draft order ${draftOrderId} didn't become an order`);
@@ -255,4 +259,55 @@ export async function fulfilWithTracking(shopifyOrderId: string, trackingNumber:
     },
   );
   ok(res.fulfillmentCreate, "fulfillmentCreate");
+}
+
+// An invoice with custom lines (no products, so no stock moves), such as a display partner's settlement.
+export async function createInvoiceDraftOrder(input: {
+  shopifyCustomerId: string;
+  currency: string;
+  lines: { title: string; quantity: number; unit: string }[];
+  tags: string[];
+  note: string;
+}): Promise<DraftOrder> {
+  const res = await admin<{ draftOrderCreate: { draftOrder: DraftOrder | null; userErrors: UserErrors } }>(
+    `mutation($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) { draftOrder { id name invoiceUrl } userErrors { field message } }
+    }`,
+    {
+      input: {
+        purchasingEntity: { customerId: gid("Customer", input.shopifyCustomerId) },
+        presentmentCurrencyCode: input.currency,
+        lineItems: input.lines.map((l) => ({
+          title: l.title,
+          quantity: l.quantity,
+          requiresShipping: false,
+          taxable: false,
+          originalUnitPriceWithCurrency: { amount: l.unit, currencyCode: input.currency },
+        })),
+        tags: input.tags,
+        note: input.note,
+      },
+    },
+  );
+  return ok(res.draftOrderCreate, "draftOrderCreate").draftOrder!;
+}
+
+// Moves "available" stock: restocks out of a warehouse and onto a display, sales and counts off a display.
+export async function adjustStock(changes: { inventoryItemId: string; locationId: string; delta: number }[], reference: string) {
+  const res = await admin<{ inventoryAdjustQuantities: { userErrors: UserErrors } }>(
+    `mutation($input: InventoryAdjustQuantitiesInput!) {
+      inventoryAdjustQuantities(input: $input) { userErrors { field message } }
+    }`,
+    {
+      input: {
+        name: "available",
+        reason: "correction",
+        referenceDocumentUri: `truecolors://wholesale/${reference}`,
+        changes: changes
+          .filter((c) => c.delta !== 0)
+          .map((c) => ({ inventoryItemId: c.inventoryItemId, locationId: gid("Location", c.locationId), delta: c.delta })),
+      },
+    },
+  );
+  ok(res.inventoryAdjustQuantities, "inventoryAdjustQuantities");
 }

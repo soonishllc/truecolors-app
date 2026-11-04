@@ -16,6 +16,8 @@ export type TicketMessage = {
   // Our WhatsApp address and the integration it came in on, so the reply goes out the same way.
   ourAddress?: string;
   integrationId?: number;
+  // Photos the customer sent, such as a till report.
+  images: string[];
   createdAt: string;
 };
 
@@ -48,6 +50,7 @@ type RawMessage = {
   integration_id?: number | null;
   created_datetime: string;
   source?: { from?: { address?: string }; to?: { address?: string }[] };
+  attachments?: { url: string; content_type?: string }[] | null;
 };
 
 export function toTicketMessage(m: RawMessage): TicketMessage {
@@ -59,6 +62,7 @@ export function toTicketMessage(m: RawMessage): TicketMessage {
     customerPhone: !m.from_agent && m.source?.from?.address ? digits(m.source.from.address) : undefined,
     ourAddress: !m.from_agent ? m.source?.to?.[0]?.address : undefined,
     integrationId: m.integration_id ?? undefined,
+    images: (m.attachments ?? []).filter((a) => a.content_type?.startsWith("image/")).map((a) => a.url),
     createdAt: m.created_datetime,
   };
 }

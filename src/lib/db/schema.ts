@@ -368,6 +368,14 @@ export const outlets = pgTable("outlets", {
   shopifyLocationId: text("shopify_location_id"),
   // Where restocks come from: Quiqup (UAE, GCC), Shipdudes (US, Canada, islands) or Cancún by FedEx.
   supplyRoute: text("supply_route").$type<"quiqup" | "shipdudes" | "cancun">().notNull(),
+  // How many of each design and size the display should hold; restocks top it back up to this.
+  parPerSku: integer("par_per_sku").notNull().default(6),
+  // 15 days, or 7 for busy outlets. The current period runs from periodStart.
+  settlementDays: integer("settlement_days").notNull().default(15),
+  periodStart: ts("period_start").notNull().defaultNow(),
+  // Set when a period ended without a sales report: restocks pause until it's settled.
+  overdueSince: ts("overdue_since"),
+  remindersSent: integer("reminders_sent").notNull().default(0),
   createdAt: createdAt(),
 });
 
@@ -434,4 +442,69 @@ export const wholesaleOrders = pgTable("wholesale_orders", {
   paidAt: ts("paid_at"),
   shippedAt: ts("shipped_at"),
   createdAt: createdAt(),
+});
+
+export type ConsignmentLine = { variantId: string; inventoryItemId: string; sku: string; title: string; size: string; quantity: number };
+
+// Stock going out to a display: proposed or asked for by the partner, approved by the team, then sent.
+export const restocks = pgTable("restocks", {
+  id: id(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  status: text("status").$type<"requested" | "approved" | "sent" | "declined">().notNull().default("requested"),
+  lines: jsonb("lines").$type<ConsignmentLine[]>().notNull(),
+  units: integer("units").notNull(),
+  // Who asked: a partner contact, or null when the team raised it.
+  requestedBy: uuid("requested_by").references(() => wholesaleContacts.id),
+  note: text("note"),
+  createdAt: createdAt(),
+  decidedAt: ts("decided_at"),
+  sentAt: ts("sent_at"),
+});
+
+// What a display partner sold on their own till, as they reported it. A draft until they confirm it;
+// confirming takes the shirts off the outlet's stock.
+export const salesReports = pgTable("sales_reports", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  status: text("status").$type<"draft" | "confirmed">().notNull().default("draft"),
+  lines: jsonb("lines").$type<ConsignmentLine[]>().notNull(),
+  units: integer("units").notNull(),
+  source: text("source").$type<"whatsapp" | "portal" | "team">().notNull(),
+  settlementId: uuid("settlement_id"),
+  createdAt: createdAt(),
+  confirmedAt: ts("confirmed_at"),
+});
+
+// A count of what's actually on a display. Shirts missing beyond what was reported count as sold.
+export const stockCounts = pgTable("stock_counts", {
+  id: id(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  lines: jsonb("lines").$type<(ConsignmentLine & { expected: number })[]>().notNull(),
+  // Shirts expected but not found: settled as sold.
+  missingUnits: integer("missing_units").notNull(),
+  countedBy: text("counted_by").notNull(),
+  settlementId: uuid("settlement_id"),
+  createdAt: createdAt(),
+});
+
+// One period's statement for one outlet: shirts sold times the partner price, invoiced as a Shopify draft order.
+export const settlements = pgTable("settlements", {
+  id: id(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  periodStart: ts("period_start").notNull(),
+  periodEnd: ts("period_end").notNull(),
+  reportedUnits: integer("reported_units").notNull(),
+  missingUnits: integer("missing_units").notNull(),
+  currency: text("currency").$type<"AED" | "USD" | "MXN">().notNull(),
+  // Per shirt and in total, as decimal strings.
+  unitPrice: text("unit_price"),
+  amount: text("amount"),
+  status: text("status").$type<"review" | "invoiced" | "paid">().notNull().default("review"),
+  draftOrderId: text("draft_order_id"),
+  payUrl: text("pay_url"),
+  problem: text("problem"),
+  createdAt: createdAt(),
+  invoicedAt: ts("invoiced_at"),
+  paidAt: ts("paid_at"),
 });

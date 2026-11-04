@@ -549,6 +549,9 @@ async function runTick(now: Date): Promise<TickLog> {
   } catch (e) {
     log.push(`fan rewards: error ${(e as Error).message}`);
   }
+  // Display partners' consignment periods: settle the ones that have ended, remind the late.
+  const { runSettlements } = await import("../wholesale/consignment");
+  await runSettlements(now, log);
   return log;
 }
 

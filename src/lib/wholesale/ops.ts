@@ -3,7 +3,7 @@ import { config } from "../config";
 import { getTicket, handOverTicket, replyOnTicket } from "../gorgias/client";
 import { bookShipment } from "../fedex/client";
 import {
-  completeDraftAsPending, createWholesaleDraftOrder, customerOrders, fulfilWithTracking, locationStock, markOrderPaid,
+  adjustStock, completeDraftAsPending, createInvoiceDraftOrder, createWholesaleDraftOrder, customerOrders, fulfilWithTracking, locationStock, markOrderPaid,
   orderShipTo, variantPrices, wholesaleCatalog,
 } from "../shopify/wholesale";
 
@@ -22,6 +22,8 @@ export type WholesaleOps = {
   orderShipTo: typeof orderShipTo;
   fulfilWithTracking: typeof fulfilWithTracking;
   bookShipment: typeof bookShipment;
+  createInvoiceDraftOrder: typeof createInvoiceDraftOrder;
+  adjustStock: typeof adjustStock;
   converse(params: Anthropic.Beta.MessageCreateParamsNonStreaming): Promise<Anthropic.Beta.BetaMessage>;
 };
 
@@ -41,6 +43,8 @@ const live: WholesaleOps = {
   orderShipTo,
   fulfilWithTracking,
   bookShipment,
+  createInvoiceDraftOrder,
+  adjustStock,
   converse: (params) => {
     client ??= new Anthropic({ apiKey: config().ANTHROPIC_API_KEY });
     return client.beta.messages.create(params);
