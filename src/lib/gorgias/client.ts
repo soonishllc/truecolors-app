@@ -25,7 +25,7 @@ export type Ticket = { id: string; channel: string; messages: TicketMessage[] };
 
 export const digits = (phone: string) => phone.replace(/\D/g, "");
 
-async function gorgias<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function gorgias<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { GORGIAS_DOMAIN, GORGIAS_USERNAME, GORGIAS_API_KEY } = config();
   if (!GORGIAS_DOMAIN || !GORGIAS_USERNAME || !GORGIAS_API_KEY) throw new GorgiasError("Gorgias isn't configured");
   const res = await fetch(`https://${GORGIAS_DOMAIN}/api${path}`, {

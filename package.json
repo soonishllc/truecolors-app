@@ -18,7 +18,11 @@
     "shirt:templates": "tsx --env-file=.env.local scripts/shirt-templates.ts",
     "designs:restyle": "tsx --env-file=.env.local scripts/restyle-designs.ts",
     "sweep:add": "tsx --env-file=.env.local scripts/add-sweep.ts",
-    "media:rebuild": "tsx --env-file=.env.local scripts/rebuild-media.ts"
+    "media:rebuild": "tsx --env-file=.env.local scripts/rebuild-media.ts",
+    "wholesale:seed": "tsx --env-file=.env.local scripts/seed-wholesale.ts",
+    "wholesale:check": "tsx --env-file=.env.local scripts/check-wholesale.ts",
+    "wholesale:chat": "tsx --env-file=.env.local scripts/bot-chat.ts",
+    "wholesale:end-period": "tsx --env-file=.env.local scripts/end-period.ts"
   },
   "license": "ISC",
   "dependencies": {

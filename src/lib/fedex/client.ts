@@ -29,7 +29,7 @@ export const fedexReady = () => {
 
 let token: { value: string; expires: number } | undefined;
 
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   if (token && token.expires > Date.now() + 60_000) return token.value;
   const { FEDEX_API_KEY, FEDEX_SECRET_KEY } = config();
   const res = await fetch(`${base()}/oauth/token`, {
