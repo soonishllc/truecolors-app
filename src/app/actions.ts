@@ -22,7 +22,9 @@ import {
   confirmSalesReport, decideRestock, invoiceSettlement, markRestockSent, markSettlementPaid, recordStockCount, reportSales, requestRestock,
 } from "@/lib/wholesale/consignment";
 import { handBackToBot } from "@/lib/wholesale/bot";
+import { assignBrief, makeLocationProduct, requestDesign, respondToDesign, submitBriefDesign } from "@/lib/wholesale/designs";
 import { markBankTransferPaid, placeOrder, quoteOrder, shipOrder } from "@/lib/wholesale/orders";
+import { addDisplay, reportFault, resolveFault } from "@/lib/wholesale/service";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
@@ -324,6 +326,51 @@ export async function stockCountAction(_: FormState, f: FormData): Promise<FormS
   return res;
 }
 
+export async function assignBriefAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await assignBrief(text(f, "briefId"), text(f, "designerEmail"));
+    return { message: "Assigned; the designer has been emailed." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function retryLocationProductAction(f: FormData) {
+  await requireAdmin();
+  await makeLocationProduct(text(f, "briefId"));
+  revalidatePath("/admin/wholesale");
+}
+
+export async function addDisplayAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await addDisplay({ outletId: text(f, "outletId"), kind: text(f, "kind"), serial: text(f, "serial"), installedAt: text(f, "installedAt") });
+    return { message: "Display added." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function resolveFaultAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(() => resolveFault(text(f, "ticketId"), text(f, "resolution")));
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+// ---- Studio: location briefs ---------------------------------------------------------------------------
+
+export async function submitBriefAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const res = await attempt(async () => {
+    await submitBriefDesign(user.id, text(f, "briefId"), text(f, "designId"));
+    return { message: "Sent to the wholesaler to review." };
+  });
+  revalidatePath("/studio");
+  return res;
+}
+
 // ---- Wholesaler portal --------------------------------------------------------------------------------
 
 async function portalStockist() {
@@ -360,6 +407,41 @@ export async function portalSalesAction(_: FormState, f: FormData): Promise<Form
     const draft = await reportSales(outlet.id, lines, "portal");
     await confirmSalesReport(outlet.id, draft.ref);
     return { message: `Thanks: ${draft.units} shirts recorded (${draft.ref}).` };
+  });
+  revalidatePath("/wholesale");
+  return res;
+}
+
+export async function portalDesignRequestAction(_: FormState, f: FormData): Promise<FormState> {
+  const me = await currentWholesaler();
+  if (!("wholesaler" in me) || !me.wholesaler) redirect("/wholesale");
+  const res = await attempt(async () => {
+    const b = await requestDesign(me.wholesaler.id, me.contact.id, text(f, "brief"));
+    return { message: `Thanks, request ${b.ref} is with the design team.` };
+  });
+  revalidatePath("/wholesale");
+  return res;
+}
+
+export async function portalDesignResponseAction(_: FormState, f: FormData): Promise<FormState> {
+  const me = await currentWholesaler();
+  if (!("wholesaler" in me) || !me.wholesaler) redirect("/wholesale");
+  const approve = text(f, "decision") === "approve";
+  const res = await attempt(async () => {
+    await respondToDesign(me.wholesaler.id, text(f, "ref"), approve, text(f, "feedback"));
+    return { message: approve ? "Approved. It's going into your catalog." : "Sent back to the designer." };
+  });
+  revalidatePath("/wholesale");
+  return res;
+}
+
+export async function portalFaultAction(_: FormState, f: FormData): Promise<FormState> {
+  const { contact, outlet } = await portalOutlet(text(f, "outletId"));
+  const res = await attempt(async () => {
+    const { ticket } = await reportFault({
+      outletId: outlet.id, contactId: contact.id, problem: text(f, "problem"), display: text(f, "display"), photos: [],
+    });
+    return { message: `Logged as ${ticket.ref}. The service team will be in touch.` };
   });
   revalidatePath("/wholesale");
   return res;

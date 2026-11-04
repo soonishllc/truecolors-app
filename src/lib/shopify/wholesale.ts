@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { PRICE_CENTS, SIZES, sku } from "../rules";
 import { admin, gid, numericId, ok, type UserErrors } from "./client";
 
 // Shopify calls for wholesale: catalog, orders and stock lookups for the bot and portal, and the draft
@@ -8,6 +9,8 @@ import { admin, gid, numericId, ok, type UserErrors } from "./client";
 export type CatalogItem = {
   title: string;
   handle: string;
+  // Set on location designs: the only wholesaler who can order it.
+  exclusiveTo?: string;
   retailPrice: string;
   currency: string;
   sizes: { size: string; sku: string; variantId: string; inventoryItemId: string; available: number }[];
@@ -36,6 +39,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
             title: string;
             handle: string;
             status: string;
+            exclusive: { value: string } | null;
             variants: {
               nodes: { id: string; title: string; sku: string | null; price: string; inventoryQuantity: number | null; inventoryItem: { id: string } }[];
             };
@@ -48,6 +52,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
       shop { currencyCode }
       collections(first: 1, query: $q) {
         nodes { products(first: 100) { nodes { title handle status
+          exclusive: metafield(namespace: "truecolors", key: "exclusive_to") { value }
           variants(first: 20) { nodes { id title sku price inventoryQuantity inventoryItem { id } } } } } }
       }
     }`,
@@ -59,6 +64,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
     .map((p) => ({
       title: p.title,
       handle: p.handle,
+      exclusiveTo: p.exclusive?.value || undefined,
       retailPrice: p.variants.nodes[0]?.price ?? "",
       currency: data.shop.currencyCode,
       sizes: p.variants.nodes.map((v) => ({
@@ -310,4 +316,66 @@ export async function adjustStock(changes: { inventoryItemId: string; locationId
     },
   );
   ok(res.inventoryAdjustQuantities, "inventoryAdjustQuantities");
+}
+
+// What a wholesaler may see and order: everything, less other wholesalers' location designs.
+export function catalogFor(items: CatalogItem[], wholesalerId: string | undefined): CatalogItem[] {
+  return items.filter((p) => !p.exclusiveTo || p.exclusiveTo === wholesalerId);
+}
+
+// A location design as a wholesale product: in the wholesale collection, not published to the store, and
+// marked with the one wholesaler who can order it. Stock is tracked, since it's printed in Cancún to order.
+export async function createLocationProduct(input: {
+  title: string; designCode: string; descriptionHtml: string; imageUrls: string[];
+  exclusiveTo: string | null; designId: string;
+}): Promise<{ productId: string }> {
+  const created = await admin<{ productCreate: { product: { id: string } | null; userErrors: UserErrors } }>(
+    `mutation($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
+      productCreate(product: $product, media: $media) { product { id } userErrors { field message } }
+    }`,
+    {
+      product: {
+        title: input.title,
+        descriptionHtml: input.descriptionHtml,
+        vendor: "Truecolors",
+        productType: "T-Shirt",
+        status: "ACTIVE",
+        tags: ["tc-location", "wholesale"],
+        productOptions: [{ name: "Size", values: SIZES.map((name) => ({ name })) }],
+        metafields: [
+          { namespace: "truecolors", key: "design_id", type: "single_line_text_field", value: input.designId },
+          ...(input.exclusiveTo ? [{ namespace: "truecolors", key: "exclusive_to", type: "single_line_text_field", value: input.exclusiveTo }] : []),
+        ],
+      },
+      media: input.imageUrls.map((originalSource) => ({ originalSource, mediaContentType: "IMAGE" })),
+    },
+  );
+  const product = ok(created.productCreate, "productCreate").product!;
+  const variants = await admin<{ productVariantsBulkCreate: { userErrors: UserErrors } }>(
+    `mutation($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkCreate(productId: $productId, variants: $variants, strategy: REMOVE_STANDALONE_VARIANT) { userErrors { field message } }
+    }`,
+    {
+      productId: product.id,
+      variants: SIZES.map((size) => ({
+        optionValues: [{ optionName: "Size", name: size }],
+        price: (PRICE_CENTS / 100).toFixed(2),
+        inventoryPolicy: "DENY",
+        inventoryItem: { sku: sku(input.designCode, size), tracked: true, requiresShipping: true },
+      })),
+    },
+  );
+  ok(variants.productVariantsBulkCreate, "productVariantsBulkCreate");
+  const collection = await admin<{ collections: { nodes: { id: string }[] } }>(
+    `query($q: String!) { collections(first: 1, query: $q) { nodes { id } } }`,
+    { q: `handle:${config().WHOLESALE_COLLECTION_HANDLE}` },
+  );
+  const collectionId = collection.collections.nodes[0]?.id;
+  if (!collectionId) throw new Error(`No Shopify collection with handle ${config().WHOLESALE_COLLECTION_HANDLE}`);
+  const added = await admin<{ collectionAddProducts: { userErrors: UserErrors } }>(
+    `mutation($id: ID!, $productIds: [ID!]!) { collectionAddProducts(id: $id, productIds: $productIds) { userErrors { field message } } }`,
+    { id: collectionId, productIds: [product.id] },
+  );
+  ok(added.collectionAddProducts, "collectionAddProducts");
+  return { productId: numericId(product.id) };
 }

@@ -8,6 +8,7 @@ import {
 import { UserError } from "../design/service";
 import { PARTNER_PRICE, REMINDER_HOURS, SETTLEMENT_REMINDERS } from "../rules";
 import type { OrderPayload } from "../shopify/webhooks";
+import { catalogFor } from "../shopify/wholesale";
 import { wholesaleOps } from "./ops";
 import { notify, showMoney } from "./orders";
 
@@ -58,14 +59,16 @@ function supplyLocation(o: Outlet): string {
   return id;
 }
 
-async function catalogIndex() {
-  const catalog = await wholesaleOps().wholesaleCatalog();
+async function catalogIndex(wholesalerId: string) {
+  const catalog = catalogFor(await wholesaleOps().wholesaleCatalog(), wholesalerId);
   return new Map(catalog.flatMap((p) => p.sizes.map((s) => [s.sku.toUpperCase(), { title: p.title, ...s }] as const)));
 }
 
 // Turns {sku, quantity} pairs into lines, refusing SKUs that aren't in the wholesale catalog.
-async function toLines(request: { sku: string; quantity: number }[], allowZero = false): Promise<ConsignmentLine[]> {
-  const index = await catalogIndex();
+async function toLines(
+  wholesalerId: string, request: { sku: string; quantity: number }[], allowZero = false,
+): Promise<ConsignmentLine[]> {
+  const index = await catalogIndex(wholesalerId);
   const merged = new Map<string, number>();
   for (const { sku, quantity } of request) {
     const q = Number(quantity);
@@ -96,7 +99,7 @@ export async function requestRestock(outletId: string, requestedBy: string | nul
   const { outlet } = await load(outletId);
   if (outlet.overdueSince) throw new UserError("Restocks are paused until this period's sales are reported.");
   const have = await onDisplay(outlet);
-  const index = await catalogIndex();
+  const index = await catalogIndex(outlet.wholesalerId);
   const lines: ConsignmentLine[] = [...index]
     .map(([sku, v]) => ({
       variantId: v.variantId, inventoryItemId: v.inventoryItemId, sku, title: v.title, size: v.size,
@@ -155,7 +158,7 @@ export async function reportSales(
   outletId: string, request: { sku: string; quantity: number }[], source: SalesReport["source"],
 ): Promise<SalesReport> {
   const { outlet } = await load(outletId);
-  const lines = await toLines(request, true);
+  const lines = await toLines(outlet.wholesalerId, request, true);
   const have = await onDisplay(outlet);
   const tooMany = lines.filter((l) => l.quantity > (have.get(l.sku) ?? 0));
   if (tooMany.length) {
@@ -197,9 +200,9 @@ export async function confirmSalesReport(outletId: string, ref: string, now = ne
 // was reported are settled as sold.
 export async function recordStockCount(outletId: string, counted: { sku: string; quantity: number }[], countedBy: string, now = new Date()) {
   const { outlet } = await load(outletId);
-  const lines = await toLines(counted, true);
+  const lines = await toLines(outlet.wholesalerId, counted, true);
   const have = await onDisplay(outlet);
-  const index = await catalogIndex();
+  const index = await catalogIndex(outlet.wholesalerId);
   // Anything on the display that wasn't counted was not found.
   for (const sku of have.keys()) {
     if (!lines.some((l) => l.sku === sku) && index.has(sku) && (have.get(sku) ?? 0) > 0) {
@@ -342,13 +345,31 @@ export async function invoiceSettlement(settlementId: string) {
   ]);
 }
 
+// Designers of location designs earn on what each paid settlement covers: shirts reported sold and shirts
+// missing at a count, at the partner price.
+async function settlementRoyalties(s: Settlement) {
+  if (!s.unitPrice) return;
+  const d = await db();
+  const reports = await d.select().from(salesReports).where(eq(salesReports.settlementId, s.id));
+  const counts = await d.select().from(stockCounts).where(eq(stockCounts.settlementId, s.id));
+  const bySku = new Map<string, number>();
+  for (const l of reports.flatMap((r) => r.lines)) bySku.set(l.sku, (bySku.get(l.sku) ?? 0) + l.quantity);
+  for (const l of counts.flatMap((c) => c.lines)) bySku.set(l.sku, (bySku.get(l.sku) ?? 0) + Math.max(0, l.expected - l.quantity));
+  const { recordLocationRoyalties, royaltyHold } = await import("./designs");
+  await recordLocationRoyalties({
+    source: `settlement:${s.id}`, currency: s.currency, payableAfter: royaltyHold(new Date()),
+    lines: [...bySku].map(([sku, quantity]) => ({ sku, quantity, unit: s.unitPrice! })),
+  });
+}
+
 // A bank transfer against a settlement has landed.
 export async function markSettlementPaid(settlementId: string) {
   const d = await db();
   const [s] = await d.select().from(settlements).where(eq(settlements.id, settlementId));
   if (s?.status !== "invoiced" || !s.draftOrderId) throw new UserError("That settlement hasn't been invoiced.");
   await wholesaleOps().completeDraftAsPending(s.draftOrderId, false);
-  await d.update(settlements).set({ status: "paid", paidAt: new Date() }).where(eq(settlements.id, s.id));
+  const [paid] = await d.update(settlements).set({ status: "paid", paidAt: new Date() }).where(eq(settlements.id, s.id)).returning();
+  await settlementRoyalties(paid);
 }
 
 // Shopify's orders/create webhook: a settlement invoice paid by card.
@@ -356,7 +377,12 @@ export async function recordSettlementPayment(payload: OrderPayload) {
   const id = payload.tags?.split(",").map((t) => t.trim()).find((t) => t.startsWith(`${SETTLEMENT_TAG}:`))?.slice(SETTLEMENT_TAG.length + 1);
   if (!id || payload.financial_status !== "paid") return;
   const d = await db();
-  await d.update(settlements).set({ status: "paid", paidAt: new Date() }).where(and(eq(settlements.id, id), eq(settlements.status, "invoiced")));
+  const [paid] = await d
+    .update(settlements)
+    .set({ status: "paid", paidAt: new Date() })
+    .where(and(eq(settlements.id, id), eq(settlements.status, "invoiced")))
+    .returning();
+  if (paid) await settlementRoyalties(paid);
 }
 
 // ---- What partners and the team see ---------------------------------------------------------------------

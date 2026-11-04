@@ -1,9 +1,14 @@
-import { portalRestockAction, portalSalesAction } from "@/app/actions";
+import {
+  portalDesignRequestAction, portalDesignResponseAction, portalFaultAction, portalRestockAction, portalSalesAction,
+} from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { CONTACT } from "@/lib/brand";
 import { date, money } from "@/lib/format";
 import { customerOrders, locationStock, type OrderSummary, type StockLine } from "@/lib/shopify/wholesale";
+import { fileUrl } from "@/lib/storage";
 import { outletSummary } from "@/lib/wholesale/consignment";
+import { briefsFor } from "@/lib/wholesale/designs";
+import { displaysAt, faultsFor } from "@/lib/wholesale/service";
 import { ordersFor, showMoney } from "@/lib/wholesale/orders";
 import { currentWholesaler, portalSignInReady } from "@/lib/wholesale/portal-auth";
 
@@ -70,10 +75,13 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
           outlet: o,
           lines: o.shopifyLocationId ? await attempt(() => locationStock(o.shopifyLocationId!)) : [],
           summary: await outletSummary(o.id),
+          displays: await displaysAt(o.id),
+          faults: (await faultsFor(o.id)).filter((t) => t.status === "open"),
         })),
       )
     : [];
   const kinds = [w.stockist && "Stockist", w.displayPartner && "Display partner"].filter(Boolean).join(" · ");
+  const briefs = await briefsFor(w.id);
   const open = (await ordersFor(w.id)).filter(
     (o) => (o.status === "quoted" && o.expiresAt > new Date()) || o.status === "awaiting_payment",
   );
@@ -122,7 +130,7 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
         <>
           <h2>Your displays</h2>
           {stock.length === 0 && <p className="muted">No outlets set up yet.</p>}
-          {stock.map(({ outlet, lines, summary: s }) => (
+          {stock.map(({ outlet, lines, summary: s, displays, faults }) => (
             <div key={outlet.id} className="card stack">
               <h3>{outlet.name} · {outlet.city}</h3>
               <p className="small">
@@ -164,6 +172,20 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
                 )
               )}
 
+              <details>
+                <summary>Report a problem with a display</summary>
+                <ActionForm action={portalFaultAction} submit="Report it">
+                  <input type="hidden" name="outletId" value={outlet.id} />
+                  {displays.length > 1 && (
+                    <label>Display
+                      <select name="display">{displays.map((x) => <option key={x.id} value={x.serial}>{x.kind} {x.serial}</option>)}</select>
+                    </label>
+                  )}
+                  <label>What&apos;s wrong<textarea name="problem" rows={3} required placeholder="The UV light doesn't come on when the button is pressed." /></label>
+                </ActionForm>
+              </details>
+              {faults.map((t) => <p key={t.id} className="small notice">Reported {t.ref}: {t.problem}. The service team is on it.</p>)}
+
               {s.settlements.length > 0 && (
                 <table>
                   <thead><tr><th>Period</th><th>Shirts</th><th>Amount</th><th>Status</th></tr></thead>
@@ -183,6 +205,49 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
           ))}
         </>
       )}
+
+      <h2 id="designs">Designs for your location</h2>
+      <p className="muted small">
+        A design around your city, resort or landmark, drawn by our designers. Once you approve it, only you can order it.
+      </p>
+      <div className="grid">
+        {briefs.map(({ b, design }) => (
+          <div key={b.id} className="card stack">
+            <div className="eyebrow">{b.ref}</div>
+            <p className="small">{b.brief}</p>
+            {b.status === "in_review" && design ? (
+              <>
+                <div className="pair">
+                  <figure><img className="art" src={fileUrl(design.lineArtKey!)} alt="In the shade" /><figcaption className="small muted">Shade</figcaption></figure>
+                  <figure><img className="art" src={fileUrl(design.compositeKey!)} alt="In the sun" /><figcaption className="small muted">Sun</figcaption></figure>
+                </div>
+                <p><strong>{design.title}</strong></p>
+                <ActionForm action={portalDesignResponseAction} submit="Approve this design">
+                  <input type="hidden" name="ref" value={b.ref} />
+                  <input type="hidden" name="decision" value="approve" />
+                </ActionForm>
+                <ActionForm action={portalDesignResponseAction} submit="Ask for changes">
+                  <input type="hidden" name="ref" value={b.ref} />
+                  <input type="hidden" name="decision" value="changes" />
+                  <textarea name="feedback" rows={2} placeholder="What should change?" />
+                </ActionForm>
+              </>
+            ) : (
+              <p className="small muted">
+                {{
+                  open: "Waiting for a designer.", assigned: "Being designed.", changes_requested: "Being changed.",
+                  approved: "Approved; going into your catalog.", live: "In your catalog.", in_review: "Ready to review.", declined: "Declined.",
+                }[b.status]}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+      <ActionForm action={portalDesignRequestAction} submit="Request a design">
+        <label>What would you like?
+          <textarea name="brief" rows={3} required placeholder="Our beach at sunset with the hotel's palm-lined pool, in warm pinks and oranges." />
+        </label>
+      </ActionForm>
 
       <form action="/wholesale/logout" method="post"><button className="secondary">Sign out</button></form>
     </>

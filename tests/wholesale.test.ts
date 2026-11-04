@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, set: () => {}, delete: () => {} }) }));
 
@@ -15,7 +15,10 @@ const { quoteOrder, placeOrder, recordWholesaleShopifyOrder, markBankTransferPai
 const { wholesaleOrders, emails } = await import("../src/lib/db/schema");
 const { cartons, shipmentRequest } = await import("../src/lib/fedex/client");
 const consignment = await import("../src/lib/wholesale/consignment");
-const { outlets, restocks, salesReports, settlements } = await import("../src/lib/db/schema");
+const { outlets, restocks, salesReports, settlements, designBriefs, displays, royaltyEntries, serviceTickets } = await import("../src/lib/db/schema");
+const designsLib = await import("../src/lib/wholesale/designs");
+const serviceLib = await import("../src/lib/wholesale/service");
+const { readyDesigner } = await import("./helpers");
 
 type Ticket = import("../src/lib/gorgias/client").Ticket;
 type Msg = Ticket["messages"][number];
@@ -56,6 +59,9 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
     adjustments: [] as { inventoryItemId: string; locationId: string; delta: number }[],
     invoices: [] as Parameters<WholesaleOps["createInvoiceDraftOrder"]>[0][],
     completed: [] as { id: string; pending: boolean }[],
+    catalogExtra: [] as Awaited<ReturnType<WholesaleOps["wholesaleCatalog"]>>,
+    products: [] as Parameters<WholesaleOps["createLocationProduct"]>[0][],
+    productFails: false,
   };
   const skuOf: Record<string, string> = { "inv-M": "TC-HAB-WHT-M", "inv-L": "TC-HAB-WHT-L" };
   const sizeOf = (sku: string) => sku.split("-").at(-1)!;
@@ -72,7 +78,13 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
     handOverTicket: async (_id, reason, tags) => {
       seen.handovers.push({ reason, tags });
     },
+    createLocationProduct: async (input) => {
+      if (seen.productFails) throw new Error("Shopify 502");
+      seen.products.push(input);
+      return { productId: "8001" };
+    },
     wholesaleCatalog: async () => [
+      ...seen.catalogExtra,
       {
         title: "Habibi", handle: "habibi", retailPrice: "36.00", currency: "USD",
         sizes: [
@@ -178,7 +190,8 @@ describe("wholesale bot", () => {
     await handleTicket("101");
 
     expect(toolNames(seen.calls[0])).toEqual([
-      "confirm_sales_report", "get_catalog", "get_display_stock", "get_orders", "get_settlement", "hand_to_person", "report_sales", "request_restock",
+      "confirm_sales_report", "get_catalog", "get_designs", "get_display_stock", "get_orders", "get_settlement", "hand_to_person",
+      "report_fault", "report_sales", "request_design", "request_restock",
     ]);
     expect(toolNames(seen.calls[0])).not.toContain("quote_order");
     expect(seen.stockAsked).toEqual(["42"]);
@@ -450,7 +463,9 @@ describe("stockist orders", () => {
       text("That's 30 shirts at $21.60, $648.00 in total. Shall I place it?"),
     ]);
     await handleTicket("200");
-    expect(toolNames(seen.calls[0])).toEqual(["get_catalog", "get_orders", "hand_to_person", "place_order", "quote_order"]);
+    expect(toolNames(seen.calls[0])).toEqual([
+      "get_catalog", "get_designs", "get_orders", "hand_to_person", "place_order", "quote_order", "request_design",
+    ]);
     const result = (seen.calls[1].messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[])[0];
     expect(JSON.parse(result.content as string)).toMatchObject({ total: "648.00", currency: "USD" });
     expect(seen.drafts).toEqual([]);
@@ -498,6 +513,10 @@ describe("display partners", () => {
 
   beforeEach(() => {
     process.env.WHOLESALE_LOCATION_ID = "900";
+    resetConfig();
+  });
+  afterEach(() => {
+    delete process.env.WHOLESALE_LOCATION_ID;
     resetConfig();
   });
 
@@ -623,4 +642,137 @@ describe("display partners", () => {
     await consignment.markSettlementPaid(open.id);
     expect(seen.completed).toEqual([{ id: "gid://shopify/DraftOrder/77", pending: false }]);
   });
+});
+
+describe("location designs", () => {
+  const none: Ticket = { id: "0", channel: "whatsapp", messages: [] };
+  const marina = (exclusiveTo?: string) => ({
+    title: "Marina Sunset", handle: "marina-sunset", exclusiveTo, retailPrice: "36.00", currency: "USD",
+    sizes: [{ size: "L", sku: "TC-LMARI-WHT-L", variantId: "gid://shopify/ProductVariant/50", inventoryItemId: "inv-ML", available: 100 }],
+  });
+  const briefRow = async (id: string) => (await (await db()).select().from(designBriefs).where(eq(designBriefs.id, id)))[0];
+
+  async function stockist(name = "Sunset Gifts", phone = PHONE) {
+    return createWholesaler({
+      name, currency: "USD", shopifyCustomerId: "777", stockist: true, displayPartner: false, contactName: "Ana", phone, email: `${name.length}@ex.example`,
+    });
+  }
+
+  it("goes from request to designer to review to an exclusive wholesale product", async () => {
+    const seen = fakes(none, []);
+    const w = await stockist();
+    const { user, design } = await readyDesigner("maya");
+    const b = await designsLib.requestDesign(w.id, null, "Our marina at sunset with the dhows");
+    await expect(designsLib.submitBriefDesign(user.id, b.id, design.id)).rejects.toThrow(/isn't waiting/);
+
+    await designsLib.assignBrief(b.id, "maya@example.com");
+    await designsLib.submitBriefDesign(user.id, b.id, design.id);
+    await expect(designsLib.respondToDesign(w.id, b.ref, false, "")).rejects.toThrow(/what to change/);
+    await designsLib.respondToDesign(w.id, b.ref, false, "More orange in the sky");
+    expect(await briefRow(b.id)).toMatchObject({ status: "changes_requested", feedback: "More orange in the sky" });
+
+    await designsLib.submitBriefDesign(user.id, b.id, design.id);
+    await designsLib.respondToDesign(w.id, b.ref, true);
+    expect(seen.products[0]).toMatchObject({
+      title: "Marina Sunset", exclusiveTo: w.id, designId: design.id, designCode: "LMARI",
+      imageUrls: ["http://localhost:3000/api/files/b.png", "http://localhost:3000/api/files/a.png"],
+    });
+    expect(await briefRow(b.id)).toMatchObject({ status: "live", shopifyProductId: "8001", designCode: "LMARI" });
+
+    const subjects = (await (await db()).select().from(emails)).map((e) => e.subject);
+    expect(subjects).toEqual(expect.arrayContaining([
+      "A location design brief for you: Sunset Gifts", `Changes requested on your location design (${b.ref})`,
+      `Approved: your location design (${b.ref})`, `"Marina Sunset" is in your Truecolors catalog`,
+    ]));
+  });
+
+  it("keeps a failed product creation on the brief to retry", async () => {
+    const seen = fakes(none, []);
+    const w = await stockist();
+    const { user, design } = await readyDesigner("maya");
+    const b = await designsLib.requestDesign(w.id, null, "Our marina at sunset with the dhows");
+    await designsLib.assignBrief(b.id, "maya@example.com");
+    await designsLib.submitBriefDesign(user.id, b.id, design.id);
+    seen.productFails = true;
+    await designsLib.respondToDesign(w.id, b.ref, true);
+    expect(await briefRow(b.id)).toMatchObject({ status: "approved", problem: "Shopify 502" });
+    seen.productFails = false;
+    await designsLib.makeLocationProduct(b.id);
+    expect((await briefRow(b.id)).status).toBe("live");
+  });
+
+  it("only lets the wholesaler it was made for order an exclusive design", async () => {
+    const seen = fakes(none, []);
+    const owner = await stockist("Owner");
+    const other = await stockist("Other Shop", "15125550101");
+    seen.catalogExtra.push(marina(owner.id));
+    await expect(quoteOrder(other.id, [{ sku: "TC-LMARI-WHT-L", quantity: 24 }])).rejects.toThrow(/Not in the wholesale catalog/);
+    expect((await quoteOrder(owner.id, [{ sku: "TC-LMARI-WHT-L", quantity: 24 }])).units).toBe(24);
+  });
+
+  it("pays the designer their share on wholesale orders of a live location design, once", async () => {
+    const seen = fakes(none, []);
+    const w = await stockist();
+    const { user, design } = await readyDesigner("maya");
+    const b = await designsLib.requestDesign(w.id, null, "Our marina at sunset with the dhows");
+    await designsLib.assignBrief(b.id, "maya@example.com");
+    await designsLib.submitBriefDesign(user.id, b.id, design.id);
+    await designsLib.respondToDesign(w.id, b.ref, true);
+    seen.catalogExtra.push(marina(w.id));
+
+    const q = await quoteOrder(w.id, [{ sku: "TC-LMARI-WHT-L", quantity: 30 }, { sku: "TC-HAB-WHT-L", quantity: 10 }]);
+    await placeOrder(w.id, q.ref, "card");
+    await recordWholesaleShopifyOrder({ id: 5001, name: "#5001", currency: "USD", line_items: [], tags: `wholesale-order:${q.ref}`, financial_status: "paid" });
+    await designsLib.recordLocationRoyalties({ source: `wholesale:${q.ref}`, currency: "USD", payableAfter: new Date(), lines: [{ sku: "TC-LMARI-WHT-L", quantity: 30, unit: "21.60" }] });
+
+    const entries = await (await db()).select().from(royaltyEntries);
+    // 40 shirts → 40% off $36 = $21.60; 30 Marina shirts = $648; 10% = $64.80. Habibi has no designer.
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ userId: user.id, designId: design.id, baseCents: 64800, amountCents: 6480, currency: "USD", campaignId: null });
+  });
+});
+
+describe("display faults", () => {
+  it("logs a fault from WhatsApp with its photos, takes the display out of service and hands over", async () => {
+    const w = await createWholesaler({
+      name: "Hotel Playa", currency: "MXN", shopifyCustomerId: "321", stockist: false, displayPartner: true,
+      contactName: "Lucía", phone: PHONE, email: "lucia@playa.example",
+    });
+    await addOutlet({ wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42", supplyRoute: "cancun" });
+    const [o] = await (await db()).select().from(outlets);
+    await serviceLib.addDisplay({ outletId: o.id, kind: "tower", serial: "tw-0042", installedAt: "2026-10-01" });
+
+    const photo = { ...customer("The sun light isn't working"), images: ["https://uploads.gorgias.example/tower.jpg"] };
+    const ticket: Ticket = { id: "400", channel: "whatsapp", messages: [photo] };
+    const seen = fakes(ticket, [
+      call("report_fault", { outlet: "", display: "", problem: "UV light doesn't come on" }),
+      text("Sorry about that. I've logged it and the service team will reply here."),
+    ]);
+    await handleTicket("400");
+
+    const [t] = await (await db()).select().from(serviceTickets);
+    expect(t).toMatchObject({ problem: "UV light doesn't come on", photos: ["https://uploads.gorgias.example/tower.jpg"], gorgiasTicketId: "400" });
+    expect((await (await db()).select().from(displays))[0].status).toBe("in_service");
+    expect(seen.handovers[0].tags).toContain("display-service");
+    expect(seen.replies).toHaveLength(1);
+
+    await serviceLib.resolveFault(t.id, "Replaced the UV tube");
+    expect((await (await db()).select().from(displays))[0].status).toBe("active");
+  });
+});
+
+it("counts only Cancún stock when the hub location is set", async () => {
+  process.env.WHOLESALE_LOCATION_ID = "900";
+  resetConfig();
+  try {
+    const seen = fakes({ id: "0", channel: "whatsapp", messages: [] }, []);
+    seen.stock.set("900", new Map([["TC-HAB-WHT-L", 10]]));
+    const w = await createWholesaler({
+      name: "Hub Test", currency: "USD", shopifyCustomerId: "1", stockist: true, displayPartner: false, contactName: "H", phone: "", email: "h@x.example",
+    });
+    await expect(quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 30 }])).rejects.toThrow(/TC-HAB-WHT-L \(10 left\)/);
+  } finally {
+    delete process.env.WHOLESALE_LOCATION_ID;
+    resetConfig();
+  }
 });

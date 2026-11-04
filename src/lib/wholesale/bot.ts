@@ -26,6 +26,8 @@ How to answer:
 - Stockists can order with you: build the basket from get_catalog SKUs, price it with quote_order, show them the quote, and only after they clearly confirm it and choose card or bank transfer, place it with place_order. Send the payment link or bank details exactly as the tool returns them.
 - Display partners report what they sold, by design and size, in text or as a photo of their till report. Read the numbers, record them with report_sales, read the result back to them, and only confirm it with confirm_sales_report once they agree. If a photo is unclear, ask rather than guess.
 - When a display partner asks for more stock, use request_restock: it proposes topping the display back up, and the team approves it. Restocks pause while a period's sales report is overdue.
+- Wholesalers can ask for a design made for their location with request_design, and follow it with get_designs. They approve designs in the wholesale portal, where they can see the mockups.
+- If a display partner reports a broken display (UV light, button, screen, glass), log it with report_fault; it passes the chat to the service team.
 - You can't change or cancel orders. For that, and for anything else you can't answer, use hand_to_person.
 - If someone new wants to stock Truecolors or take a display, find out their name, business, city and type of venue, then save them with record_lead and tell them the wholesale team will be in touch.`;
 
@@ -155,7 +157,9 @@ export async function handleTicket(ticketId: string) {
   if (sender.contact && !conv.contactId) {
     await d.update(botConversations).set({ contactId: sender.contact.id }).where(eq(botConversations.id, conv.id));
   }
-  const state: RunState = {};
+  // Photos sent since our last reply, for tools that keep them (fault reports).
+  const lastReply = ticket.messages.findLastIndex((m) => m.fromAgent);
+  const state: RunState = { ticketId: ticket.id, images: ticket.messages.slice(lastReply + 1).flatMap((m) => m.images) };
   let reply: string | undefined;
   try {
     reply = await converse(sender, ticket, state);
@@ -178,7 +182,7 @@ export async function handleTicket(ticketId: string) {
   }
   if (state.handover) {
     const lastCustomer = ticket.messages.filter((m) => !m.fromAgent).at(-1)?.body ?? "";
-    await ops.handOverTicket(ticket.id, state.handover, ["bot-handover", "wholesale", languageTag(lastCustomer)]);
+    await ops.handOverTicket(ticket.id, state.handover, ["bot-handover", "wholesale", languageTag(lastCustomer), ...(state.tags ?? [])]);
     await d
       .update(botConversations)
       .set({ status: "human", handoverReason: state.handover, updatedAt: new Date() })

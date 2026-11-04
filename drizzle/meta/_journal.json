@@ -43,6 +43,13 @@
       "when": 1793805407322,
       "tag": "0005_consignment",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793806578891,
+      "tag": "0006_location_designs_service",
+      "breakpoints": true
     }
   ]
 }

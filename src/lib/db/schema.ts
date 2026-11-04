@@ -199,8 +199,11 @@ export const royaltyEntries = pgTable(
   {
     id: id(),
     userId: uuid("user_id").notNull().references(() => users.id),
-    campaignId: uuid("campaign_id").notNull().references(() => campaigns.id),
-    pledgeId: uuid("pledge_id").notNull().references(() => pledges.id),
+    // Campaign pre-orders carry their campaign and pledge. Location designs sold to wholesalers carry the
+    // design instead, and a sourceRef unique across the table: "wholesale:<quote>:<sku>", "settlement:<id>:<sku>".
+    campaignId: uuid("campaign_id").references(() => campaigns.id),
+    pledgeId: uuid("pledge_id").references(() => pledges.id),
+    designId: uuid("design_id").references(() => designs.id),
     kind: text("kind").$type<"earning" | "clawback">().notNull(),
     // Makes webhook retries safe: "earning" or "refund:<refund id>".
     sourceRef: text("source_ref").notNull(),
@@ -212,7 +215,10 @@ export const royaltyEntries = pgTable(
     payoutId: uuid("payout_id"),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("royalty_source_unique").on(t.pledgeId, t.sourceRef)],
+  (t) => [
+    uniqueIndex("royalty_source_unique").on(t.pledgeId, t.sourceRef),
+    uniqueIndex("royalty_wholesale_source_unique").on(t.sourceRef).where(sql`${t.pledgeId} is null`),
+  ],
 );
 
 export const payouts = pgTable("payouts", {
@@ -507,4 +513,57 @@ export const settlements = pgTable("settlements", {
   createdAt: createdAt(),
   invoicedAt: ts("invoiced_at"),
   paidAt: ts("paid_at"),
+});
+
+// A design drawn for one wholesaler's location. The team assigns a designer, the designer submits a design
+// from their studio, the wholesaler approves the mockups, and it becomes a wholesale product only they can
+// order (unless Truecolors agrees otherwise). Truecolors owns it; the designer earns their usual share.
+export const designBriefs = pgTable("design_briefs", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  wholesalerId: uuid("wholesaler_id").notNull().references(() => wholesalers.id),
+  requestedBy: uuid("requested_by").references(() => wholesaleContacts.id),
+  brief: text("brief").notNull(),
+  status: text("status")
+    .$type<"open" | "assigned" | "in_review" | "changes_requested" | "approved" | "live" | "declined">()
+    .notNull()
+    .default("open"),
+  designerId: uuid("designer_id").references(() => users.id),
+  designId: uuid("design_id").references(() => designs.id),
+  feedback: text("feedback"),
+  // Short code in the SKU, like campaigns': TC-<code>-WHT-<size>.
+  designCode: text("design_code").unique(),
+  shopifyProductId: text("shopify_product_id"),
+  // Blank = only this wholesaler can order it. Set when Truecolors agrees to sell it more widely from a date.
+  exclusiveUntil: ts("exclusive_until"),
+  problem: text("problem"),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+// The physical displays out at partners' outlets.
+export const displays = pgTable("displays", {
+  id: id(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  kind: text("kind").$type<"sunbox" | "prism" | "tower">().notNull(),
+  serial: text("serial").notNull().unique(),
+  status: text("status").$type<"active" | "in_service" | "removed">().notNull().default("active"),
+  installedAt: ts("installed_at"),
+  createdAt: createdAt(),
+});
+
+// A fault a partner reported on a display, such as the UV light not working.
+export const serviceTickets = pgTable("service_tickets", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  outletId: uuid("outlet_id").notNull().references(() => outlets.id),
+  displayId: uuid("display_id").references(() => displays.id),
+  reportedBy: uuid("reported_by").references(() => wholesaleContacts.id),
+  problem: text("problem").notNull(),
+  photos: jsonb("photos").$type<string[]>().notNull().default([]),
+  gorgiasTicketId: text("gorgias_ticket_id"),
+  status: text("status").$type<"open" | "resolved">().notNull().default("open"),
+  resolution: text("resolution"),
+  createdAt: createdAt(),
+  resolvedAt: ts("resolved_at"),
 });

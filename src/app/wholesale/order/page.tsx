@@ -4,7 +4,7 @@ import { portalPlaceAction, portalQuoteAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { config } from "@/lib/config";
 import { CURRENCY_COUNTRY, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS } from "@/lib/rules";
-import { variantPrices, wholesaleCatalog } from "@/lib/shopify/wholesale";
+import { catalogFor, variantPrices, wholesaleCatalog } from "@/lib/shopify/wholesale";
 import { quoteFor, showMoney, type WholesaleOrder } from "@/lib/wholesale/orders";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
 
@@ -60,7 +60,7 @@ export default async function WholesaleOrder({ searchParams }: { searchParams: P
   let catalog: Awaited<ReturnType<typeof wholesaleCatalog>> = [];
   let prices = new Map<string, { amount: string; currency: string }>();
   try {
-    catalog = await wholesaleCatalog();
+    catalog = catalogFor(await wholesaleCatalog(), w.id);
     prices = await variantPrices(catalog.flatMap((p) => p.sizes.map((s) => s.variantId)), CURRENCY_COUNTRY[w.currency]);
   } catch (e) {
     console.error("[wholesale order]", (e as Error).message);

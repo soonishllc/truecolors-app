@@ -2,7 +2,8 @@ import Link from "next/link";
 import {
   activateWholesalerAction, addContactAction, addOutletAction, createWholesalerAction, handBackToBotAction,
   markWholesalePaidAction, retryShippingAction, decideRestockAction, sendRestockAction, invoiceSettlementAction,
-  settlementPaidAction, stockCountAction, outletSettingsAction,
+  settlementPaidAction, stockCountAction, outletSettingsAction, assignBriefAction, retryLocationProductAction, addDisplayAction,
+  resolveFaultAction,
 } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth/session";
@@ -11,6 +12,8 @@ import { WHOLESALE_CURRENCIES } from "@/lib/rules";
 import { fileUrl } from "@/lib/storage";
 import { wholesaleOverview } from "@/lib/wholesale/accounts";
 import { consignmentQueue } from "@/lib/wholesale/consignment";
+import { adminBriefs } from "@/lib/wholesale/designs";
+import { openFaults } from "@/lib/wholesale/service";
 import { adminOrders, showMoney } from "@/lib/wholesale/orders";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +40,8 @@ export default async function WholesaleAdmin() {
   const { wholesalers, chats } = await wholesaleOverview();
   const orders = (await adminOrders()).filter(({ o }) => o.status !== "quoted");
   const queue = await consignmentQueue();
+  const briefs = await adminBriefs();
+  const faults = await openFaults();
   const allOutlets = wholesalers.flatMap(({ w, outlets }) => outlets.map((o) => ({ o, w })));
   const leads = wholesalers.filter(({ w }) => w.status === "lead");
   const active = wholesalers.filter(({ w }) => w.status === "active");
@@ -171,6 +176,66 @@ export default async function WholesaleAdmin() {
           </ActionForm>
         </div>
       </div>
+
+      <h3>Display faults ({faults.length})</h3>
+      {faults.length === 0 && <p className="muted">None open.</p>}
+      <table>
+        <tbody>
+          {faults.map(({ t, outlet, wholesaler, display }) => (
+            <tr key={t.id}>
+              <td><strong>{outlet.name}</strong><br /><span className="small muted">{wholesaler.name} · {display ? `${display.kind} ${display.serial}` : "display not identified"} · {t.ref}</span></td>
+              <td className="small">{t.problem}{t.photos.map((p, i) => <div key={p}><a href={p}>Photo {i + 1}</a></div>)}</td>
+              <td>
+                <ActionForm action={resolveFaultAction} submit="Resolved">
+                  <input type="hidden" name="ticketId" value={t.id} />
+                  <input name="resolution" placeholder="What was done" required />
+                </ActionForm>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h3>Add a display</h3>
+      <ActionForm action={addDisplayAction} className="row" submit="Add display">
+        <select name="outletId">{allOutlets.map(({ o, w }) => <option key={o.id} value={o.id}>{o.name} ({w.name})</option>)}</select>
+        <select name="kind"><option value="sunbox">Sunbox</option><option value="prism">Prism</option><option value="tower">Tower</option></select>
+        <input name="serial" placeholder="Serial" required />
+        <input name="installedAt" type="date" />
+      </ActionForm>
+
+      <h2>Location designs ({briefs.length})</h2>
+      {briefs.length === 0 && <p className="muted">No requests.</p>}
+      <table>
+        <tbody>
+          {briefs.map(({ b, w, designer, design }) => (
+            <tr key={b.id}>
+              <td><strong>{w.name}</strong> <span className="muted small">{b.ref}</span><br /><span className="small">{b.brief}</span></td>
+              <td className="small">
+                <span className="badge">{b.status.replace("_", " ")}</span>
+                {designer && <div>{designer.name}</div>}
+                {design && <div className="muted">{design.title}</div>}
+                {b.feedback && <div className="muted">“{b.feedback}”</div>}
+                {b.problem && <div className="warn">{b.problem}</div>}
+              </td>
+              <td>
+                {["open", "assigned", "changes_requested"].includes(b.status) && (
+                  <ActionForm action={assignBriefAction} className="row" submit={designer ? "Reassign" : "Assign"}>
+                    <input type="hidden" name="briefId" value={b.id} />
+                    <input name="designerEmail" type="email" placeholder="Designer's email" required />
+                  </ActionForm>
+                )}
+                {b.status === "approved" && (
+                  <form action={retryLocationProductAction}>
+                    <input type="hidden" name="briefId" value={b.id} />
+                    <button className="secondary">Create the product again</button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h2>WhatsApp chats</h2>
       {chats.length === 0 && <p className="muted">No chats yet.</p>}

@@ -5,8 +5,12 @@ import { outlets, wholesaleContacts, wholesalers } from "../db/schema";
 import {
   PARTNER_MSRP_MULTIPLE, PARTNER_PRICE, SETTLEMENT_DAYS, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS,
 } from "../rules";
+import { catalogFor } from "../shopify/wholesale";
 import { wholesaleOps } from "./ops";
+import { config } from "../config";
 import { confirmSalesReport, outletSummary, reportSales, requestRestock } from "./consignment";
+import { briefsFor, requestDesign } from "./designs";
+import { reportFault } from "./service";
 import { placeOrder, quoteOrder, showMoney, summary } from "./orders";
 
 // The bot's tools. Every one takes the sender from the verified WhatsApp number, never from the model, so
@@ -19,8 +23,15 @@ type Outlet = typeof outlets.$inferSelect;
 
 export type Sender = { phone: string; contact?: Contact; wholesaler?: Wholesaler; outlets: Outlet[] };
 
-// What a run of the bot decided besides its reply.
-export type RunState = { handover?: string };
+// What a run of the bot knows about the conversation and decided besides its reply.
+export type RunState = {
+  handover?: string;
+  // Extra Gorgias tags for the handover, such as display-service.
+  tags?: string[];
+  ticketId?: string;
+  // Photos the customer sent since the bot last replied.
+  images?: string[];
+};
 
 export async function identifySender(phone: string): Promise<Sender> {
   const d = await db();
@@ -57,7 +68,7 @@ const getCatalog: Tool = {
     strict: true,
   },
   async run(_input, sender) {
-    const items = await wholesaleOps().wholesaleCatalog();
+    const items = catalogFor(await wholesaleOps().wholesaleCatalog(), sender.wholesaler?.id);
     const w = sender.wholesaler;
     return {
       designs: items,
@@ -303,12 +314,79 @@ const getSettlementTool: Tool = {
     }),
 };
 
+const requestDesignTool: Tool = {
+  def: {
+    name: "request_design",
+    description:
+      "Asks the Truecolors design team for a design made for the wholesaler's location: their city, resort, landmark " +
+      "or theme. Truecolors owns location designs unless agreed otherwise; once approved, only this wholesaler can order it.",
+    input_schema: schema({ brief: { type: "string", description: "What they want, in their words: place, landmarks, feel, colours." } }, ["brief"]),
+    strict: true,
+  },
+  run: (input, sender) =>
+    attempt(async () => {
+      const b = await requestDesign(sender.wholesaler!.id, sender.contact?.id ?? null, String(input.brief ?? ""));
+      return { requested: b.ref, next: "The design team will pick it up; they'll get a link to review the design in the wholesale portal." };
+    }),
+};
+
+const getDesignsTool: Tool = {
+  def: {
+    name: "get_designs",
+    description:
+      "Lists the wholesaler's location design requests and where each stands. Designs ready for review are approved " +
+      "or sent back in the wholesale portal, where they can see the shade and sun mockups: give them the link.",
+    input_schema: schema({}),
+    strict: true,
+  },
+  run: (_input, sender) =>
+    attempt(async () => ({
+      reviewIn: `${config().APP_URL}/wholesale#designs`,
+      designs: (await briefsFor(sender.wholesaler!.id)).map(({ b, design }) => ({
+        ref: b.ref, brief: b.brief, design: design?.title, feedback: b.feedback ?? undefined,
+        status: {
+          open: "waiting for a designer", assigned: "being designed", in_review: "ready for you to review",
+          changes_requested: "being changed", approved: "approved, going into your catalog", live: "in your catalog", declined: "declined",
+        }[b.status],
+      })),
+    })),
+};
+
+const reportFaultTool: Tool = {
+  def: {
+    name: "report_fault",
+    description:
+      "Logs a fault on a display partner's display (UV light, button, screen, glass, lock) for the service team, with any " +
+      "photos they sent, and passes the chat to a person. Tell them the team will reply here.",
+    input_schema: schema(
+      {
+        ...outletParam,
+        display: { type: "string", description: "Which display: Sunbox, Prism, Tower or its serial; empty if they have one." },
+        problem: { type: "string", description: "What's wrong, in their words." },
+      },
+      ["outlet", "display", "problem"],
+    ),
+    strict: true,
+  },
+  run: (input, sender, state) =>
+    attempt(async () => {
+      const outlet = outletOf(sender, input.outlet);
+      const { ticket, display } = await reportFault({
+        outletId: outlet.id, contactId: sender.contact?.id ?? null, problem: String(input.problem ?? ""),
+        display: String(input.display ?? ""), photos: state.images ?? [], gorgiasTicketId: state.ticketId,
+      });
+      state.handover = `display fault ${ticket.ref} at ${outlet.name}${display ? ` (${display.kind} ${display.serial})` : ""}: ${ticket.problem}`;
+      state.tags = [...(state.tags ?? []), "display-service"];
+      return { logged: ticket.ref, display: display ? `${display.kind} ${display.serial}` : "not sure which; the team will check" };
+    }),
+};
+
 const handToPerson: Tool = {
   def: {
     name: "hand_to_person",
     description:
       "Passes the chat to the Truecolors wholesale team. Use it for anything you can't answer or do with your tools: " +
-      "changing or cancelling an order, payment problems, complaints, custom designs, contract terms, or when they ask for a person. " +
+      "changing or cancelling an order, payment problems, complaints, contract terms, or when they ask for a person. " +
       "After calling it, tell them a team member will reply here.",
     input_schema: schema({ reason: { type: "string", description: "One line for the team: what they need." } }, ["reason"]),
     strict: true,
@@ -325,9 +403,9 @@ export function toolsFor(sender: Sender): Tool[] {
   if (!isActive(sender)) return [getCatalog, ...(sender.contact ? [] : [recordLead]), handToPerson];
   const w = sender.wholesaler!;
   return [
-    getCatalog, getOrders,
+    getCatalog, getOrders, requestDesignTool, getDesignsTool,
     ...(w.stockist ? [quoteOrderTool, placeOrderTool] : []),
-    ...(w.displayPartner ? [getDisplayStock, reportSalesTool, confirmSalesTool, getSettlementTool, requestRestockTool] : []),
+    ...(w.displayPartner ? [getDisplayStock, reportSalesTool, confirmSalesTool, getSettlementTool, requestRestockTool, reportFaultTool] : []),
     handToPerson,
   ];
 }

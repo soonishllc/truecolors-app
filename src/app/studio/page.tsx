@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
-import { acceptAgreementAction, createDesignAction, relaunchAction } from "@/app/actions";
+import { acceptAgreementAction, createDesignAction, relaunchAction, submitBriefAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { ShareKit } from "@/components/ShareKit";
 import { ProviderIcon } from "@/components/SocialButtons";
@@ -17,6 +17,7 @@ import { payoutMethod } from "@/lib/payouts/methods";
 import { designerEarnings } from "@/lib/royalties/ledger";
 import { siteImageUrl } from "@/lib/site-images";
 import { fileUrl } from "@/lib/storage";
+import { briefsForDesigner } from "@/lib/wholesale/designs";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
     : [];
   const designOf = (id: string) => mine.find((x) => x.id === id);
   const firstName = user.name.split(" ")[0];
+  const briefs = await briefsForDesigner(user.id);
+  const finished = mine.filter((x) => x.printReport?.ok && x.compositeKey && x.lineArtKey);
   const banner = siteImageUrl("studio-hero");
 
   return (
@@ -215,6 +218,39 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
               </article>
             );
           })}
+
+          {briefs.length > 0 && (
+            <>
+              <div className="section-head" id="briefs"><h2>Location briefs</h2></div>
+              <p className="small muted">
+                Designs for a wholesaler&apos;s city, resort or landmark. Truecolors owns them; you earn your usual share on every shirt sold.
+              </p>
+              <div className="grid">
+                {briefs.map(({ b, w }) => (
+                  <div key={b.id} className="card stack">
+                    <div className="eyebrow">{b.ref} · {w.name}</div>
+                    <p>{b.brief}</p>
+                    {b.feedback && b.status === "changes_requested" && <p className="notice small">They asked: “{b.feedback}”</p>}
+                    {b.status === "in_review" && <p className="small muted">With the wholesaler for review.</p>}
+                    {(b.status === "approved" || b.status === "live") && <p className="small good">Approved{b.status === "live" ? " and in their catalog" : ""}.</p>}
+                    {(b.status === "assigned" || b.status === "changes_requested") &&
+                      (finished.length ? (
+                        <ActionForm action={submitBriefAction} submit="Send for review">
+                          <input type="hidden" name="briefId" value={b.id} />
+                          <label>Design
+                            <select name="designId" defaultValue={b.designId ?? undefined}>
+                              {finished.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+                            </select>
+                          </label>
+                        </ActionForm>
+                      ) : (
+                        <p className="small muted">Make the design below, colour it and pass the print check, then send it from here.</p>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="section-head">
             <h2>Your designs</h2>

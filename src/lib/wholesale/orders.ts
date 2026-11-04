@@ -7,6 +7,7 @@ import { UserError } from "../design/service";
 import { sendEmail } from "../email";
 import { money } from "../format";
 import { CURRENCY_COUNTRY, QUOTE_HOURS, WHOLESALE_MIN_UNITS, wholesaleDiscountBps } from "../rules";
+import { catalogFor } from "../shopify/wholesale";
 import type { OrderPayload } from "../shopify/webhooks";
 import { put } from "../storage";
 import { wholesaleOps } from "./ops";
@@ -60,17 +61,17 @@ export async function quoteOrder(wholesalerId: string, request: QuoteRequest, no
   const discountBps = wholesaleDiscountBps(units)!;
 
   const ops = wholesaleOps();
-  const catalog = await ops.wholesaleCatalog();
+  const catalog = catalogFor(await ops.wholesaleCatalog(), w.id);
   const bySku = new Map(catalog.flatMap((p) => p.sizes.map((s) => [s.sku.toUpperCase(), { product: p, size: s }] as const)));
   const missing = [...wanted.keys()].filter((sku) => !bySku.has(sku));
   if (missing.length) throw new UserError(`Not in the wholesale catalog: ${missing.join(", ")}.`);
 
   const hub = config().WHOLESALE_LOCATION_ID;
   const hubStock = hub ? new Map((await ops.locationStock(hub)).map((l) => [l.sku.toUpperCase(), l.available])) : undefined;
-  const short = [...wanted].filter(([sku, q]) => q > (hubStock?.get(sku) ?? (hub ? 0 : bySku.get(sku)!.size.available)));
-  if (short.length) {
-    throw new UserError(`Not enough stock for: ${short.map(([sku]) => `${sku} (${hubStock?.get(sku) ?? bySku.get(sku)!.size.available} left)`).join(", ")}.`);
-  }
+  // With a hub location set, only the Cancún stock counts; otherwise stock across every location.
+  const left = (sku: string) => (hubStock ? (hubStock.get(sku) ?? 0) : bySku.get(sku)!.size.available);
+  const short = [...wanted].filter(([sku, q]) => q > left(sku));
+  if (short.length) throw new UserError(`Not enough stock for: ${short.map(([sku]) => `${sku} (${left(sku)} left)`).join(", ")}.`);
 
   const prices = await ops.variantPrices([...wanted.keys()].map((sku) => bySku.get(sku)!.size.variantId), CURRENCY_COUNTRY[w.currency]);
   const lines: WholesaleLine[] = [...wanted].map(([sku, quantity]) => {
@@ -233,6 +234,11 @@ export async function shipOrder(orderId: string, opts: { retry?: boolean } = {})
       .set({ status: "shipped", shippedAt: new Date(), shippingProblem: null })
       .where(eq(wholesaleOrders.id, o.id))
       .returning();
+    const { recordLocationRoyalties, royaltyHold } = await import("./designs");
+    await recordLocationRoyalties({
+      source: `wholesale:${o.ref}`, currency: o.currency, payableAfter: royaltyHold(new Date()),
+      lines: o.lines.map((l) => ({ sku: l.sku, quantity: l.quantity, unit: l.unit })),
+    });
     const w = (await wholesalerById(o.wholesalerId))!;
     await notify(w, `order-shipped:${o.ref}`, `Your Truecolors order ${shipped.shopifyOrderName ?? o.ref} has shipped`, [
       `It's on its way from Cancún by FedEx, duties paid. Tracking number ${shipment.trackingNumber}:`,
