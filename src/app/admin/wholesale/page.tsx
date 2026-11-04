@@ -7,6 +7,8 @@ import {
 } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth/session";
+import { config } from "@/lib/config";
+import { ensureDemoAccounts } from "@/lib/wholesale/demo";
 import { ago, date } from "@/lib/format";
 import { WHOLESALE_CURRENCIES } from "@/lib/rules";
 import { fileUrl } from "@/lib/storage";
@@ -37,6 +39,7 @@ function Currency({ value = "USD" }) {
 
 export default async function WholesaleAdmin() {
   await requireAdmin();
+  if (config().WHOLESALE_DEMO) await ensureDemoAccounts();
   const { wholesalers, chats } = await wholesaleOverview();
   const orders = (await adminOrders()).filter(({ o }) => o.status !== "quoted");
   const queue = await consignmentQueue();
@@ -50,6 +53,9 @@ export default async function WholesaleAdmin() {
     <>
       <p className="small"><Link href="/admin">← Admin</Link></p>
       <h1>Wholesale</h1>
+      {config().WHOLESALE_DEMO && (
+        <p className="notice">Local demo with sample data. <Link href="/admin/wholesale/simulator">Open the WhatsApp bot simulator →</Link></p>
+      )}
 
       <h2>Stockist orders</h2>
       {orders.length === 0 && <p className="muted">No orders yet.</p>}

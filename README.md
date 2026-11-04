@@ -100,8 +100,8 @@ The site runs on [Render](https://render.com) as one Docker web service, a manag
    - `PAYOUT_ENCRYPTION_KEY`: make one with `openssl rand -base64 32`, keep a copy in your password manager, and never change it.
    - `OPENAI_API_KEY`, the four `S3_*` values, the Shopify keys and `RESEND_API_KEY`.
    - `DESIGNER_AGREEMENT_VERSION`: leave blank until the agreement is signed.
-4. **Domain.** In the web service's Settings → Custom Domains, Render shows the DNS records for `truecolors.design` and `www`. Add them at the domain registrar; Render issues the certificate.
-5. **Check it.** `https://truecolors.design/api/health` returns `{"ok":true}`. The cron job's logs show `200` every 15 minutes.
+4. **Domain.** In the web service's Settings → Custom Domains, Render shows the DNS record for `app.truecolors.global`. Add it where truecolors.global's DNS is managed; Render issues the certificate. Then point the Shopify app proxy (`apps/truecolors`) at `https://app.truecolors.global/proxy`.
+5. **Check it.** `https://app.truecolors.global/api/health` returns `{"ok":true}`. The cron job's logs show `200` every 15 minutes.
 
 The server refuses to start in production if a setting is still a local default (http `APP_URL`, no database or bucket, short secrets, dev login links on). The startup log lists what to fix. Migrations run automatically when the server starts. To try a production build locally, run it with `ALLOW_LOCAL_PRODUCTION=true`.
 

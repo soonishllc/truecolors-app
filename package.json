@@ -22,7 +22,8 @@
     "wholesale:seed": "tsx --env-file=.env.local scripts/seed-wholesale.ts",
     "wholesale:check": "tsx --env-file=.env.local scripts/check-wholesale.ts",
     "wholesale:chat": "tsx --env-file=.env.local scripts/bot-chat.ts",
-    "wholesale:end-period": "tsx --env-file=.env.local scripts/end-period.ts"
+    "wholesale:end-period": "tsx --env-file=.env.local scripts/end-period.ts",
+    "demo:wholesale": "WHOLESALE_DEMO=true PGLITE_DIR=.pglite-demo WHOLESALE_LOCATION_ID=9001 QUIQUP_LOCATION_ID=9002 SHIPDUDES_LOCATION_ID=9003 WHOLESALE_BANK_DETAILS='Demo Bank \u00b7 IBAN AE00 0000 DEMO' APP_URL=http://localhost:3001 STORE_URL=http://localhost:3001/dev/store SHOPIFY_PROXY_SECRET=local-demo-proxy-secret next dev -p 3001"
   },
   "license": "ISC",
   "dependencies": {

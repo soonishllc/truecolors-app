@@ -11,11 +11,32 @@ export const GARMENT: {
   sizeChart?: ({ label: string } & Record<Size, string>)[];
 } = {};
 
-export const MARKET = "US" as const;
-export const CURRENCY = "USD" as const;
+// Pre-orders sell in both of the store's markets, as one campaign with one goal counted across both. The UAE pays
+// the store's base price in AED; the USA pays from its own price list in USD. Compare-at is the "later" price
+// shown struck through: $45, and AED 165 as its placeholder equivalent until Truecolors confirms it.
+export const PREORDER_MARKETS = ["AE", "US"] as const;
+export type PreorderMarket = (typeof PREORDER_MARKETS)[number];
+export const PREORDER_PRICE: Record<PreorderMarket, { currency: "AED" | "USD"; cents: number; compareAtCents: number; label: string }> = {
+  AE: { currency: "AED", cents: 12900, compareAtCents: 16500, label: "UAE" },
+  US: { currency: "USD", cents: 3600, compareAtCents: 4500, label: "USA" },
+};
+// Visitors in the GCC and the rest of the Middle East and North Africa see the UAE store; everyone else sees the
+// USA store. The same list is in theme/snippets/tc-market-from-location.liquid; the Shopify markets need these
+// countries too, or checkout won't ship to them.
+export const UAE_MARKET_COUNTRIES = [
+  // GCC
+  "AE", "SA", "KW", "QA", "BH", "OM",
+  // Rest of MENA
+  "EG", "JO", "LB", "IQ", "SY", "PS", "YE", "IR", "IL", "MA", "DZ", "TN", "LY", "DJ",
+] as const;
+export const marketForCountry = (country: string | null | undefined): PreorderMarket =>
+  country && (UAE_MARKET_COUNTRIES as readonly string[]).includes(country.toUpperCase()) ? "AE" : "US";
 
-export const PRICE_CENTS = 3600;
-export const COMPARE_AT_CENTS = 4500;
+// The store's base currency is AED, so the UAE price is what goes on the product itself.
+export const BASE_MARKET: PreorderMarket = "AE";
+export const MARKET = PREORDER_MARKETS.join(",");
+export const CURRENCY = PREORDER_PRICE[BASE_MARKET].currency;
+export const PRICE_CENTS = PREORDER_PRICE[BASE_MARKET].cents;
 
 export const FUNDING_GOAL = 100;
 export const STRETCH_GOALS = [250, 500];

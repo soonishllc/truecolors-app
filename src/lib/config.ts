@@ -12,6 +12,8 @@ const schema = z.object({
 
   // Leave empty to run on an embedded Postgres (PGlite) stored in .pglite/.
   DATABASE_URL: z.string().optional(),
+  // Where the embedded database lives. The wholesale demo uses its own, so it never touches real local data.
+  PGLITE_DIR: z.string().default(".pglite"),
   STORAGE_DIR: z.string().default("./storage"),
   // S3-compatible file storage for production (Cloudflare R2: endpoint https://<account id>.r2.cloudflarestorage.com, region auto).
   S3_BUCKET: z.string().optional(),
@@ -26,14 +28,23 @@ const schema = z.object({
   OPENAI_IMAGE_MODEL: z.string().default("gpt-image-2"),
 
   SHOPIFY_STORE_DOMAIN: z.string().default("cjfxb1-ex.myshopify.com"),
-  SHOPIFY_STOREFRONT_URL: z.string().url().default("https://truecolors.global/en-us"),
+  // The design and wholesale pages live inside the store at STORE_URL + PROXY_PATH (a Shopify app proxy), which
+  // signs each request with the proxy app's client secret.
+  STORE_URL: z.string().url().default("https://www.truecolors.global"),
+  PROXY_PATH: z.string().default("/apps/truecolors"),
+  SHOPIFY_PROXY_SECRET: z.string().optional(),
+  // The store is segmented by market: the UAE is the store's root (AED), the USA this subfolder of it (USD).
+  STORE_US_PATH: z.string().default("/en-us"),
   SHOPIFY_ADMIN_TOKEN: z.string().optional(),
   SHOPIFY_API_VERSION: z.string().default("2026-10"),
   SHOPIFY_WEBHOOK_SECRET: z.string().optional(),
   // Plus can charge part of an order; without it, an order is only ever charged its whole balance.
   SHOPIFY_PLUS: bool,
-  // Publication behind the "United States" market catalog.
+  // Publications behind the "United Arab Emirates" and "United States" market catalogs, and the USA's price list,
+  // so pre-orders are listed in both markets and priced in USD for the USA.
+  SHOPIFY_AE_PUBLICATION_ID: z.string().optional(),
   SHOPIFY_US_PUBLICATION_ID: z.string().optional(),
+  SHOPIFY_US_PRICE_LIST_ID: z.string().optional(),
 
   // Blank until the lawyers sign off; campaigns cannot be approved while blank.
   DESIGNER_AGREEMENT_VERSION: z.string().default(""),
@@ -57,7 +68,7 @@ const schema = z.object({
 
   // Email. With a Resend key, emails are sent; without one they're only logged (see Admin, Emails).
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default("Truecolors Design <hello@truecolors.design>"),
+  EMAIL_FROM: z.string().default("Truecolors <hello@truecolors.global>"),
 
   // Encrypts designers' payout details. Production must set its own; changing it makes saved details unreadable.
   PAYOUT_ENCRYPTION_KEY: z.string().optional(),
@@ -90,6 +101,10 @@ const schema = z.object({
   FEDEX_ACCOUNT_NUMBER: z.string().optional(),
   FEDEX_SANDBOX: bool,
   FEDEX_SERVICE_TYPE: z.string().default("FEDEX_INTERNATIONAL_PRIORITY"),
+
+  // Local demo of the wholesale bot: Shopify, Gorgias and FedEx are replaced with sample data, and the
+  // simulator at /admin/wholesale/simulator stands in for WhatsApp. Claude is real. Never in production.
+  WHOLESALE_DEMO: bool,
 
   CRON_SECRET: z.string().default("dev-cron-secret"),
   DEV_SHOW_LOGIN_LINKS: bool,
@@ -130,5 +145,8 @@ export function productionProblems(c: Config = config()): string[] {
     problems.push("CRON_SECRET must be 32+ random characters");
   if (!c.PAYOUT_ENCRYPTION_KEY || c.PAYOUT_ENCRYPTION_KEY.length < 32) problems.push("PAYOUT_ENCRYPTION_KEY must be 32+ random characters");
   if (c.DEV_SHOW_LOGIN_LINKS) problems.push("DEV_SHOW_LOGIN_LINKS must be off");
+  if (c.WHOLESALE_DEMO) problems.push("WHOLESALE_DEMO must be off");
+  if (!c.SHOPIFY_PROXY_SECRET) problems.push("SHOPIFY_PROXY_SECRET is required (the store's design and wholesale pages)");
+  if (!c.STORE_URL.startsWith("https://")) problems.push("STORE_URL must be the store's https:// address");
   return problems;
 }

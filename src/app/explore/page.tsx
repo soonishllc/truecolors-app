@@ -10,7 +10,7 @@ import { fileUrl } from "@/lib/storage";
 import { TileSweep } from "@/components/TileSweep";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Explore designs · Truecolors Design" };
+export const metadata: Metadata = { title: "Explore designs · Truecolors" };
 
 const FILTERS = {
   live: { label: "Live now", statuses: ["live"] },

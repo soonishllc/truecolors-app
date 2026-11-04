@@ -11,14 +11,14 @@ import {
 import { inArray } from "drizzle-orm";
 import { designerTarget, ensureFan, joinWaitlist, sendFanLink } from "../src/lib/fans";
 import { colourDesign, createDesign, renderMedia } from "../src/lib/design/service";
-import { CURRENCY, FUNDING_GOAL, PRICE_CENTS, SIZES, STRETCH_GOALS, royaltyCents, shareBps } from "../src/lib/rules";
+import { CURRENCY, FUNDING_GOAL, MARKET, PRICE_CENTS, SIZES, STRETCH_GOALS, royaltyCents, shareBps } from "../src/lib/rules";
 
 // Local only: a demo designer with designs, campaigns and pre-orders, so the studio dashboard has something
 // to show. Prints a login link for the demo designer.
 //   npm run demo                 mock artist, free
 //   npm run demo -- --reset --ai rebuilds the demo with real designs from the OpenAI image model (8 paid calls)
 
-const EMAIL = "demo.designer@truecolors.design";
+const EMAIL = "demo.designer@example.com";
 const DAY = 86_400_000;
 const CITIES = ["Austin", "Miami", "Brooklyn", "San Diego", "Chicago", "Houston", "Denver", "Seattle"];
 
@@ -152,7 +152,7 @@ async function main() {
       .insert(campaigns)
       .values({
         slug: `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${n}`, designCode: `DEMO${n}`, designId: design.id,
-        userId: user.id, title: p.title, market: "US", status: p.status, goal: FUNDING_GOAL, stretchGoals: STRETCH_GOALS,
+        userId: user.id, title: p.title, market: MARKET, status: p.status, goal: FUNDING_GOAL, stretchGoals: STRETCH_GOALS,
         priceCents: PRICE_CENTS, currency: CURRENCY, startsAt, endsAt: new Date(startsAt.getTime() + 21 * DAY),
         fundedAt: p.status === "funded" ? new Date(now - DAY) : null,
       })
@@ -165,7 +165,7 @@ async function main() {
         .insert(pledges)
         .values({
           campaignId: c.id, shopifyOrderId: randomBytes(6).toString("hex"), orderName: `#D${1000 + i}`, lineItemId: "1",
-          size: SIZES[i % SIZES.length], quantity: 1, netCents: PRICE_CENTS, viaDesignerLink: via,
+          size: SIZES[i % SIZES.length], quantity: 1, netCents: PRICE_CENTS, currency: CURRENCY, viaDesignerLink: via,
           email: `demo.backer${n}.${i}@example.com`, city: CITIES[(i * 7 + n) % CITIES.length],
           status: p.status === "funded" ? "charged" : "pledged",
           createdAt: new Date(startsAt.getTime() + t * (p.daysIn * DAY - 3_600_000)),

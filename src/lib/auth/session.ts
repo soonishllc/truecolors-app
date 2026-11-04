@@ -16,6 +16,7 @@ import type { Handshake, Profile, Provider } from "./oauth";
 const COOKIE = "tc_session";
 const HANDSHAKE_COOKIE = "tc_oauth";
 const PENDING_COOKIE = "tc_pending";
+const STORE_COOKIE = "tc_store";
 const SESSION_DAYS = 30;
 const LINK_MINUTES = 30;
 
@@ -61,6 +62,40 @@ async function startSession(userId: string) {
   });
 }
 
+// Who is signed in to the store, as Shopify told us. Kept so someone who isn't a designer yet can join with
+// that same account, without a second email to confirm.
+export type StoreIdentity = { email: string; name: string | null };
+
+// Inside the store, the store's signed-in customer is the designer with the same email, if there is one; anyone
+// else is signed out of the studio. Callers must have verified the customer came from Shopify.
+export async function signInStoreCustomer(customer: StoreIdentity | undefined) {
+  const jar = await cookies();
+  if (customer) {
+    jar.set(STORE_COOKIE, seal({ email: customer.email.toLowerCase(), name: customer.name } satisfies StoreIdentity, SESSION_DAYS * 1440), {
+      httpOnly: true, sameSite: "lax", secure: secure(), path: "/", maxAge: SESSION_DAYS * 86_400,
+    });
+  } else {
+    jar.delete(STORE_COOKIE);
+  }
+  const d = await db();
+  const [user] = customer ? await d.select().from(users).where(eq(users.email, customer.email.toLowerCase())) : [];
+  if (user) await startSession(user.id);
+  else await signOut();
+}
+
+export async function storeIdentity() {
+  return unseal<StoreIdentity>((await cookies()).get(STORE_COOKIE)?.value);
+}
+
+// The local demo signs in as a demo designer or the admin directly, since there's no email to click.
+export async function signInAsDemoUser(email: string) {
+  if (!config().WHOLESALE_DEMO) throw new Error("Demo sign-in is only for the local demo");
+  const d = await db();
+  const [user] = await d.select().from(users).where(eq(users.email, email));
+  if (!user) throw new Error(`No demo user ${email}`);
+  await startSession(user.id);
+}
+
 export async function currentUser() {
   const userId = readSessionValue((await cookies()).get(COOKIE)?.value);
   if (!userId) return;
@@ -99,9 +134,10 @@ export async function clearPendingSignUp() {
   (await cookies()).delete(PENDING_COOKIE);
 }
 
-// Returns the link in dev so it can be shown on screen. Signing up through a provider logs straight in instead.
+// Returns the link in dev so it can be shown on screen. Signing up through a provider, or with the store account
+// (whose email Shopify has already confirmed), logs straight in instead.
 export async function signUp(input: {
-  email: string; name: string; invite: string; acceptAgreement: boolean; via?: PendingSignUp;
+  email: string; name: string; invite: string; acceptAgreement: boolean; via?: PendingSignUp; fromStore?: boolean;
 }): Promise<string | undefined> {
   if (!input.acceptAgreement) throw new UserError("Accept the designer agreement to continue.");
   const d = await db();
@@ -124,6 +160,7 @@ export async function signUp(input: {
     })
     .returning();
   await d.update(invites).set({ usedBy: user.id, usedAt: new Date() }).where(eq(invites.code, invite.code));
+  if (input.fromStore) return void (await startSession(user.id));
   if (!input.via) return sendLoginLink(email);
   await linkIdentity(user.id, input.via.provider, input.via.profile);
   await clearPendingSignUp();
@@ -152,7 +189,7 @@ export async function sendLoginLink(emailInput: string): Promise<string | undefi
   console.log(`[login link] ${email}: ${link}`);
   await sendEmail({
     to: email,
-    subject: "Your Truecolors Design login link",
+    subject: "Your Truecolors login link",
     body: `Tap to log in to your studio:\n${link}\n\nThe link works once, for ${LINK_MINUTES} minutes.`,
   });
   return config().DEV_SHOW_LOGIN_LINKS ? link : undefined;

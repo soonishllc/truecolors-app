@@ -21,7 +21,7 @@ export function LegalPage({ title, updated = LEGAL_UPDATED, children }: { title:
       <h2>Contact</h2>
       <p>
         Questions about this page: <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a> or WhatsApp{" "}
-        <a href={CONTACT.whatsapp.href}>{CONTACT.whatsapp.label}</a>.
+        <a href={CONTACT.whatsapp.href} target="_blank" rel="noreferrer">{CONTACT.whatsapp.label}</a>.
       </p>
       <nav className="legal-nav" aria-label="Legal pages">
         {PAGES.map((p) => <Link key={p.href} href={p.href}>{p.label}</Link>)}

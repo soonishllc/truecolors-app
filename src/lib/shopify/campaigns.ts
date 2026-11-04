@@ -1,5 +1,6 @@
 import { config } from "../config";
-import { COMPARE_AT_CENTS, SIZES, sku } from "../rules";
+import { BASE_MARKET, PREORDER_PRICE, SIZES, sku, type PreorderMarket } from "../rules";
+import { storefront } from "../links";
 import { admin, gid, numericId, ok, type UserErrors } from "./client";
 
 // Everything the app does to Shopify for a campaign. Mutation shapes follow the Admin GraphQL API;
@@ -20,7 +21,6 @@ export async function createCampaignProduct(input: {
   descriptionHtml: string;
   designCode: string;
   designerName: string;
-  priceCents: number;
   endsAt: Date;
   imageUrls: string[];
 }): Promise<CampaignProduct> {
@@ -63,10 +63,11 @@ export async function createCampaignProduct(input: {
     }`,
     {
       productId: product.id,
+      // The product's own price is the store's base currency (AED, the UAE); the USA's comes from its price list below.
       variants: SIZES.map((size) => ({
         optionValues: [{ optionName: "Size", name: size }],
-        price: dollars(input.priceCents),
-        compareAtPrice: dollars(COMPARE_AT_CENTS),
+        price: dollars(PREORDER_PRICE[BASE_MARKET].cents),
+        compareAtPrice: dollars(PREORDER_PRICE[BASE_MARKET].compareAtCents),
         inventoryPolicy: "CONTINUE",
         inventoryItem: { sku: sku(input.designCode, size), tracked: false, requiresShipping: true },
       })),
@@ -115,13 +116,33 @@ export async function createCampaignProduct(input: {
   );
   const sellingPlanGroupId = ok(plan.sellingPlanGroupCreate, "sellingPlanGroupCreate").sellingPlanGroup!.id;
 
-  const publicationId = config().SHOPIFY_US_PUBLICATION_ID;
-  if (publicationId) {
+  // Each market's fixed price, on that market's price list (the base market needs none).
+  for (const [market, priceListId] of Object.entries(marketPriceLists()) as [PreorderMarket, string][]) {
+    const price = PREORDER_PRICE[market];
+    const res = await admin<{ priceListFixedPricesAdd: { userErrors: UserErrors } }>(
+      `mutation($priceListId: ID!, $prices: [PriceListPriceInput!]!) {
+        priceListFixedPricesAdd(priceListId: $priceListId, prices: $prices) { userErrors { field message } }
+      }`,
+      {
+        priceListId: gid("PriceList", priceListId),
+        prices: Object.values(variantIds).map((variantId) => ({
+          variantId,
+          price: { amount: dollars(price.cents), currencyCode: price.currency },
+          compareAtPrice: { amount: dollars(price.compareAtCents), currencyCode: price.currency },
+        })),
+      },
+    );
+    ok(res.priceListFixedPricesAdd, "priceListFixedPricesAdd");
+  }
+
+  // Listed in both markets' catalogs, so UAE and USA shoppers can both pre-order.
+  const publications = [config().SHOPIFY_AE_PUBLICATION_ID, config().SHOPIFY_US_PUBLICATION_ID].filter(Boolean) as string[];
+  if (publications.length) {
     const pub = await admin<{ publishablePublish: { userErrors: UserErrors } }>(
       `mutation($id: ID!, $input: [PublicationInput!]!) {
         publishablePublish(id: $id, input: $input) { userErrors { field message } }
       }`,
-      { id: product.id, input: [{ publicationId: gid("Publication", publicationId) }] },
+      { id: product.id, input: publications.map((id) => ({ publicationId: gid("Publication", id) })) },
     );
     ok(pub.publishablePublish, "publishablePublish");
   }
@@ -129,10 +150,20 @@ export async function createCampaignProduct(input: {
   return { productId: numericId(product.id), handle: product.handle, variantIds, sellingPlanGroupId };
 }
 
+// The price list for each market that isn't the base market. Without one, Shopify would convert the AED price.
+function marketPriceLists(): Partial<Record<PreorderMarket, string>> {
+  const id = config().SHOPIFY_US_PRICE_LIST_ID;
+  if (!id) throw new Error("SHOPIFY_US_PRICE_LIST_ID is blank, so the USA would get a converted AED price instead of $36");
+  return { US: id };
+}
+
 export type ChargeResult = { ok: true; reference: string } | { ok: false; error: string };
 
-// Charges the card Shopify saved at checkout. amountCents undefined = the order's whole outstanding balance.
-export async function chargeOrder(orderId: string, idempotencyKey: string, amountCents?: number): Promise<ChargeResult> {
+// Charges the card Shopify saved at checkout, in the order's own currency. amount undefined = the order's whole
+// outstanding balance.
+export async function chargeOrder(
+  orderId: string, idempotencyKey: string, amount?: { cents: number; currency: string },
+): Promise<ChargeResult> {
   const found = await admin<{
     order: { paymentCollectionDetails: { vaultedPaymentMethods: { id: string }[] | null } } | null;
   }>(
@@ -154,7 +185,7 @@ export async function chargeOrder(orderId: string, idempotencyKey: string, amoun
       id: gid("Order", orderId),
       mandateId,
       idempotencyKey,
-      amount: amountCents === undefined ? null : { amount: dollars(amountCents), currencyCode: "USD" },
+      amount: amount ? { amount: dollars(amount.cents), currencyCode: amount.currency } : null,
     },
   );
   const p = res.orderCreateMandatePayment;
@@ -197,8 +228,9 @@ export async function createRewardCode(code: string, valueCents: number) {
   ok(res.discountCodeBasicCreate, "discountCodeBasicCreate");
 }
 
-export function productUrl(handle: string, ref?: string) {
-  const url = new URL(`${config().SHOPIFY_STOREFRONT_URL.replace(/\/$/, "")}/products/${handle}`);
+// The product in the given market's storefront, so the shopper checks out in that market's currency.
+export function productUrl(handle: string, ref?: string, market: PreorderMarket = "US") {
+  const url = new URL(`${storefront(market)}/products/${handle}`);
   if (ref) url.searchParams.set("ref", ref);
   return url.toString();
 }

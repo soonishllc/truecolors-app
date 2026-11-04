@@ -1,6 +1,7 @@
-// The app's public name and address. The designer workspace inside it is still called the studio.
-export const BRAND = "Truecolors Design";
-export const DOMAIN = "truecolors.design";
+// The public name and address. Designs, wholesale and displays live inside the Truecolors app and store,
+// so there's no separate brand for them; the designer workspace is still called the studio.
+export const BRAND = "Truecolors";
+export const DOMAIN = "truecolors.global";
 
 // The store's own logo, served from its Shopify CDN so a logo change there shows here too.
 export const STORE_LOGO = "https://www.truecolors.global/cdn/shop/files/TRUECOLORSNEW.png?width=300";

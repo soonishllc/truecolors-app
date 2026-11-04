@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
 import { getTicket, handOverTicket, replyOnTicket } from "../gorgias/client";
+import { demoOps } from "./demo";
 import { bookShipment } from "../fedex/client";
 import {
   adjustStock, completeDraftAsPending, createInvoiceDraftOrder, createLocationProduct, createWholesaleDraftOrder, customerOrders, fulfilWithTracking, locationStock, markOrderPaid,
@@ -53,9 +54,16 @@ const live: WholesaleOps = {
   },
 };
 
-let ops: WholesaleOps = live;
+let ops: WholesaleOps | undefined;
+let demo: WholesaleOps | undefined;
 
-export const wholesaleOps = () => ops;
+// The live services, or the in-memory sample ones in the local demo. Tests swap in their own.
+export const wholesaleOps = (): WholesaleOps => {
+  if (ops) return ops;
+  if (!config().WHOLESALE_DEMO) return live;
+  demo ??= demoOps(live);
+  return demo;
+};
 
 export function useWholesaleOps(next: WholesaleOps) {
   ops = next;

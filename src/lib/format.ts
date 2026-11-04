@@ -1,6 +1,10 @@
 export const money = (cents: number, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 
+// Amounts in several currencies, e.g. "AED 129.00 + $36.00", each kept apart; "$0.00" when there are none.
+export const moneyEach = <K extends string>(totals: ({ currency: string } & Record<K, number>)[], key: K) =>
+  totals.filter((t) => t[key] !== 0).map((t) => money(t[key], t.currency)).join(" + ") || money(0);
+
 export const date = (d: Date | null | undefined) =>
   d ? d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "";
 

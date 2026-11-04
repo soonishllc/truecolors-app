@@ -9,6 +9,7 @@ import { PAYOUT_BUFFER_DAYS, RETURN_WINDOW_DAYS, royaltyCents, SHARE_BPS } from 
 import { fileUrl } from "../storage";
 import { wholesaleOps } from "./ops";
 import { notify } from "./orders";
+import { publicUrl } from "../links";
 
 // Location designs: a wholesaler asks for a design around their city, resort or landmark; the team assigns
 // a studio designer; the designer submits one of their finished designs; the wholesaler approves the shade
@@ -61,7 +62,7 @@ export async function assignBrief(briefId: string, designerEmail: string) {
   await sendEmail({
     to: designer.email,
     subject: `A location design brief for you: ${w.name}`,
-    body: `Hi ${designer.name},\n\n${w.name} would like a design:\n\n"${b.brief}"\n\nMake it in your studio as usual, then submit it from the brief at ${config().APP_URL}/studio#briefs. Truecolors owns location designs; you earn your usual ${SHARE_BPS / 100}% on every shirt sold.`,
+    body: `Hi ${designer.name},\n\n${w.name} would like a design:\n\n"${b.brief}"\n\nMake it in your studio as usual, then submit it from the brief at ${publicUrl("/studio#briefs")}. Truecolors owns location designs; you earn your usual ${SHARE_BPS / 100}% on every shirt sold.`,
     key: `brief-assigned:${b.id}:${designer.id}`,
   });
 }
@@ -94,7 +95,7 @@ export async function submitBriefDesign(userId: string, briefId: string, designI
     .where(eq(designBriefs.id, b.id));
   await notify(w, `brief-review:${b.id}:${design.id}`, `Your Truecolors design is ready to review (${b.ref})`, [
     `"${design.title}" for your brief:\n"${b.brief}"`,
-    `See it in the shade and in the sun, and approve it or ask for changes:\n${config().APP_URL}/wholesale#designs`,
+    `See it in the shade and in the sun, and approve it or ask for changes:\n${publicUrl("/wholesale#designs")}`,
   ]);
 }
 
@@ -173,7 +174,7 @@ export async function makeLocationProduct(briefId: string) {
       .where(eq(designBriefs.id, b.id));
     await notify(w, `brief-live:${b.id}`, `"${design.title}" is in your Truecolors catalog`, [
       "Your location design is ready to order. Only you can order it.",
-      `${config().APP_URL}/wholesale`,
+      publicUrl("/wholesale"),
     ]);
   } catch (e) {
     console.error(`[location design] ${b.ref}:`, (e as Error).message);

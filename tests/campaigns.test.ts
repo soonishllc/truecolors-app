@@ -183,7 +183,7 @@ describe("royalties", () => {
     const { user } = await fundedWith("maya");
     const e = await designerEarnings(user.id);
     // 9 orders x $360 x 10% + 1 order x $360 x 15%
-    expect(e.earned).toBe(9 * 3_600 + 5_400);
+    expect(e.totals).toMatchObject([{ currency: "USD", earned: 9 * 3_600 + 5_400 }]);
   });
 
   it("holds earnings until the return window closes after shipping", async () => {
@@ -209,7 +209,55 @@ describe("royalties", () => {
     const clawbacks = await d.select().from(royaltyEntries).where(eq(royaltyEntries.kind, "clawback"));
     expect(clawbacks).toHaveLength(1);
     expect(clawbacks[0].amountCents).toBe(-3_600);
-    expect((await designerEarnings(user.id)).earned).toBe(9 * 3_600);
+    expect((await designerEarnings(user.id)).totals[0].earned).toBe(9 * 3_600);
+  });
+});
+
+describe("UAE and USA pre-orders", () => {
+  it("counts both markets towards one goal, and records, charges and pays each in its own currency", async () => {
+    process.env.SHOPIFY_PLUS = "true";
+    resetConfig();
+    try {
+      const { user, c } = await liveCampaign();
+      for (let i = 0; i < 5; i++) await recordOrder(order(c.shopifyProductId!, 10, { market: "US" }));
+      for (let i = 0; i < 4; i++) await recordOrder(order(c.shopifyProductId!, 10, { market: "AE" }));
+      await recordOrder(order(c.shopifyProductId!, 10, { market: "AE", extraLine: true }));
+      await tick(at(DAY));
+      expect(await campaignStats(c.id)).toEqual({ pledged: 100, charged: 100 });
+
+      const d = await db();
+      const all = await d.select().from(pledges);
+      expect(all.filter((p) => p.currency === "USD").every((p) => p.netCents === 36_000 && p.taxCents === 2_880)).toBe(true);
+      expect(all.filter((p) => p.currency === "AED").every((p) => p.netCents === 129_000 && p.taxCents === 6_450)).toBe(true);
+      // The shared UAE order is charged just its campaign lines, in dirhams.
+      expect(shop.charges.find((ch) => ch.amountCents !== undefined)).toMatchObject({ amountCents: 129_000 + 6_450, currency: "AED" });
+
+      // 10% of each market's sales, never added together: 5 x $360 and 5 x AED 1,290.
+      expect((await designerEarnings(user.id)).totals).toMatchObject([
+        { currency: "AED", earned: 5 * 12_900 },
+        { currency: "USD", earned: 5 * 3_600 },
+      ]);
+    } finally {
+      delete process.env.SHOPIFY_PLUS;
+      resetConfig();
+    }
+  });
+
+  it("claws back a USA refund in dollars, not the shop's dirhams", async () => {
+    const { user, c } = await liveCampaign();
+    const first = order(c.shopifyProductId!, 10, { market: "US" });
+    await recordOrder(first);
+    for (let i = 0; i < 9; i++) await recordOrder(order(c.shopifyProductId!, 10, { market: "US" }));
+    await tick(at(DAY));
+    const d = await db();
+    const [p] = await d.select().from(pledges).where(eq(pledges.shopifyOrderId, String(first.id)));
+    await recordRefund({
+      id: 78, order_id: first.id,
+      refund_line_items: [{ line_item_id: Number(p.lineItemId), quantity: 10, subtotal: "1322.10", subtotal_set: { presentment_money: { amount: "360.00" } } }],
+    });
+    const [clawback] = await d.select().from(royaltyEntries).where(eq(royaltyEntries.kind, "clawback"));
+    expect(clawback).toMatchObject({ amountCents: -3_600, currency: "USD" });
+    expect((await designerEarnings(user.id)).totals).toMatchObject([{ currency: "USD", earned: 9 * 3_600 }]);
   });
 });
 

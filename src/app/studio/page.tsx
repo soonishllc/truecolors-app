@@ -11,15 +11,17 @@ import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, media, pledges } from "@/lib/db/schema";
-import { ago, compact, daysLeft, money, nextStretch } from "@/lib/format";
+import { ago, compact, daysLeft, money, moneyEach, nextStretch } from "@/lib/format";
 import { CREDIT_COST, FUNDING_GOAL } from "@/lib/rules";
 import { payoutMethod } from "@/lib/payouts/methods";
 import { designerEarnings } from "@/lib/royalties/ledger";
 import { siteImageUrl } from "@/lib/site-images";
 import { fileUrl } from "@/lib/storage";
 import { briefsForDesigner } from "@/lib/wholesale/designs";
+import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Studio · Truecolors" };
 
 const SPARK_DAYS = 14;
 const SHOWN: Provider[] = ["instagram", "tiktok", "x", "google", "apple"];
@@ -162,8 +164,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         </div>
         <div className="kpi">
           <div className="eyebrow">Earned</div>
-          <div className="kpi-num">{money(earnings.earned)}</div>
-          <div className="kpi-note">{money(earnings.payable)} ready for the next payout</div>
+          <div className="kpi-num">{moneyEach(earnings.totals, "earned")}</div>
+          <div className="kpi-note">{moneyEach(earnings.totals, "payable")} ready for the next payout</div>
         </div>
         <div className="kpi">
           <div className="eyebrow">Live campaigns</div>
@@ -187,7 +189,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
             const image = files.find((m) => m.template === "split-square");
             const days = daysLeft(c.endsAt);
             const target = nextStretch(s.pledged, c.goal, c.stretchGoals) ?? s.pledged;
-            const url = `${config().APP_URL}/c/${c.slug}?ref=${user.handle}`;
+            const url = publicUrl(`/c/${c.slug}?ref=${user.handle}`);
             const tip = c.status === "live" ? nudge(s.pledged, c.goal, days) : undefined;
             return (
               <article key={c.id} className="campaign card">
@@ -345,10 +347,10 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <div className="card rail-card">
             <div className="eyebrow">Earnings</div>
             <dl className="money">
-              <div><dt>Earned</dt><dd>{money(earnings.earned)}</dd></div>
-              <div><dt>Held until returns close</dt><dd>{money(earnings.held)}</dd></div>
-              <div><dt>Ready for next payout</dt><dd>{money(earnings.payable)}</dd></div>
-              <div><dt>Paid</dt><dd>{money(earnings.paid)}</dd></div>
+              <div><dt>Earned</dt><dd>{moneyEach(earnings.totals, "earned")}</dd></div>
+              <div><dt>Held until returns close</dt><dd>{moneyEach(earnings.totals, "held")}</dd></div>
+              <div><dt>Ready for next payout</dt><dd>{moneyEach(earnings.totals, "payable")}</dd></div>
+              <div><dt>Paid</dt><dd>{moneyEach(earnings.totals, "paid")}</dd></div>
             </dl>
             <Link href="/studio/payouts" className={payout ? "payout-line" : "payout-line missing"}>
               {payout ? <>Paid by {payout.summary}</> : <>Add how you&apos;d like to be paid →</>}
@@ -371,7 +373,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
                       {acct?.followers != null && <span className="muted"> · {compact(acct.followers)}</span>}
                     </span>
                     {acct ? <span className="badge status-funded">Connected</span>
-                      : canConnect ? <a className="button small secondary" href={`/auth/${p}`}>Connect</a>
+                      : canConnect ? <a className="button small secondary" href={`/auth/${p}`} target="_parent">Connect</a>
                       : <span className="small muted">Soon</span>}
                   </li>
                 );

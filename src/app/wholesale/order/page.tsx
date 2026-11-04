@@ -4,11 +4,13 @@ import { portalPlaceAction, portalQuoteAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { config } from "@/lib/config";
 import { CURRENCY_COUNTRY, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS } from "@/lib/rules";
-import { catalogFor, variantPrices, wholesaleCatalog } from "@/lib/shopify/wholesale";
+import { catalogFor } from "@/lib/shopify/wholesale";
+import { wholesaleOps } from "@/lib/wholesale/ops";
 import { quoteFor, showMoney, type WholesaleOrder } from "@/lib/wholesale/orders";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "New wholesale order · Truecolors" };
 
 // Stockists build a basket, see the quote at their tier, then pay by card or bank transfer.
 export default async function WholesaleOrder({ searchParams }: { searchParams: Promise<{ quote?: string; placed?: string }> }) {
@@ -25,8 +27,19 @@ export default async function WholesaleOrder({ searchParams }: { searchParams: P
       <>
         <p className="small"><Link href="/wholesale">← Wholesale</Link></p>
         <h1>Order {o.shopifyOrderName ?? o.ref} is placed</h1>
-        <p>Pay by bank transfer, quoting <strong>{o.shopifyOrderName ?? o.ref}</strong> as the reference:</p>
-        <pre className="card">{config().WHOLESALE_BANK_DETAILS.replace(/\\n/g, "\n")}</pre>
+        {o.payUrl ? (
+          <>
+            <p>Pay by card to confirm it. Checkout opens in the store; afterwards, come back to Wholesale to follow the order.</p>
+            {o.paidAt
+              ? <p className="good">Paid. Thank you.</p>
+              : <p><a className="button" href={o.payUrl} target="_parent">Pay {showMoney(o.subtotal, o.currency)} by card</a></p>}
+          </>
+        ) : (
+          <>
+            <p>Pay by bank transfer, quoting <strong>{o.shopifyOrderName ?? o.ref}</strong> as the reference:</p>
+            <pre className="card">{config().WHOLESALE_BANK_DETAILS.replace(/\\n/g, "\n")}</pre>
+          </>
+        )}
         <p className="muted">It ships from Cancún by FedEx, duties paid, as soon as the payment arrives. We&apos;ve emailed you these details too.</p>
       </>
     );
@@ -57,11 +70,17 @@ export default async function WholesaleOrder({ searchParams }: { searchParams: P
     );
   }
 
-  let catalog: Awaited<ReturnType<typeof wholesaleCatalog>> = [];
+  let catalog: Awaited<ReturnType<ReturnType<typeof wholesaleOps>["wholesaleCatalog"]>> = [];
   let prices = new Map<string, { amount: string; currency: string }>();
   try {
-    catalog = catalogFor(await wholesaleCatalog(), w.id);
-    prices = await variantPrices(catalog.flatMap((p) => p.sizes.map((s) => s.variantId)), CURRENCY_COUNTRY[w.currency]);
+    catalog = catalogFor(await wholesaleOps().wholesaleCatalog(), w.id);
+    prices = await wholesaleOps().variantPrices(catalog.flatMap((p) => p.sizes.map((s) => s.variantId)), CURRENCY_COUNTRY[w.currency]);
+    // Stockist orders ship from Cancún, so show what's there, as the quote counts it.
+    const hub = config().WHOLESALE_LOCATION_ID;
+    if (hub) {
+      const there = new Map((await wholesaleOps().locationStock(hub)).map((l) => [l.sku.toUpperCase(), l.available]));
+      catalog = catalog.map((p) => ({ ...p, sizes: p.sizes.map((s) => ({ ...s, available: there.get(s.sku.toUpperCase()) ?? 0 })) }));
+    }
   } catch (e) {
     console.error("[wholesale order]", (e as Error).message);
   }

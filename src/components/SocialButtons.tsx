@@ -54,7 +54,8 @@ export function SocialButtons({ verb }: { verb: string }) {
     <div className="social">
       {shown.map((p) =>
         on.includes(p) ? (
-          <a key={p} className="social-button" href={`/auth/${p}`}>
+          // The whole window: sign-in providers refuse to be shown inside the store's frame.
+          <a key={p} className="social-button" href={`/auth/${p}`} target="_parent">
             <ProviderIcon provider={p} />{verb} with {providerLabel(p)}
           </a>
         ) : (

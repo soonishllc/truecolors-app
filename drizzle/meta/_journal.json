@@ -50,6 +50,13 @@
       "when": 1793806578891,
       "tag": "0006_location_designs_service",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793814239855,
+      "tag": "0007_pledge_currency",
+      "breakpoints": true
     }
   ]
 }

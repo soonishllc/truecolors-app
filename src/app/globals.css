@@ -17,6 +17,10 @@
   --bad: #b8322a;
   --notice-bg: #fbf3dc;
   --notice-ink: #5c4500;
+  /* The wholesale bot simulator's own bubbles, WhatsApp-like. */
+  --sim-me-bg: #d9fdd3;
+  --sim-me-ink: #111b21;
+  --sim-chat-bg: #efeae2;
   --radius: 4px;
   --font-display: var(--font-space-grotesk), "Space Grotesk", sans-serif;
   --font-body: var(--font-assistant), Assistant, sans-serif;
@@ -41,6 +45,9 @@
     --notice-bg: #3a3118;
     --notice-ink: #f3dc9a;
     --gold-text: #cdaa3d;
+    --sim-me-bg: #005c4b;
+    --sim-me-ink: #e9edef;
+    --sim-chat-bg: #0b141a;
   }
 }
 
@@ -65,13 +72,10 @@ strong { font-weight: 600; }
 .top nav button.link { padding: 0; line-height: inherit; }
 .top nav a, .top nav button.link { text-decoration: none; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dark-ink); }
 .brand { text-decoration: none; }
-/* Store logo + ".design", read as the domain: light, lowercase, white, with an orange dot. */
-.wordmark { display: inline-flex; align-items: flex-end; gap: 3px; color: #fff; vertical-align: middle; }
+/* The store logo */
+.wordmark { display: inline-flex; vertical-align: middle; }
 .wordmark img { height: 26px; width: auto; display: block; }
-.wm-design { font-family: var(--font-wordmark), sans-serif; font-size: 17px; font-weight: 300; letter-spacing: 0.02em; line-height: 1; padding-bottom: 1px; }
-.wm-dot { color: #f29a0c; }
 .foot .wordmark img { height: 20px; }
-.foot .wm-design { font-size: 13px; }
 .top .button { background: var(--dark-ink); color: var(--dark); border-color: var(--dark-ink); }
 /* Footer laid out like the store's: gradient rule, logo and blurb, link columns, then the legal line. */
 .foot { background: var(--dark); color: #8a8780; padding: 0 24px 28px; font-size: 14px; }
@@ -449,8 +453,6 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .hero-bg img, .hero-bg video { object-position: 70% center; }
   .hero-bg::after { background: linear-gradient(rgba(23, 22, 20, 0.55), rgba(23, 22, 20, 0.88)); }
   .wordmark img { height: 22px; }
-  .wm-design { font-size: 14px; }
-  .wm-design { font-size: 18px; }
   .steps { grid-template-columns: 1fr; }
   table { display: block; overflow-x: auto; }
   .dash-head { padding-top: 40px; padding-bottom: 32px; }
@@ -542,3 +544,118 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 .entry-buy { text-align: center; }
 .entry-campaign { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--gold-text); text-decoration: none; }
 .entry-campaign:hover { text-decoration: underline; }
+
+/* Wholesale bot simulator (local demo) */
+.sim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 32px; align-items: start; margin-top: 24px; }
+.sim-personas { display: flex; flex-wrap: wrap; gap: 8px; }
+.sim-phone { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.sim-head { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.sim-head .small { color: var(--muted); }
+.sim-chat { background: var(--sim-chat-bg); padding: 16px; display: flex; flex-direction: column; gap: 8px; min-height: 420px; max-height: 64vh; overflow-y: auto; }
+.sim-row { display: flex; flex-direction: column; gap: 6px; }
+.bubble { max-width: 82%; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; line-height: 1.45; font-size: 15px; background: var(--surface); color: var(--ink); align-self: flex-start; overflow-wrap: anywhere; }
+.bubble.me { align-self: flex-end; background: var(--sim-me-bg); color: var(--sim-me-ink); }
+.bubble.team { border-left: 3px solid var(--gold); }
+.bubble img { display: block; max-width: 220px; border-radius: 6px; margin-bottom: 6px; }
+.bubble-who { display: block; font-size: 12px; font-weight: 600; color: var(--gold-text); }
+.sim-tool { align-self: flex-start; margin: 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.sim-note { align-self: center; margin: 4px 0; padding: 4px 10px; border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 12px; text-align: center; }
+.sim-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.sim-photo { grid-column: 1 / -1; }
+.sim-photo input { width: 100%; margin-top: 6px; }
+.sim-try { width: 100%; text-align: left; border-radius: 10px; font-family: var(--font-body); font-size: 14px; padding: 9px 14px; }
+.sim-side h3 { margin-top: 24px; }
+.sim-side .row input { flex: 1; min-width: 0; }
+@media (max-width: 860px) { .sim { grid-template-columns: minmax(0, 1fr); } }
+
+/* The app: its web tabs drop the site's header and footer, since the app's tab bar replaces them. */
+.in-app .top, .in-app .foot { display: none; }
+.in-app main { padding: 16px 16px 32px; }
+
+/* Local app preview: a phone with the app's tab bar, and the walkthrough beside it */
+body:has(.app-preview) > .top, body:has(.app-preview) > .foot { display: none; }
+.app-preview { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 48px; align-items: start; }
+.app-device { position: sticky; top: 24px; display: flex; flex-direction: column; width: 390px; height: min(800px, calc(100vh - 48px)); border: 10px solid #1b1a18; border-radius: 44px; overflow: hidden; background: var(--bg); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18); }
+.app-device iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+.app-tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--surface); padding: 6px 4px 14px; }
+.app-tabs button { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border: 0; border-radius: 0; background: none; color: var(--muted); font-family: var(--font-body); font-size: 11.5px; }
+.app-tabs button.on { color: var(--ink); font-weight: 600; }
+.app-tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.app-flow h1 { margin-top: 8px; }
+.app-steps { list-style: none; counter-reset: step; padding: 0; margin: 24px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.app-steps li { counter-increment: step; }
+.app-steps button { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 10px; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); padding: 12px 14px; font-family: var(--font-body); font-size: 15px; }
+.app-steps button::before { content: counter(step); grid-row: span 2; align-self: center; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--line); font-family: var(--font-mono); font-size: 12px; }
+.app-steps button.on { border-color: var(--gold); }
+.app-steps button.on::before { background: var(--gold); color: #1b1a18; }
+@media (max-width: 860px) {
+  .app-preview { grid-template-columns: minmax(0, 1fr); }
+  .app-device { position: static; width: 100%; max-width: 390px; margin: 0 auto; }
+}
+
+/* The app preview's Chat tab (standing in for WhatsApp) */
+.app-chat .sim-chat { min-height: 300px; max-height: none; }
+.app-tries { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; }
+.app-tries .sim-try { width: max-content; max-width: 240px; white-space: normal; font-size: 13px; padding: 8px 12px; }
+
+/* Inside the store (and the mobile app built from it): the store theme's own tokens, so the design and wholesale
+   pages read as part of truecolors.global. The store is light only, so its colours win over dark mode. */
+html.in-app {
+  color-scheme: light;
+  --bg: oklch(0.985 0.006 85);
+  --surface: #ffffff;
+  --ink: oklch(0.18 0.01 80);
+  --muted: oklch(0.38 0.015 80);
+  --line: oklch(0.88 0.012 80);
+  --dark: oklch(0.16 0.01 80);
+  --dark-ink: #ffffff;
+  --gold: oklch(0.72 0.17 55);
+  --gold-text: oklch(0.52 0.15 50);
+  --good: #1f7a46;
+  --warn: #a35a00;
+  --bad: #b8322a;
+  --notice-bg: oklch(0.93 0.06 70);
+  --notice-ink: oklch(0.3 0.06 60);
+  --sim-me-bg: #d9fdd3;
+  --sim-me-ink: #111b21;
+  --sim-chat-bg: #efeae2;
+  --font-body: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.in-app main { max-width: none; padding: 0 0 24px; }
+.in-app h1, .in-app h2, .in-app h3 { font-weight: 600; letter-spacing: -0.02em; }
+.in-app .eyebrow { font-size: 11px; letter-spacing: 0.1em; color: var(--gold); }
+.in-app .button, .in-app button { border-radius: var(--radius); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 13px 28px; }
+.in-app .button.small { padding: 8px 16px; font-size: 12px; }
+.in-app .button:hover, .in-app button:hover { transform: none; box-shadow: none; opacity: 0.85; }
+.in-app button.secondary, .in-app .button.secondary { border-width: 1.5px; }
+.in-app button.link { text-transform: none; letter-spacing: 0; font-weight: inherit; padding: 0; }
+.in-app .card { border-radius: var(--radius); }
+.store-only { display: none; }
+.in-app .store-only { display: grid; }
+.in-app .site-only { display: none; }
+/* In a store page's frame, which is exactly as tall as the page: nothing inside scrolls, the store page does. */
+html.in-store-frame, html.in-store-frame body { overflow: hidden; }
+.page-loading { height: 3px; margin: 0 0 24px; background: var(--sun); background-size: 200% 100%; animation: loading-bar 1s linear infinite; border-radius: 2px; }
+@keyframes loading-bar { from { background-position: 0 0; } to { background-position: -200% 0; } }
+
+/* Inside the store, the studio's welcome reads like the store's own light pages rather than the old dark banner. */
+.in-app .dash-head { background: var(--surface); color: var(--ink); margin: 0 0 24px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--radius); }
+.in-app .dash-head-bg, .in-app .dash-head.photo::after { display: none; }
+.in-app .dash-head h1 { font-size: clamp(30px, 4vw, 44px); margin: 6px 0 14px; }
+.in-app .pill-stat { color: var(--muted); border-color: var(--line); background: var(--bg); border-radius: var(--radius); backdrop-filter: none; }
+.in-app .pill-stat b { color: var(--ink); }
+.in-app .dash-head .button { background: var(--ink); color: #fff; }
+/* Disclosures (Report sales, Report a problem) as the store's quiet buttons. */
+.in-app details > summary { display: inline-block; cursor: pointer; list-style: none; padding: 10px 18px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.in-app details > summary::-webkit-details-marker { display: none; }
+.in-app details[open] > summary { border-color: var(--ink); margin-bottom: 12px; }
+
+/* The app's own menu inside the store, under the store's header: the store's mono labels and a rule below. */
+.in-app .app-nav { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: 0 0 28px; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+.in-app .app-nav a { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--muted); padding: 6px 0; border-bottom: 2px solid transparent; }
+.in-app .app-nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--gold); }
+@media (max-width: 600px) { .in-app .app-nav { flex-wrap: nowrap; overflow-x: auto; gap: 18px; } .in-app .app-nav a { white-space: nowrap; } }
+.size-grid th:not(:first-child), .size-grid td:not(:first-child) { text-align: center; width: 72px; }
+.size-grid .warn { color: var(--warn); font-weight: 600; }

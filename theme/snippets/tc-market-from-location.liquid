@@ -1,0 +1,43 @@
+{%- comment -%}
+  Truecolors: shows each visitor the market for where they are, once. Visitors in the GCC and the rest of MENA get
+  the UAE store; everyone else gets the USA store. Shopify only does this itself on Plus, so the theme does it.
+  A visitor who then picks the other market with the switch keeps their choice.
+
+  Add to layout/theme.liquid, just before </body>:  {% render 'tc-market-from-location' %}
+  Keep the country list in step with UAE_MARKET_COUNTRIES in the app (src/lib/rules.ts).
+{%- endcomment -%}
+<script>
+  (function () {
+    var KEY = "tc_market_chosen";
+    var UAE = ["AE","SA","KW","QA","BH","OM","EG","JO","LB","IQ","SY","PS","YE","IR","IL","MA","DZ","TN","LY","DJ"];
+    var current = "{{ localization.country.iso_code }}";
+    try {
+      if (localStorage.getItem(KEY)) return;
+      // A choice made with the market switch is the visitor's own.
+      document.addEventListener("submit", function (e) {
+        if (e.target && e.target.id === "localization_form") localStorage.setItem(KEY, "picked");
+      }, true);
+    } catch (e) { return; }
+    fetch("{{ routes.root_url | append: '/' | replace: '//', '/' }}browsing_context_suggestions.json")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var country = data && data.detected_values && data.detected_values.country && data.detected_values.country.handle;
+        if (!country) return;
+        var want = UAE.indexOf(country) >= 0 ? "AE" : "US";
+        localStorage.setItem(KEY, "location");
+        if (want === current) return;
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = "{{ routes.root_url | append: '/' | replace: '//', '/' }}localization";
+        [["form_type", "localization"], ["_method", "put"], ["country_code", want], ["return_to", location.pathname + location.search]]
+          .forEach(function (f) {
+            var i = document.createElement("input");
+            i.type = "hidden"; i.name = f[0]; i.value = f[1];
+            form.appendChild(i);
+          });
+        document.body.appendChild(form);
+        form.submit();
+      })
+      .catch(function () {});
+  })();
+</script>

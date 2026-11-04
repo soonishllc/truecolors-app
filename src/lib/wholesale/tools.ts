@@ -12,6 +12,7 @@ import { confirmSalesReport, outletSummary, reportSales, requestRestock } from "
 import { briefsFor, requestDesign } from "./designs";
 import { reportFault } from "./service";
 import { placeOrder, quoteOrder, showMoney, summary } from "./orders";
+import { publicUrl } from "../links";
 
 // The bot's tools. Every one takes the sender from the verified WhatsApp number, never from the model, so
 // a wholesaler only ever sees their own orders and stock. Stockists can quote and place orders; a placed
@@ -341,7 +342,7 @@ const getDesignsTool: Tool = {
   },
   run: (_input, sender) =>
     attempt(async () => ({
-      reviewIn: `${config().APP_URL}/wholesale#designs`,
+      reviewIn: publicUrl("/wholesale#designs"),
       designs: (await briefsFor(sender.wholesaler!.id)).map(({ b, design }) => ({
         ref: b.ref, brief: b.brief, design: design?.title, feedback: b.feedback ?? undefined,
         status: {

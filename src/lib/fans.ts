@@ -11,6 +11,7 @@ import {
 import { UserError } from "./design/service";
 import { sendEmail } from "./email";
 import { PRICE_CENTS, REFERRALS_PER_REWARD } from "./rules";
+import { publicUrl, safePath } from "./links";
 
 // Fans have no passwords: they confirm their email once from a link, and a cookie remembers them for a year.
 
@@ -39,11 +40,10 @@ export async function ensureFan(emailInput: string) {
 // Emails a link that confirms the address and brings them back to `next`. Returns the link in dev.
 export async function sendFanLink(emailInput: string, next: string, why: string): Promise<string | undefined> {
   const fan = await ensureFan(emailInput);
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
-  const link = `${config().APP_URL}/fan/verify?token=${seal({ fanId: fan.id, next: safeNext }, 24 * 60)}`;
+  const link = `${config().APP_URL}/fan/verify?token=${seal({ fanId: fan.id, next: safePath(next, "/me") }, 24 * 60)}`;
   await sendEmail({
     to: fan.email,
-    subject: "Confirm your email for Truecolors Design",
+    subject: "Confirm your email for Truecolors",
     body: `Tap to confirm your email and ${why}:\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`,
   });
   return config().DEV_SHOW_LOGIN_LINKS ? link : undefined;
@@ -91,7 +91,7 @@ export async function notifyWaitlists(c: typeof campaigns.$inferSelect, targets:
   const d = await db();
   const [designer] = await d.select().from(users).where(eq(users.id, c.userId));
   const list = await d.select().from(waitlist).where(and(inArray(waitlist.target, targets), isNull(waitlist.notifiedAt)));
-  const url = `${config().APP_URL}/c/${c.slug}`;
+  const url = publicUrl(`/c/${c.slug}`);
   const comeback = targets.some((t) => t.startsWith("campaign:"));
   for (const w of list) {
     await sendEmail({
@@ -141,7 +141,7 @@ export async function issueFanRewards(log: string[] = []) {
         key: `reward:${code}`,
         subject: "You've earned a free Truecolors tee",
         body: `Your link brought in ${stats.charged} pre-orders. Thank you! Here's a free tee on us: use code ${code} ` +
-          `at checkout on ${config().SHOPIFY_STOREFRONT_URL}. It works once, on any shirt.`,
+          `at checkout on ${config().STORE_URL}. It works once, on any shirt.`,
       });
       log.push(`fan reward ${code} for ${fan.email}`);
     }
@@ -159,6 +159,18 @@ export async function fanByReferralCode(code: string) {
 
 export async function signOutFan() {
   (await cookies()).delete(FAN_COOKIE);
+}
+
+// Inside the store, the store's signed-in customer is also the fan with that email (Shopify confirmed it), so
+// their pre-orders, votes and referral link need no emailed link. Callers must have verified the email.
+export async function signInStoreFan(email: string | undefined) {
+  if (!email) return signOutFan();
+  const fan = await ensureFan(email);
+  const d = await db();
+  await d.update(fans).set({ verifiedAt: new Date() }).where(and(eq(fans.id, fan.id), isNull(fans.verifiedAt)));
+  (await cookies()).set(FAN_COOKIE, seal({ fanId: fan.id }, YEAR_MINUTES), {
+    httpOnly: true, sameSite: "lax", secure: config().APP_URL.startsWith("https"), path: "/", maxAge: YEAR_MINUTES * 60,
+  });
 }
 
 // Every pre-order placed with this fan's email, newest first, with its campaign and edition numbers.

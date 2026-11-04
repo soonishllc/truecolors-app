@@ -14,6 +14,7 @@ import { date, daysLeft } from "@/lib/format";
 import { ShareKit } from "@/components/ShareKit";
 import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
+import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function ChallengePage({
   const mine = user && p === "open"
     ? await (await db()).select().from(designs).where(and(eq(designs.userId, user.id), isNotNull(designs.compositeKey)))
     : [];
-  const url = `${config().APP_URL}/challenges/${ch.slug}`;
+  const url = publicUrl(`/challenges/${ch.slug}`);
 
   return (
     <>

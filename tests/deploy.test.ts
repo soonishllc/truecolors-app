@@ -6,7 +6,7 @@ const { freshDb } = await import("./helpers");
 
 const secret = "x".repeat(40);
 const good = {
-  APP_URL: "https://truecolors.design", DATABASE_URL: "postgres://db", S3_BUCKET: "files",
+  APP_URL: "https://app.truecolors.global", STORE_URL: "https://www.truecolors.global", SHOPIFY_PROXY_SECRET: "proxy", DATABASE_URL: "postgres://db", S3_BUCKET: "files",
   S3_ACCESS_KEY_ID: "id", S3_SECRET_ACCESS_KEY: "key", SESSION_SECRET: secret, CRON_SECRET: secret,
   PAYOUT_ENCRYPTION_KEY: secret, DEV_SHOW_LOGIN_LINKS: false,
 };

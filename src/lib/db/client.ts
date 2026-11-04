@@ -28,7 +28,7 @@ async function open(url: string | undefined): Promise<DB> {
     await migrate(d, { migrationsFolder: MIGRATIONS });
     return d;
   }
-  return openPglite(path.join(process.cwd(), ".pglite"));
+  return openPglite(path.join(process.cwd(), config().PGLITE_DIR));
 }
 
 // dataDir undefined = in memory (tests).

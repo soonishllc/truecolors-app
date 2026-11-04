@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fanEmailAction, fanSignOutAction, unfollowAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { StoreSignIn } from "@/components/StoreSignIn";
 import { ShareKit } from "@/components/ShareKit";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
@@ -10,9 +11,10 @@ import { date, daysLeft } from "@/lib/format";
 import { REFERRALS_PER_REWARD } from "@/lib/rules";
 import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
+import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "My pre-orders · Truecolors Design" };
+export const metadata: Metadata = { title: "My pre-orders · Truecolors" };
 
 // What a pre-order's status means to the person who placed it.
 function stateOf(p: { status: string }, c: { status: string; goal: number }, backed: number) {
@@ -32,11 +34,14 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
       <div className="narrow">
         <div className="eyebrow">Fans</div>
         <h1>My pre-orders</h1>
-        <p className="muted">
+        <StoreSignIn back="/me">
+          <p className="muted">Sign in to see your pre-orders, edition numbers, referral link and votes.</p>
+        </StoreSignIn>
+        <p className="muted site-only">
           Enter the email you used at checkout. We&apos;ll send a link that opens your pre-orders, your edition numbers,
           your referral link and your votes. No password needed.
         </p>
-        <div className="card">
+        <div className="card site-only">
           <ActionForm action={fanEmailAction} submit="Email me a link" className="inline-form">
             <input type="hidden" name="next" value="/me" />
             <input type="hidden" name="why" value="orders" />
@@ -139,7 +144,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
             {live.length > 0 ? live.map((c) => (
               <div key={c.id} className="fan-share">
                 <div className="small"><strong>{c.title}</strong></div>
-                <ShareKit url={`${config().APP_URL}/c/${c.slug}?ref=${fan.referralCode}`} text={`This shirt changes colour in the sun. Help get "${c.title}" printed:`} />
+                <ShareKit url={publicUrl(`/c/${c.slug}?ref=${fan.referralCode}`)} text={`This shirt changes colour in the sun. Help get "${c.title}" printed:`} />
               </div>
             )) : (
               <p className="small">Your code is <code>{fan.referralCode}</code>. Open any live design from <Link href="/explore">Explore</Link> to get its link.</p>

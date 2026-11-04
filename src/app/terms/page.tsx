@@ -27,7 +27,7 @@ export default function Terms() {
       <h2>2. Buying a shirt</h2>
       <p>
         Pre-orders are placed and paid for through our store at{" "}
-        <a href={config().SHOPIFY_STOREFRONT_URL}>{new URL(config().SHOPIFY_STOREFRONT_URL).host}</a>, which is
+        <a href={config().STORE_URL}>{new URL(config().STORE_URL).host}</a>, which is
         covered by the store&rsquo;s own terms of service and refund policy. How pre-orders are charged, numbered,
         shipped and returned is set out in our <Link href="/pre-orders">pre-order policy</Link>. Colour intensity
         depends on the strength of the sunlight, and colours on screen are a guide only.

@@ -4,12 +4,12 @@ import { LegalPage } from "@/components/LegalPage";
 import { BRAND, CONTACT } from "@/lib/brand";
 import { config } from "@/lib/config";
 import { money } from "@/lib/format";
-import { CAMPAIGN_DAYS, CHARGE_RETRY_HOURS, FUNDING_GOAL, PRICE_CENTS, RETURN_WINDOW_DAYS, SIZES } from "@/lib/rules";
+import { CAMPAIGN_DAYS, CHARGE_RETRY_HOURS, FUNDING_GOAL, PREORDER_PRICE, RETURN_WINDOW_DAYS, SIZES } from "@/lib/rules";
 
 export const metadata: Metadata = { title: `Pre-orders, shipping and returns · ${BRAND}` };
 
 export default function PreOrders() {
-  const store = config().SHOPIFY_STOREFRONT_URL;
+  const store = config().STORE_URL;
   return (
     <LegalPage title="Pre-orders, shipping and returns">
       <p>
@@ -21,9 +21,9 @@ export default function PreOrders() {
 
       <h2>How a pre-order works</h2>
       <ol>
-        <li>Each campaign runs for up to {CAMPAIGN_DAYS} days. Shirts are {money(PRICE_CENTS, "USD")}, sizes {SIZES[0]}–{SIZES[SIZES.length - 1]}, plus shipping and any tax shown at checkout.</li>
+        <li>Each campaign runs for up to {CAMPAIGN_DAYS} days. Shirts are {money(PREORDER_PRICE.AE.cents, "AED")} in our UAE store and {money(PREORDER_PRICE.US.cents, "USD")} in our USA store, sizes {SIZES[0]}–{SIZES[SIZES.length - 1]}, plus shipping and any tax shown at checkout.</li>
         <li>At checkout your card is saved securely by the store but <strong>not charged</strong>.</li>
-        <li>If the campaign reaches {FUNDING_GOAL} pre-orders, it&rsquo;s funded and your card is charged, usually within an hour. Pre-orders placed after that are charged straight away.</li>
+        <li>Pre-orders from both stores count towards the same goal. If the campaign reaches {FUNDING_GOAL} pre-orders, it&rsquo;s funded and your card is charged, usually within an hour. Pre-orders placed after that are charged straight away.</li>
         <li>If the campaign ends without reaching {FUNDING_GOAL}, nothing is printed and <strong>nobody is charged</strong>. Your pre-order is cancelled automatically and we email you.</li>
         <li>If your card can&rsquo;t be charged, we&rsquo;ll email you and try again for {CHARGE_RETRY_HOURS / 24} days. After that the pre-order is cancelled.</li>
       </ol>

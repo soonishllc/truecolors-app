@@ -91,3 +91,34 @@ describe("social sign-in", () => {
     expect(mine.map((x) => x.username)).toEqual(["a.draws"]);
   });
 });
+
+describe("signing in through the store", () => {
+  it("signs in the designer with the store customer's email, and signs everyone else out", async () => {
+    const code = await session.createInvite("test");
+    await session.signUp({ email: "maya@example.com", name: "Maya", invite: code, acceptAgreement: true, fromStore: true });
+    const d = await db();
+    const [maya] = await d.select().from(users).where(eq(users.email, "maya@example.com"));
+
+    jar.clear();
+    await session.signInStoreCustomer({ email: "Maya@Example.com", name: "Maya" });
+    expect(loggedInAs()).toBe(maya.id);
+
+    await session.signInStoreCustomer({ email: "shopper@example.com", name: "Sam" });
+    expect(loggedInAs()).toBeUndefined();
+    expect(await session.storeIdentity()).toEqual({ email: "shopper@example.com", name: "Sam" });
+
+    await session.signInStoreCustomer(undefined);
+    expect(loggedInAs()).toBeUndefined();
+    expect(await session.storeIdentity()).toBeUndefined();
+  });
+
+  it("lets a store customer join with an invite and logs them straight in, without a login link", async () => {
+    await session.signInStoreCustomer({ email: "new@example.com", name: "Noor" });
+    const code = await session.createInvite("test");
+    const link = await session.signUp({ email: "new@example.com", name: "Noor", invite: code, acceptAgreement: true, fromStore: true });
+    expect(link).toBeUndefined();
+    const d = await db();
+    const [noor] = await d.select().from(users).where(eq(users.email, "new@example.com"));
+    expect(loggedInAs()).toBe(noor.id);
+  });
+});

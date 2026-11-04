@@ -2,7 +2,7 @@ import Link from "next/link";
 import { payoutMethodAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth/session";
-import { money } from "@/lib/format";
+import { money, moneyEach } from "@/lib/format";
 import { payoutMethod, USDC_NETWORKS } from "@/lib/payouts/methods";
 import { designerEarnings } from "@/lib/royalties/ledger";
 
@@ -30,8 +30,8 @@ export default async function Payouts() {
         be paid; you can change it any time before a payout.
       </p>
       <div className="stats" style={{ margin: "20px 0" }}>
-        <div className="card"><div className="eyebrow">Ready for next payout</div><div className="stat">{money(earnings.payable)}</div></div>
-        <div className="card"><div className="eyebrow">Paid so far</div><div className="stat">{money(earnings.paid)}</div></div>
+        <div className="card"><div className="eyebrow">Ready for next payout</div><div className="stat">{moneyEach(earnings.totals, "payable")}</div></div>
+        <div className="card"><div className="eyebrow">Paid so far</div><div className="stat">{moneyEach(earnings.totals, "paid")}</div></div>
       </div>
       {current && <p className="notice good-notice">Currently paid by <strong>{current.summary}</strong>.</p>}
 

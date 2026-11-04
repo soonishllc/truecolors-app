@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  acceptAgreement, clearPendingSignUp, createInvite, pendingSignUp, requireAdmin, requireUser, sendLoginLink, signUp,
+  acceptAgreement, clearPendingSignUp, createInvite, pendingSignUp, requireAdmin, requireUser, sendLoginLink, signUp, storeIdentity,
 } from "@/lib/auth/session";
 import {
   clearAttention, relaunchCampaign, reviewCampaign, submitCampaign, tick,
@@ -42,15 +42,16 @@ async function attempt(fn: () => Promise<FormState | void>): Promise<FormState> 
 }
 
 export async function joinAction(_: FormState, f: FormData): Promise<FormState> {
-  // Someone who came back from Google, Apple, X or Instagram is logged straight in.
+  // Someone signed in to the store, or back from Google, Apple, X or Instagram, is logged straight in.
   const via = await pendingSignUp();
+  const store = via ? undefined : await storeIdentity();
   let joined = false;
   const res = await attempt(async () => {
     const link = await signUp({
-      email: via?.profile.email ?? text(f, "email"), name: text(f, "name"), invite: text(f, "invite"),
-      acceptAgreement: f.get("agree") === "on", via,
+      email: store?.email ?? via?.profile.email ?? text(f, "email"), name: text(f, "name"), invite: text(f, "invite"),
+      acceptAgreement: f.get("agree") === "on", via, fromStore: Boolean(store),
     });
-    if (via) joined = true;
+    if (via || store) joined = true;
     else return { message: "Account created. We've sent you a login link.", link };
   });
   if (joined) redirect("/studio?welcome=1");
@@ -464,8 +465,9 @@ export async function portalPlaceAction(_: FormState, f: FormData): Promise<Form
   const w = await portalStockist();
   let to = "";
   const res = await attempt(async () => {
+    // Card payment opens from the placed page in the whole window: Shopify's checkout can't show inside the store's frame.
     const placed = await placeOrder(w.id, text(f, "quote"), text(f, "payment") === "bank_transfer" ? "bank_transfer" : "card");
-    to = placed.payUrl ?? `/wholesale/order?placed=${placed.order.ref}`;
+    to = `/wholesale/order?placed=${placed.order.ref}`;
   });
   if (!to) return res;
   revalidatePath("/wholesale");

@@ -169,8 +169,10 @@ export const pledges = pgTable(
     lineItemId: text("line_item_id").notNull(),
     size: text("size").notNull(),
     quantity: integer("quantity").notNull(),
+    // In the currency the backer paid: AED in the UAE, USD in the USA.
     netCents: integer("net_cents").notNull(),
     taxCents: integer("tax_cents").notNull().default(0),
+    currency: text("currency").notNull().default("USD"),
     viaDesignerLink: boolean("via_designer_link").notNull().default(false),
     // The fan whose link brought this pre-order, for referral rewards.
     fanRef: uuid("fan_ref"),

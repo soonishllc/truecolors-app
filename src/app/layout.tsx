@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
-import { Assistant, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Assistant, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
+import { Suspense } from "react";
+import { AppNav } from "@/components/AppNav";
+import { FrameBridge } from "@/components/FrameBridge";
 import { Wordmark } from "@/components/Wordmark";
 import { BRAND, COMPANY, CONTACT } from "@/lib/brand";
 import { config } from "@/lib/config";
+import { storeOrigins } from "@/lib/links";
 import "./globals.css";
 
 // The same three typefaces as the truecolors.global theme.
 const display = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-space-grotesk" });
 const body = Assistant({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-assistant" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-jetbrains-mono" });
-// Only for ".design" in the logo.
-const wordmark = Inter({ subsets: ["latin"], weight: ["300"], variable: "--font-wordmark" });
 
 export const metadata: Metadata = {
   title: BRAND,
@@ -22,8 +24,13 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${wordmark.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Inside the store (framed by a store page) or the mobile app, the store's own header, menu and footer replace the site's. */}
+        <script dangerouslySetInnerHTML={{ __html: "if(self!==top||/TruecolorsApp/.test(navigator.userAgent))document.documentElement.classList.add('in-app')" }} />
+      </head>
       <body>
+        <Suspense><FrameBridge stores={storeOrigins()} /></Suspense>
         <header className="top">
           <Link href="/" className="brand" aria-label={BRAND}><Wordmark /></Link>
           <nav>
@@ -44,7 +51,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </nav>
         </header>
-        <main>{children}</main>
+        <main>
+          <AppNav designer={Boolean(user)} />
+          {children}
+        </main>
         <footer className="foot">
           <div className="foot-grid">
             <div className="foot-brand">
@@ -56,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/explore">Explore</Link>
               <Link href="/challenges">Challenges</Link>
               <Link href="/me">My pre-orders</Link>
-              <a href={config().SHOPIFY_STOREFRONT_URL}>Shop the store</a>
+              <a href={config().STORE_URL}>Shop the store</a>
             </nav>
             <nav aria-label="Designers">
               <h3>Designers</h3>

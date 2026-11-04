@@ -5,28 +5,35 @@ import { UserError } from "../design/service";
 
 // Phase 1 payouts are prepared by the app and paid by hand; automatic payouts come in Phase 2.
 
+// A designer's earnings, one total per currency: pre-orders earn in the currency the backer paid (AED or USD),
+// and wholesale designs in the wholesaler's currency, so they're never added together.
 export async function designerEarnings(userId: string) {
   const d = await db();
-  const [totals] = await d
+  const rows = await d
     .select({
+      currency: royaltyEntries.currency,
       earned: sql<number>`coalesce(sum(${royaltyEntries.amountCents}), 0)::int`,
       paid: sql<number>`coalesce(sum(${royaltyEntries.amountCents}) filter (where ${royaltyEntries.payoutId} is not null), 0)::int`,
       payable: sql<number>`coalesce(sum(${royaltyEntries.amountCents}) filter (where ${royaltyEntries.payoutId} is null and ${royaltyEntries.payableAfter} <= now()), 0)::int`,
     })
     .from(royaltyEntries)
-    .where(eq(royaltyEntries.userId, userId));
+    .where(eq(royaltyEntries.userId, userId))
+    .groupBy(royaltyEntries.currency)
+    .orderBy(royaltyEntries.currency);
+  const totals = rows.map((t) => ({ ...t, held: t.earned - t.paid - t.payable }));
   const byCampaign = await d
     .select({
       title: campaigns.title,
       slug: campaigns.slug,
+      currency: royaltyEntries.currency,
       amount: sql<number>`sum(${royaltyEntries.amountCents})::int`,
     })
     .from(royaltyEntries)
     .innerJoin(campaigns, eq(campaigns.id, royaltyEntries.campaignId))
     .where(eq(royaltyEntries.userId, userId))
-    .groupBy(campaigns.title, campaigns.slug);
+    .groupBy(campaigns.title, campaigns.slug, royaltyEntries.currency);
   const history = await d.select().from(payouts).where(eq(payouts.userId, userId)).orderBy(desc(payouts.createdAt));
-  return { ...totals, held: totals.earned - totals.paid - totals.payable, byCampaign, history };
+  return { totals, byCampaign, history };
 }
 
 // Groups every payable, unpaid entry into one pending payout per designer. Run monthly.

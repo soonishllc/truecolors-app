@@ -90,6 +90,22 @@ export async function finishPortalSignIn(params: URLSearchParams): Promise<strin
   return "/wholesale";
 }
 
+// The local demo signs in as a demo contact directly, since there's no Shopify to sign in with.
+export async function signInAsDemo(email: string) {
+  if (!config().WHOLESALE_DEMO) throw new Error("Demo sign-in is only for the local demo");
+  await signInToPortal(email);
+}
+
+// Signs in whoever the store says is signed in (inside the store, by app proxy): their email, and their wholesale
+// contact when the email belongs to one. Callers must have verified the email came from Shopify.
+export async function signInToPortal(email: string) {
+  const d = await db();
+  const [contact] = await d.select().from(wholesaleContacts).where(eq(wholesaleContacts.email, email));
+  (await cookies()).set(COOKIE, seal({ email, contactId: contact?.id } satisfies PortalSession, SESSION_DAYS * 1440), {
+    httpOnly: true, sameSite: "lax", secure: secure(), path: "/", maxAge: SESSION_DAYS * 86_400,
+  });
+}
+
 export async function signOutOfPortal() {
   (await cookies()).delete(COOKIE);
 }

@@ -12,10 +12,11 @@ import { sendEmail } from "../email";
 import { campaignTarget, designerTarget, fanByReferralCode, issueFanRewards, joinWaitlist, notifyWaitlists } from "../fans";
 import { fileUrl } from "../storage";
 import {
-  lineNetCents, lineTaxCents, refCode, cents,
+  lineNetCents, lineTaxCents, orderCurrency, refCode, refundSubtotalCents,
   type FulfillmentPayload, type OrderPayload, type RefundPayload,
 } from "../shopify/webhooks";
 import { shopify } from "./shopify-ops";
+import { publicUrl } from "../links";
 
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
@@ -115,7 +116,6 @@ export async function reviewCampaign(reviewer: string, campaignId: string, appro
       `Pre-order: you're only charged if this design reaches ${c.goal} pre-orders by ${endsAt.toDateString()}.</p>`,
     designCode: c.designCode,
     designerName: designer.handle,
-    priceCents: c.priceCents,
     endsAt,
     imageUrls: [design.compositeKey!, ...images.map((m) => m.key)].map((k) => `${appUrl}${fileUrl(k)}`),
   });
@@ -183,6 +183,7 @@ export async function recordOrder(order: OrderPayload) {
         quantity: line.quantity,
         netCents: lineNetCents(line),
         taxCents: lineTaxCents(line),
+        currency: orderCurrency(order),
         viaDesignerLink: ref === handle.toLowerCase(),
         fanRef: fan && fan.email !== email ? fan.id : null,
         email,
@@ -216,7 +217,7 @@ export async function recordRefund(refund: RefundPayload) {
       .from(royaltyEntries)
       .where(and(eq(royaltyEntries.pledgeId, p.id), eq(royaltyEntries.kind, "earning")));
     if (earning) {
-      const base = Math.min(cents(item.subtotal), p.netCents);
+      const base = Math.min(refundSubtotalCents(item), p.netCents);
       await d
         .insert(royaltyEntries)
         .values({
@@ -265,12 +266,12 @@ type Campaign = typeof campaigns.$inferSelect;
 type Item = { p: Pledge; c: Campaign };
 
 // Charges the saved card on one order for the given pledges and records the designer's share for each.
-async function chargePledges(items: Item[], amountCents: number | undefined, now: Date) {
+async function chargePledges(items: Item[], amount: { cents: number; currency: string } | undefined, now: Date) {
   const d = await db();
   const first = items[0].p;
   const attempt = Math.max(...items.map((x) => x.p.chargeAttempts)) + 1;
   const key = `${first.shopifyOrderId}:${[...new Set(items.map((x) => x.c.id))].sort().join("+")}:${attempt}`;
-  const result = await shopify().chargeOrder(first.shopifyOrderId, key, amountCents);
+  const result = await shopify().chargeOrder(first.shopifyOrderId, key, amount);
   const ids = items.map((x) => x.p.id);
   const firstChargeAt = first.firstChargeAt ?? now;
 
@@ -307,7 +308,7 @@ async function chargePledges(items: Item[], amountCents: number | undefined, now
         const rateBps = shareBps(p.viaDesignerLink);
         return {
           userId: c.userId, campaignId: c.id, pledgeId: p.id, kind: "earning" as const, sourceRef: "earning",
-          rateBps, baseCents: p.netCents, amountCents: royaltyCents(p.netCents, rateBps), currency: c.currency,
+          rateBps, baseCents: p.netCents, amountCents: royaltyCents(p.netCents, rateBps), currency: p.currency,
         };
       }),
     )
@@ -330,8 +331,8 @@ async function chargeOrderPledges(c: Campaign, orderPledges: Pledge[], now: Date
     return;
   }
   if (config().SHOPIFY_PLUS) {
-    const amount = orderPledges.reduce((s, p) => s + p.netCents + p.taxCents, 0);
-    await chargePledges(orderPledges.map((p) => ({ p, c })), amount, now);
+    const cents = orderPledges.reduce((s, p) => s + p.netCents + p.taxCents, 0);
+    await chargePledges(orderPledges.map((p) => ({ p, c })), { cents, currency: first.currency }, now);
     log.push(`${c.slug}: charged ${c.slug} lines on ${first.orderName}`);
     return;
   }
@@ -485,7 +486,7 @@ const MILESTONES = [
 ] as const;
 
 function milestoneEmail(key: string, c: Campaign, n: number) {
-  const url = `${config().APP_URL}/c/${c.slug}`;
+  const url = publicUrl(`/c/${c.slug}`);
   const left = c.goal - n;
   switch (key) {
     case "halfway": return { subject: `${c.title} is halfway there`, body: `${n} of ${c.goal} pre-orders so far. Share it with a friend and help it get printed:

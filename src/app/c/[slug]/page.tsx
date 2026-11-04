@@ -12,12 +12,14 @@ import { TileSweep } from "@/components/TileSweep";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
+import { RETAIL_MARKETS, preorderPrice, visitorMarket } from "@/lib/markets";
 import { campaigns, designs, media, pledges, users } from "@/lib/db/schema";
 import { campaignTarget, currentFan, designerTarget, referralStats, waitlistCount } from "@/lib/fans";
-import { ago, money, nextStretch } from "@/lib/format";
+import { ago, nextStretch } from "@/lib/format";
 import { GARMENT, REFERRALS_PER_REWARD, RETURN_WINDOW_DAYS, SIZES, STRETCH_REWARDS } from "@/lib/rules";
 import { productUrl } from "@/lib/shopify/campaigns";
 import { fileUrl } from "@/lib/storage";
+import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +52,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function CampaignPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ ref?: string; confirmed?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ ref?: string; confirmed?: string; market?: string }> }) {
   const data = await load((await params).slug);
   if (!data) notFound();
-  const { c, designer, files, stats } = data;
+  const { c, designer, design, files, stats } = data;
   const q = await searchParams;
   const ref = q.ref ?? designer.handle;
+  const market = await visitorMarket(q.market);
   const d = await db();
   const recent = await d
     .select({ size: pledges.size, quantity: pledges.quantity, city: pledges.city, at: pledges.createdAt })
@@ -73,12 +76,12 @@ export default async function CampaignPage({
   const pairSun = mockups.find((m) => m.template === "flat-square" && m.view === "sun");
   const target = nextStretch(stats.pledged, c.goal, c.stretchGoals) ?? stats.pledged;
   const pct = Math.min(100, Math.round((stats.pledged / Math.max(target, 1)) * 100));
-  const pageUrl = `${config().APP_URL}/c/${c.slug}`;
+  const pageUrl = publicUrl(`/c/${c.slug}`);
   const open = c.status === "live";
   const missed = c.status === "missed";
   const goals = [c.goal, ...c.stretchGoals];
   const toGo = c.goal - stats.pledged;
-  const buyUrl = c.shopifyHandle ? productUrl(c.shopifyHandle, ref) : undefined;
+  const buyUrl = c.shopifyHandle ? productUrl(c.shopifyHandle, ref, market) : undefined;
   // Shares keep whichever link brought this visitor, so the designer or fan still gets the credit.
   const shareUrl = `${pageUrl}?ref=${ref}`;
   const share = encodeURIComponent(`${c.title}: a shirt that changes colour in the sun ${shareUrl}`);
@@ -95,7 +98,9 @@ export default async function CampaignPage({
               <img className="art" src={fileUrl(pairShade.key)} alt={c.title} />
               <TileSweep src={fileUrl(sweep.key)} inView />
             </div>
-          ) : video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline /> : null}
+          ) : video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline />
+            // Before the mockups and clips are made: the design itself.
+            : design.compositeKey ? <img className="art" src={fileUrl(design.compositeKey)} alt={c.title} /> : null}
         </div>
         <div>
           <div className="eyebrow">{missed ? "Campaign ended" : "Pre-order campaign"}</div>
@@ -106,7 +111,19 @@ export default async function CampaignPage({
             {c.editionSize ? <>Numbered limited edition · <b>{c.editionSize}</b> made, never restocked</>
               : <>Numbered limited edition · every shirt gets its own number, no restocks</>}
           </div>
-          {!missed && <p><span className="stat">{money(c.priceCents, c.currency)}</span> <span className="muted">· sizes S–XL · ships in the US</span></p>}
+          {!missed && (
+            <p>
+              <span className="stat">{preorderPrice(market)}</span> <span className="muted">· sizes S–XL · ships in the {RETAIL_MARKETS[market].label}</span>
+              <br />
+              {/* Inside the store, its own market switch does this. */}
+              <span className="small muted site-only">
+                Shopping from {market === "AE" ? "the USA" : "the UAE"}?{" "}
+                <Link href={`/c/${c.slug}?market=${market === "AE" ? "US" : "AE"}${q.ref ? `&ref=${encodeURIComponent(q.ref)}` : ""}`}>
+                  {preorderPrice(market === "AE" ? "US" : "AE")} in the {RETAIL_MARKETS[market === "AE" ? "US" : "AE"].label} store
+                </Link>
+              </span>
+            </p>
+          )}
 
           {missed ? (
             <div className="card comeback">
@@ -264,7 +281,7 @@ export default async function CampaignPage({
       </section>
 
       {open && (
-        <StickyBuy watch="buy" href={buyUrl} price={money(c.priceCents, c.currency)} progress={`${stats.pledged} of ${target}`}>
+        <StickyBuy watch="buy" href={buyUrl} price={preorderPrice(market)} progress={`${stats.pledged} of ${target}`}>
           {c.endsAt && <Countdown endsAt={c.endsAt.toISOString()} />}
         </StickyBuy>
       )}

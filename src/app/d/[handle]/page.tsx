@@ -31,7 +31,7 @@ async function load(handle: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
   const designer = await load((await params).handle);
-  return designer ? { title: `${designer.name} · Truecolors Design` } : {};
+  return designer ? { title: `${designer.name} · Truecolors` } : {};
 }
 
 // A designer's public page: their campaigns, their socials and a way to hear about their next launch.
