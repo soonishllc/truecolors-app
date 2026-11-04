@@ -17,6 +17,8 @@ import { eq, sql } from "drizzle-orm";
 import { currentFan, joinWaitlist, leaveWaitlist, sendFanLink, signOutFan } from "@/lib/fans";
 import { createChallenge, enterChallenge, toggleVote } from "@/lib/challenges";
 import { savePayoutMethod } from "@/lib/payouts/methods";
+import { activateWholesaler, addContact, addOutlet, createWholesaler } from "@/lib/wholesale/accounts";
+import { handBackToBot } from "@/lib/wholesale/bot";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
 
@@ -173,6 +175,66 @@ export async function clearAttentionAction(f: FormData) {
   await requireAdmin();
   await clearAttention(text(f, "pledgeId"));
   revalidatePath("/admin");
+}
+
+// ---- Admin: wholesale ----------------------------------------------------------------------------------
+
+const checked = (f: FormData, k: string) => f.get(k) === "on";
+
+export async function createWholesalerAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    const w = await createWholesaler({
+      name: text(f, "name"), currency: text(f, "currency"), shopifyCustomerId: text(f, "shopifyCustomerId"),
+      stockist: checked(f, "stockist"), displayPartner: checked(f, "displayPartner"),
+      contactName: text(f, "contactName"), phone: text(f, "phone"), email: text(f, "email"),
+    });
+    return { message: `${w.name} is set up.` };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function activateWholesalerAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await activateWholesaler({
+      wholesalerId: text(f, "wholesalerId"), currency: text(f, "currency"), shopifyCustomerId: text(f, "shopifyCustomerId"),
+      stockist: checked(f, "stockist"), displayPartner: checked(f, "displayPartner"),
+    });
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function addContactAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(() =>
+    addContact({
+      wholesalerId: text(f, "wholesalerId"), name: text(f, "name"), phone: text(f, "phone"),
+      email: text(f, "email"), role: text(f, "role"),
+    }),
+  );
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function addOutletAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(() =>
+    addOutlet({
+      wholesalerId: text(f, "wholesalerId"), name: text(f, "name"), city: text(f, "city"), country: text(f, "country"),
+      shopifyLocationId: text(f, "shopifyLocationId"), supplyRoute: text(f, "supplyRoute"),
+    }),
+  );
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function handBackToBotAction(f: FormData) {
+  await requireAdmin();
+  await handBackToBot(text(f, "conversationId"));
+  revalidatePath("/admin/wholesale");
 }
 
 // ---- Fans: waitlists, referral links, votes ---------------------------------------------------------

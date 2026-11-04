@@ -62,6 +62,21 @@ const schema = z.object({
   // Encrypts designers' payout details. Production must set its own; changing it makes saved details unreadable.
   PAYOUT_ENCRYPTION_KEY: z.string().optional(),
 
+  // Wholesale bot. WhatsApp runs through Gorgias: its HTTP integration posts each new ticket message to
+  // APP_URL/api/gorgias with the header X-Truecolors-Secret, and the bot replies through Gorgias' REST API.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  BOT_MODEL: z.string().default("claude-opus-5-5"),
+  GORGIAS_DOMAIN: z.string().optional(),
+  GORGIAS_USERNAME: z.string().optional(),
+  GORGIAS_API_KEY: z.string().optional(),
+  GORGIAS_WEBHOOK_SECRET: z.string().optional(),
+  // The Shopify collection that holds what wholesalers can order.
+  WHOLESALE_COLLECTION_HANDLE: z.string().default("wholesale-catalog"),
+  // Wholesaler portal sign-in: a confidential client from Shopify's Customer Account API settings, with
+  // APP_URL/wholesale/callback as its callback URL.
+  SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: z.string().optional(),
+  SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET: z.string().optional(),
+
   CRON_SECRET: z.string().default("dev-cron-secret"),
   DEV_SHOW_LOGIN_LINKS: bool,
 });

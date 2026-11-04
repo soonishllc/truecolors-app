@@ -326,3 +326,69 @@ export const payoutMethods = pgTable("payout_methods", {
   summary: text("summary").notNull(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+// ---- Wholesale ---------------------------------------------------------------------------------------
+
+// A wholesale business. Stockists buy outright; display partners hold consignment stock at their outlets.
+// One business can be both. Leads are businesses that have messaged but aren't set up yet.
+export const wholesalers = pgTable("wholesalers", {
+  id: id(),
+  name: text("name").notNull(),
+  status: text("status").$type<"lead" | "active" | "closed">().notNull().default("lead"),
+  stockist: boolean("stockist").notNull().default(false),
+  displayPartner: boolean("display_partner").notNull().default(false),
+  currency: text("currency").$type<"AED" | "USD" | "MXN">().notNull().default("USD"),
+  // The Shopify customer their orders are placed under.
+  shopifyCustomerId: text("shopify_customer_id"),
+  // What a lead told the bot about themselves: city, venue, interest.
+  notes: text("notes"),
+  createdAt: createdAt(),
+});
+
+// A person at a wholesaler. Their WhatsApp number identifies them to the bot; their email signs them in
+// to the portal through their Shopify customer account.
+export const wholesaleContacts = pgTable("wholesale_contacts", {
+  id: id(),
+  wholesalerId: uuid("wholesaler_id").notNull().references(() => wholesalers.id),
+  name: text("name").notNull(),
+  // Digits only, with the country code: 971501234567.
+  phone: text("phone").unique(),
+  email: text("email").unique(),
+  role: text("role").$type<"owner" | "staff">().notNull().default("staff"),
+  createdAt: createdAt(),
+});
+
+// A display partner's outlet. Its stock is inventory at its own Shopify location.
+export const outlets = pgTable("outlets", {
+  id: id(),
+  wholesalerId: uuid("wholesaler_id").notNull().references(() => wholesalers.id),
+  name: text("name").notNull(),
+  city: text("city").notNull(),
+  country: text("country").notNull(),
+  shopifyLocationId: text("shopify_location_id"),
+  // Where restocks come from: Quiqup (UAE, GCC), Shipdudes (US, Canada, islands) or Cancún by FedEx.
+  supplyRoute: text("supply_route").$type<"quiqup" | "shipdudes" | "cancun">().notNull(),
+  createdAt: createdAt(),
+});
+
+// One WhatsApp conversation, as a Gorgias ticket. The bot answers until it hands over or a person replies.
+export const botConversations = pgTable("bot_conversations", {
+  id: id(),
+  gorgiasTicketId: text("gorgias_ticket_id").notNull().unique(),
+  phone: text("phone").notNull(),
+  contactId: uuid("contact_id").references(() => wholesaleContacts.id),
+  status: text("status").$type<"bot" | "human">().notNull().default("bot"),
+  handoverReason: text("handover_reason"),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+// Every message the bot has seen or sent, by Gorgias message id, so a repeated webhook is answered once.
+export const botMessages = pgTable("bot_messages", {
+  id: id(),
+  conversationId: uuid("conversation_id").notNull().references(() => botConversations.id),
+  gorgiasMessageId: text("gorgias_message_id").notNull().unique(),
+  role: text("role").$type<"customer" | "bot" | "agent">().notNull(),
+  body: text("body").notNull(),
+  createdAt: createdAt(),
+});

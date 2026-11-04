@@ -48,6 +48,7 @@ export default async function Admin() {
   return (
     <>
       <h1>Admin</h1>
+      <p><Link href="/admin/wholesale">Wholesale: accounts and WhatsApp chats →</Link></p>
       {!agreementReady && (
         <p className="notice">The designer agreement isn&apos;t final (DESIGNER_AGREEMENT_VERSION is blank), so campaigns can&apos;t be approved yet.</p>
       )}

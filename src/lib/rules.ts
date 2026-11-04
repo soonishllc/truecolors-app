@@ -72,3 +72,29 @@ export function royaltyCents(netCents: number, bps: number): number {
 export function sku(designCode: string, size: Size): string {
   return `TC-${designCode}-WHT-${size}`;
 }
+
+// ---- Wholesale ---------------------------------------------------------------------------------------
+// Stockists buy outright and pay upfront; display partners hold Truecolors stock on consignment.
+
+export const WHOLESALE_CURRENCIES = ["AED", "USD", "MXN"] as const;
+export type WholesaleCurrency = (typeof WHOLESALE_CURRENCIES)[number];
+
+// Placeholders until Truecolors confirms the numbers: the minimum shirts per stockist order, and the
+// discount off retail from each quantity up.
+export const WHOLESALE_MIN_UNITS = 24;
+export const WHOLESALE_TIERS: { fromUnits: number; discountBps: number }[] = [
+  { fromUnits: 24, discountBps: 4000 },
+  { fromUnits: 100, discountBps: 4500 },
+  { fromUnits: 250, discountBps: 5000 },
+];
+
+// Display partners pay this per shirt sold; the MSRP guests pay is twice it, VAT included. AED and USD
+// are still to be confirmed, so they're left out until they are.
+export const PARTNER_PRICE: Partial<Record<WholesaleCurrency, number>> = { MXN: 150 };
+export const PARTNER_MSRP_MULTIPLE = 2;
+
+export const SETTLEMENT_DAYS = 15;
+
+export function wholesaleDiscountBps(units: number): number | undefined {
+  return WHOLESALE_TIERS.filter((t) => units >= t.fromUnits).at(-1)?.discountBps;
+}
