@@ -30,6 +30,8 @@ export type OrderPayload = {
   contact_email?: string | null;
   shipping_address?: { city?: string | null } | null;
   cancelled_at?: string | null;
+  tags?: string;
+  financial_status?: string;
 };
 
 export type RefundPayload = {

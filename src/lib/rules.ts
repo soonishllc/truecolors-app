@@ -98,3 +98,28 @@ export const SETTLEMENT_DAYS = 15;
 export function wholesaleDiscountBps(units: number): number | undefined {
   return WHOLESALE_TIERS.filter((t) => units >= t.fromUnits).at(-1)?.discountBps;
 }
+
+// Stockist prices follow the store's own retail price in the stockist's market, less their tier discount.
+export const CURRENCY_COUNTRY: Record<WholesaleCurrency, string> = { AED: "AE", USD: "US", MXN: "MX" };
+
+// A quote holds its prices, and the order holds its stock, this long before they lapse.
+export const QUOTE_HOURS = 48;
+
+// Stockist orders ship by FedEx from the Cancún hub, duties paid by Truecolors. The hub's address, carton
+// sizes and customs details are placeholders until Truecolors confirms them; FedEx booking stays off until
+// SHIP_FROM is filled in.
+export const SHIP_FROM = {
+  company: "Truecolors",
+  person: "",
+  phone: "",
+  street: "",
+  city: "Cancún",
+  state: "QR",
+  postalCode: "",
+  country: "MX",
+};
+export const SHIRTS_PER_CARTON = 50;
+export const SHIRT_KG = 0.22;
+export const CARTON_KG = 0.6;
+export const HS_CODE = "610910";
+export const CUSTOMS_DESCRIPTION = "Cotton T-shirts, printed";

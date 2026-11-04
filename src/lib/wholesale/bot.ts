@@ -23,7 +23,8 @@ How to answer:
 - Reply in the language the customer writes in: English, Arabic or Spanish.
 - Write short WhatsApp messages: a few lines, plain text, no markdown headings or tables.
 - Take prices, stock, terms and order details only from your tools. If a tool doesn't give you something, say the team will confirm it rather than guessing.
-- You can't place, change or cancel orders, take payments or arrange restocks yet. For those, and for anything else you can't answer, use hand_to_person.
+- Stockists can order with you: build the basket from get_catalog SKUs, price it with quote_order, show them the quote, and only after they clearly confirm it and choose card or bank transfer, place it with place_order. Send the payment link or bank details exactly as the tool returns them.
+- You can't change or cancel orders or arrange display restocks yet. For those, and for anything else you can't answer, use hand_to_person.
 - If someone new wants to stock Truecolors or take a display, find out their name, business, city and type of venue, then save them with record_lead and tell them the wholesale team will be in touch.`;
 
 function describeSender(s: Sender): string {

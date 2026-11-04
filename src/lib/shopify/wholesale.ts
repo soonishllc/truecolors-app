@@ -1,15 +1,16 @@
 import { config } from "../config";
-import { admin, gid } from "./client";
+import { admin, gid, numericId, ok, type UserErrors } from "./client";
 
-// Read-only Shopify lookups for the wholesale bot and portal. Writes (draft orders, transfers) come in
-// phase 2, behind payment or team approval.
+// Shopify calls for wholesale: catalog, orders and stock lookups for the bot and portal, and the draft
+// orders, payments and fulfilments behind stockist orders. Mutation shapes follow the Admin GraphQL API;
+// run them against a development store before the first live wholesale order.
 
 export type CatalogItem = {
   title: string;
   handle: string;
   retailPrice: string;
   currency: string;
-  sizes: { size: string; sku: string; available: number }[];
+  sizes: { size: string; sku: string; variantId: string; available: number }[];
 };
 
 export type OrderSummary = {
@@ -35,7 +36,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
             title: string;
             handle: string;
             status: string;
-            variants: { nodes: { title: string; sku: string | null; price: string; inventoryQuantity: number | null }[] };
+            variants: { nodes: { id: string; title: string; sku: string | null; price: string; inventoryQuantity: number | null }[] };
           }[];
         };
       }[];
@@ -45,7 +46,7 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
       shop { currencyCode }
       collections(first: 1, query: $q) {
         nodes { products(first: 100) { nodes { title handle status
-          variants(first: 20) { nodes { title sku price inventoryQuantity } } } } }
+          variants(first: 20) { nodes { id title sku price inventoryQuantity } } } } }
       }
     }`,
     { q: `handle:${config().WHOLESALE_COLLECTION_HANDLE}` },
@@ -58,7 +59,9 @@ export async function wholesaleCatalog(): Promise<CatalogItem[]> {
       handle: p.handle,
       retailPrice: p.variants.nodes[0]?.price ?? "",
       currency: data.shop.currencyCode,
-      sizes: p.variants.nodes.map((v) => ({ size: v.title, sku: v.sku ?? "", available: Math.max(0, v.inventoryQuantity ?? 0) })),
+      sizes: p.variants.nodes.map((v) => ({
+        size: v.title, sku: v.sku ?? "", variantId: v.id, available: Math.max(0, v.inventoryQuantity ?? 0),
+      })),
     }));
 }
 
@@ -131,4 +134,125 @@ export async function locationStock(shopifyLocationId: string): Promise<StockLin
       sku: l.item.sku ?? "",
       available: l.quantities.find((q) => q.name === "available")?.quantity ?? 0,
     }));
+}
+
+// The retail price each variant sells for in a country's market, in that market's currency.
+export async function variantPrices(variantIds: string[], country: string): Promise<Map<string, { amount: string; currency: string }>> {
+  const data = await admin<{
+    nodes: ({ id: string; contextualPricing: { price: { amount: string; currencyCode: string } } } | null)[];
+  }>(
+    `query($ids: [ID!]!, $country: CountryCode!) {
+      nodes(ids: $ids) { ... on ProductVariant { id contextualPricing(context: { country: $country }) { price { amount currencyCode } } } }
+    }`,
+    { ids: variantIds, country },
+  );
+  return new Map(
+    data.nodes.filter((n) => n?.contextualPricing).map((n) => [n!.id, { amount: n!.contextualPricing.price.amount, currency: n!.contextualPricing.price.currencyCode }]),
+  );
+}
+
+export type DraftOrder = { id: string; name: string; invoiceUrl: string };
+
+// A draft order at the quoted prices, in the stockist's currency, holding the stock until the quote lapses.
+export async function createWholesaleDraftOrder(input: {
+  shopifyCustomerId: string;
+  currency: string;
+  lines: { variantId: string; quantity: number; unit: string }[];
+  tags: string[];
+  note: string;
+  reserveUntil: Date;
+}): Promise<DraftOrder> {
+  const res = await admin<{ draftOrderCreate: { draftOrder: DraftOrder | null; userErrors: UserErrors } }>(
+    `mutation($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) { draftOrder { id name invoiceUrl } userErrors { field message } }
+    }`,
+    {
+      input: {
+        purchasingEntity: { customerId: gid("Customer", input.shopifyCustomerId) },
+        useCustomerDefaultAddress: true,
+        presentmentCurrencyCode: input.currency,
+        lineItems: input.lines.map((l) => ({
+          variantId: l.variantId,
+          quantity: l.quantity,
+          priceOverride: { amount: l.unit, currencyCode: input.currency },
+        })),
+        tags: input.tags,
+        note: input.note,
+        reserveInventoryUntil: input.reserveUntil.toISOString(),
+      },
+    },
+  );
+  return ok(res.draftOrderCreate, "draftOrderCreate").draftOrder!;
+}
+
+// Turns a draft into an order awaiting payment, for stockists paying by bank transfer.
+export async function completeDraftAsPending(draftOrderId: string): Promise<{ orderId: string; orderName: string }> {
+  const res = await admin<{
+    draftOrderComplete: { draftOrder: { order: { id: string; name: string } | null } | null; userErrors: UserErrors };
+  }>(
+    `mutation($id: ID!) {
+      draftOrderComplete(id: $id, paymentPending: true) { draftOrder { order { id name } } userErrors { field message } }
+    }`,
+    { id: draftOrderId },
+  );
+  const order = ok(res.draftOrderComplete, "draftOrderComplete").draftOrder?.order;
+  if (!order) throw new Error(`Draft order ${draftOrderId} didn't become an order`);
+  return { orderId: numericId(order.id), orderName: order.name };
+}
+
+export async function markOrderPaid(shopifyOrderId: string) {
+  const res = await admin<{ orderMarkAsPaid: { userErrors: UserErrors } }>(
+    `mutation($input: OrderMarkAsPaidInput!) { orderMarkAsPaid(input: $input) { userErrors { field message } } }`,
+    { input: { id: gid("Order", shopifyOrderId) } },
+  );
+  ok(res.orderMarkAsPaid, "orderMarkAsPaid");
+}
+
+export type ShipTo = {
+  name: string; company?: string; phone?: string; email?: string;
+  street: string[]; city: string; state?: string; postalCode?: string; country: string;
+};
+
+export async function orderShipTo(shopifyOrderId: string): Promise<ShipTo | undefined> {
+  const data = await admin<{
+    order: {
+      email: string | null;
+      shippingAddress: {
+        name: string | null; company: string | null; phone: string | null; address1: string | null; address2: string | null;
+        city: string | null; provinceCode: string | null; zip: string | null; countryCodeV2: string | null;
+      } | null;
+    } | null;
+  }>(
+    `query($id: ID!) { order(id: $id) { email shippingAddress {
+      name company phone address1 address2 city provinceCode zip countryCodeV2 } } }`,
+    { id: gid("Order", shopifyOrderId) },
+  );
+  const a = data.order?.shippingAddress;
+  if (!a?.address1 || !a.city || !a.countryCodeV2) return;
+  return {
+    name: a.name ?? "", company: a.company ?? undefined, phone: a.phone ?? undefined, email: data.order?.email ?? undefined,
+    street: [a.address1, a.address2].filter(Boolean) as string[], city: a.city, state: a.provinceCode ?? undefined,
+    postalCode: a.zip ?? undefined, country: a.countryCodeV2,
+  };
+}
+
+// Marks the whole order shipped with its FedEx tracking; Shopify emails the stockist its shipping confirmation.
+export async function fulfilWithTracking(shopifyOrderId: string, trackingNumber: string) {
+  const data = await admin<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null }>(
+    `query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }`,
+    { id: gid("Order", shopifyOrderId) },
+  );
+  const open = (data.order?.fulfillmentOrders.nodes ?? []).filter((f) => f.status === "OPEN" || f.status === "IN_PROGRESS");
+  if (!open.length) throw new Error(`Order ${shopifyOrderId} has nothing left to fulfil`);
+  const res = await admin<{ fulfillmentCreate: { userErrors: UserErrors } }>(
+    `mutation($fulfillment: FulfillmentInput!) { fulfillmentCreate(fulfillment: $fulfillment) { userErrors { field message } } }`,
+    {
+      fulfillment: {
+        lineItemsByFulfillmentOrder: open.map((f) => ({ fulfillmentOrderId: f.id })),
+        trackingInfo: { company: "FedEx", number: trackingNumber, url: `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}` },
+        notifyCustomer: true,
+      },
+    },
+  );
+  ok(res.fulfillmentCreate, "fulfillmentCreate");
 }

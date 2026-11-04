@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
 import { getTicket, handOverTicket, replyOnTicket } from "../gorgias/client";
-import { customerOrders, locationStock, wholesaleCatalog } from "../shopify/wholesale";
+import { bookShipment } from "../fedex/client";
+import {
+  completeDraftAsPending, createWholesaleDraftOrder, customerOrders, fulfilWithTracking, locationStock, markOrderPaid,
+  orderShipTo, variantPrices, wholesaleCatalog,
+} from "../shopify/wholesale";
 
 // Everything the wholesale bot calls outside the app, swappable in tests.
 export type WholesaleOps = {
@@ -11,6 +15,13 @@ export type WholesaleOps = {
   wholesaleCatalog: typeof wholesaleCatalog;
   customerOrders: typeof customerOrders;
   locationStock: typeof locationStock;
+  variantPrices: typeof variantPrices;
+  createWholesaleDraftOrder: typeof createWholesaleDraftOrder;
+  completeDraftAsPending: typeof completeDraftAsPending;
+  markOrderPaid: typeof markOrderPaid;
+  orderShipTo: typeof orderShipTo;
+  fulfilWithTracking: typeof fulfilWithTracking;
+  bookShipment: typeof bookShipment;
   converse(params: Anthropic.Beta.MessageCreateParamsNonStreaming): Promise<Anthropic.Beta.BetaMessage>;
 };
 
@@ -23,6 +34,13 @@ const live: WholesaleOps = {
   wholesaleCatalog,
   customerOrders,
   locationStock,
+  variantPrices,
+  createWholesaleDraftOrder,
+  completeDraftAsPending,
+  markOrderPaid,
+  orderShipTo,
+  fulfilWithTracking,
+  bookShipment,
   converse: (params) => {
     client ??= new Anthropic({ apiKey: config().ANTHROPIC_API_KEY });
     return client.beta.messages.create(params);

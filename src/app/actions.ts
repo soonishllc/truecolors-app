@@ -19,6 +19,8 @@ import { createChallenge, enterChallenge, toggleVote } from "@/lib/challenges";
 import { savePayoutMethod } from "@/lib/payouts/methods";
 import { activateWholesaler, addContact, addOutlet, createWholesaler } from "@/lib/wholesale/accounts";
 import { handBackToBot } from "@/lib/wholesale/bot";
+import { markBankTransferPaid, placeOrder, quoteOrder, shipOrder } from "@/lib/wholesale/orders";
+import { currentWholesaler } from "@/lib/wholesale/portal-auth";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
 
@@ -235,6 +237,55 @@ export async function handBackToBotAction(f: FormData) {
   await requireAdmin();
   await handBackToBot(text(f, "conversationId"));
   revalidatePath("/admin/wholesale");
+}
+
+export async function markWholesalePaidAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await markBankTransferPaid(text(f, "orderId"));
+    return { message: "Marked paid. Shipping is booked if FedEx is set up." };
+  });
+  revalidatePath("/admin/wholesale");
+  return res;
+}
+
+export async function retryShippingAction(f: FormData) {
+  await requireAdmin();
+  await shipOrder(text(f, "orderId"), { retry: true });
+  revalidatePath("/admin/wholesale");
+}
+
+// ---- Wholesaler portal --------------------------------------------------------------------------------
+
+async function portalStockist() {
+  const me = await currentWholesaler();
+  if (!("wholesaler" in me) || !me.wholesaler) redirect("/wholesale");
+  return me.wholesaler;
+}
+
+export async function portalQuoteAction(_: FormState, f: FormData): Promise<FormState> {
+  const w = await portalStockist();
+  const lines = [...f.entries()]
+    .filter(([k, v]) => k.startsWith("qty:") && String(v).trim() !== "")
+    .map(([k, v]) => ({ sku: k.slice(4), quantity: Number(v) }));
+  let ref = "";
+  const res = await attempt(async () => {
+    ref = (await quoteOrder(w.id, lines)).ref;
+  });
+  if (!ref) return res;
+  redirect(`/wholesale/order?quote=${ref}`);
+}
+
+export async function portalPlaceAction(_: FormState, f: FormData): Promise<FormState> {
+  const w = await portalStockist();
+  let to = "";
+  const res = await attempt(async () => {
+    const placed = await placeOrder(w.id, text(f, "quote"), text(f, "payment") === "bank_transfer" ? "bank_transfer" : "card");
+    to = placed.payUrl ?? `/wholesale/order?placed=${placed.order.ref}`;
+  });
+  if (!to) return res;
+  revalidatePath("/wholesale");
+  redirect(to);
 }
 
 // ---- Fans: waitlists, referral links, votes ---------------------------------------------------------

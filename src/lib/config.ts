@@ -72,10 +72,21 @@ const schema = z.object({
   GORGIAS_WEBHOOK_SECRET: z.string().optional(),
   // The Shopify collection that holds what wholesalers can order.
   WHOLESALE_COLLECTION_HANDLE: z.string().default("wholesale-catalog"),
+  // The Shopify location of the Cancún hub, which stockist orders ship from. Blank = stock across all locations.
+  WHOLESALE_LOCATION_ID: z.string().optional(),
   // Wholesaler portal sign-in: a confidential client from Shopify's Customer Account API settings, with
   // APP_URL/wholesale/callback as its callback URL.
   SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: z.string().optional(),
   SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET: z.string().optional(),
+
+  // Bank details sent to stockists who pay by transfer, as one block of text (newlines as \n).
+  WHOLESALE_BANK_DETAILS: z.string().default(""),
+  // FedEx Ship API for stockist orders from Cancún. FEDEX_SANDBOX=true uses FedEx's test environment.
+  FEDEX_API_KEY: z.string().optional(),
+  FEDEX_SECRET_KEY: z.string().optional(),
+  FEDEX_ACCOUNT_NUMBER: z.string().optional(),
+  FEDEX_SANDBOX: bool,
+  FEDEX_SERVICE_TYPE: z.string().default("FEDEX_INTERNATIONAL_PRIORITY"),
 
   CRON_SECRET: z.string().default("dev-cron-secret"),
   DEV_SHOW_LOGIN_LINKS: bool,

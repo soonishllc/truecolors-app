@@ -1,12 +1,15 @@
 import Link from "next/link";
 import {
   activateWholesalerAction, addContactAction, addOutletAction, createWholesalerAction, handBackToBotAction,
+  markWholesalePaidAction, retryShippingAction,
 } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth/session";
 import { ago } from "@/lib/format";
 import { WHOLESALE_CURRENCIES } from "@/lib/rules";
+import { fileUrl } from "@/lib/storage";
 import { wholesaleOverview } from "@/lib/wholesale/accounts";
+import { adminOrders, showMoney } from "@/lib/wholesale/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,7 @@ function Currency({ value = "USD" }) {
 export default async function WholesaleAdmin() {
   await requireAdmin();
   const { wholesalers, chats } = await wholesaleOverview();
+  const orders = (await adminOrders()).filter(({ o }) => o.status !== "quoted");
   const leads = wholesalers.filter(({ w }) => w.status === "lead");
   const active = wholesalers.filter(({ w }) => w.status === "active");
 
@@ -37,6 +41,42 @@ export default async function WholesaleAdmin() {
     <>
       <p className="small"><Link href="/admin">← Admin</Link></p>
       <h1>Wholesale</h1>
+
+      <h2>Stockist orders</h2>
+      {orders.length === 0 && <p className="muted">No orders yet.</p>}
+      <table>
+        <thead><tr><th>Order</th><th>Stockist</th><th>Total</th><th>Status</th><th>Shipping</th><th></th></tr></thead>
+        <tbody>
+          {orders.map(({ o, w }) => (
+            <tr key={o.id}>
+              <td>{o.shopifyOrderName ?? "draft"} <span className="muted small">{o.ref}</span></td>
+              <td>{w.name}</td>
+              <td>{showMoney(o.subtotal, o.currency)}<br /><span className="small muted">{o.units} shirts · {o.paymentMethod === "bank_transfer" ? "bank transfer" : "card"}</span></td>
+              <td><span className="badge">{o.status.replace("_", " ")}</span></td>
+              <td className="small">
+                {o.trackingNumber && <div>FedEx {o.trackingNumber}</div>}
+                {o.documents.map((doc) => (
+                  <div key={doc.key}><a href={fileUrl(doc.key)}>{doc.kind === "label" ? "Label" : "Commercial invoice"}</a></div>
+                ))}
+                {o.shippingProblem && <div className="warn">{o.shippingProblem}</div>}
+              </td>
+              <td>
+                {o.status === "awaiting_payment" && o.paymentMethod === "bank_transfer" && (
+                  <ActionForm action={markWholesalePaidAction} className="row" submit="Transfer received">
+                    <input type="hidden" name="orderId" value={o.id} />
+                  </ActionForm>
+                )}
+                {o.status === "paid" && (
+                  <form action={retryShippingAction}>
+                    <input type="hidden" name="orderId" value={o.id} />
+                    <button className="secondary">Book FedEx again</button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h2>WhatsApp chats</h2>
       {chats.length === 0 && <p className="muted">No chats yet.</p>}

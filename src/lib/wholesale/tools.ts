@@ -6,9 +6,11 @@ import {
   PARTNER_MSRP_MULTIPLE, PARTNER_PRICE, SETTLEMENT_DAYS, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS,
 } from "../rules";
 import { wholesaleOps } from "./ops";
+import { placeOrder, quoteOrder, summary } from "./orders";
 
 // The bot's tools. Every one takes the sender from the verified WhatsApp number, never from the model, so
-// a wholesaler only ever sees their own orders and stock. Phase 1 tools only read, except record_lead.
+// a wholesaler only ever sees their own orders and stock. Stockists can quote and place orders; a placed
+// order is always one we quoted, so the model can't change prices or quantities on the way.
 
 type Contact = typeof wholesaleContacts.$inferSelect;
 type Wholesaler = typeof wholesalers.$inferSelect;
@@ -155,12 +157,65 @@ const recordLead: Tool = {
   },
 };
 
+const quoteOrderTool: Tool = {
+  def: {
+    name: "quote_order",
+    description:
+      "Prices a stockist's basket: checks the minimum order and stock, applies their quantity discount in their " +
+      "currency, and returns a quote reference with the lines and total. Use SKUs from get_catalog. Show the stockist " +
+      "the quote and ask them to confirm it, and how they'll pay, before placing it.",
+    input_schema: schema(
+      {
+        lines: {
+          type: "array",
+          items: schema({ sku: { type: "string" }, quantity: { type: "integer" } }, ["sku", "quantity"]),
+        },
+      },
+      ["lines"],
+    ),
+    strict: true,
+  },
+  async run(input, sender) {
+    try {
+      const q = await quoteOrder(sender.wholesaler!.id, input.lines as { sku: string; quantity: number }[]);
+      return { quote: q.ref, validUntil: q.expiresAt.toISOString(), summary: summary(q), currency: q.currency, total: q.subtotal };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
+  },
+};
+
+const placeOrderTool: Tool = {
+  def: {
+    name: "place_order",
+    description:
+      "Places a quote the stockist has explicitly confirmed. Card returns a checkout link to send them; bank_transfer " +
+      "returns bank details and the order number to quote as the payment reference. Only call it after they say yes to the quote.",
+    input_schema: schema(
+      { quote: { type: "string", description: "The quote reference, like Q-7F3K2." }, payment: { type: "string", enum: ["card", "bank_transfer"] } },
+      ["quote", "payment"],
+    ),
+    strict: true,
+  },
+  async run(input, sender) {
+    try {
+      const placed = await placeOrder(sender.wholesaler!.id, String(input.quote), input.payment === "bank_transfer" ? "bank_transfer" : "card");
+      return {
+        placed: true, reference: placed.reference, payUrl: placed.payUrl, bankDetails: placed.bankDetails,
+        note: "It ships from Cancún by FedEx, duties paid, once payment arrives. They'll get the tracking by email.",
+      };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
+  },
+};
+
 const handToPerson: Tool = {
   def: {
     name: "hand_to_person",
     description:
-      "Passes the chat to the Truecolors wholesale team. Use it for anything you can't answer from your tools: " +
-      "placing or changing an order, payments, restocks, complaints, custom designs, contract terms, or when they ask for a person. " +
+      "Passes the chat to the Truecolors wholesale team. Use it for anything you can't answer or do with your tools: " +
+      "changing or cancelling an order, payment problems, restocks, complaints, custom designs, contract terms, or when they ask for a person. " +
       "After calling it, tell them a team member will reply here.",
     input_schema: schema({ reason: { type: "string", description: "One line for the team: what they need." } }, ["reason"]),
     strict: true,
@@ -175,5 +230,11 @@ const handToPerson: Tool = {
 // orders, and display partners their display stock.
 export function toolsFor(sender: Sender): Tool[] {
   if (!isActive(sender)) return [getCatalog, ...(sender.contact ? [] : [recordLead]), handToPerson];
-  return [getCatalog, getOrders, ...(sender.wholesaler?.displayPartner ? [getDisplayStock] : []), handToPerson];
+  const w = sender.wholesaler!;
+  return [
+    getCatalog, getOrders,
+    ...(w.stockist ? [quoteOrderTool, placeOrderTool] : []),
+    ...(w.displayPartner ? [getDisplayStock] : []),
+    handToPerson,
+  ];
 }

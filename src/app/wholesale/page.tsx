@@ -1,6 +1,7 @@
 import { CONTACT } from "@/lib/brand";
 import { date, money } from "@/lib/format";
 import { customerOrders, locationStock, type OrderSummary, type StockLine } from "@/lib/shopify/wholesale";
+import { ordersFor, showMoney } from "@/lib/wholesale/orders";
 import { currentWholesaler, portalSignInReady } from "@/lib/wholesale/portal-auth";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,9 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
       )
     : [];
   const kinds = [w.stockist && "Stockist", w.displayPartner && "Display partner"].filter(Boolean).join(" · ");
+  const open = (await ordersFor(w.id)).filter(
+    (o) => (o.status === "quoted" && o.expiresAt > new Date()) || o.status === "awaiting_payment",
+  );
 
   return (
     <>
@@ -78,6 +82,34 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
         Signed in as {contact.name} ({me.email}). To order, restock or ask anything, message us on WhatsApp at{" "}
         <a href={CONTACT.whatsapp.href}>{CONTACT.whatsapp.label}</a>.
       </p>
+
+      {w.stockist && (
+        <>
+          <p><a className="button" href="/wholesale/order">New order</a></p>
+          {open.length > 0 && (
+            <>
+              <h2>Waiting on you</h2>
+              <table>
+                <thead><tr><th>Order</th><th>Shirts</th><th>Total</th><th>Next step</th></tr></thead>
+                <tbody>
+                  {open.map((o) => (
+                    <tr key={o.id}>
+                      <td>{o.shopifyOrderName ?? o.ref}</td>
+                      <td>{o.units}</td>
+                      <td>{showMoney(o.subtotal, o.currency)}</td>
+                      <td>
+                        {o.status === "quoted" && <a href={`/wholesale/order?quote=${o.ref}`}>Review and pay</a>}
+                        {o.status === "awaiting_payment" && o.payUrl && <a href={o.payUrl}>Pay by card</a>}
+                        {o.status === "awaiting_payment" && !o.payUrl && <a href={`/wholesale/order?placed=${o.ref}`}>Bank transfer details</a>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </>
+      )}
 
       <h2>Orders</h2>
       <Orders orders={orders} />

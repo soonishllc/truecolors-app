@@ -11,10 +11,14 @@ const { useWholesaleOps } = await import("../src/lib/wholesale/ops");
 const { addOutlet, createWholesaler, normalisePhone } = await import("../src/lib/wholesale/accounts");
 const { resetConfig } = await import("../src/lib/config");
 const { freshDb } = await import("./helpers");
+const { quoteOrder, placeOrder, recordWholesaleShopifyOrder, markBankTransferPaid, shipOrder } = await import("../src/lib/wholesale/orders");
+const { wholesaleOrders, emails } = await import("../src/lib/db/schema");
+const { cartons, shipmentRequest } = await import("../src/lib/fedex/client");
 
 type Ticket = import("../src/lib/gorgias/client").Ticket;
 type Msg = Ticket["messages"][number];
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming;
+type WholesaleOps = import("../src/lib/wholesale/ops").WholesaleOps;
 
 const PHONE = "971501234567";
 
@@ -32,13 +36,19 @@ const message = (content: unknown[], stop_reason: string) =>
 const text = (t: string) => message([{ type: "text", text: t }], "end_turn");
 const call = (name: string, input: object = {}) => message([{ type: "tool_use", id: `tu_${seq++}`, name, input }], "tool_use");
 
-// A fake Gorgias, Shopify and Claude. The model answers from a script, one response per call.
+// A fake Gorgias, Shopify, FedEx and Claude. The model answers from a script, one response per call.
 function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
   const seen = {
     calls: [] as Params[],
     replies: [] as string[],
     handovers: [] as { reason: string; tags: string[] }[],
     stockAsked: [] as string[],
+    drafts: [] as Parameters<WholesaleOps["createWholesaleDraftOrder"]>[0][],
+    pending: [] as string[],
+    markedPaid: [] as string[],
+    shipments: [] as Parameters<WholesaleOps["bookShipment"]>[0][],
+    fulfilled: [] as { orderId: string; tracking: string }[],
+    fedexDown: false,
   };
   useWholesaleOps({
     getTicket: async () => ticket,
@@ -50,12 +60,44 @@ function fakes(ticket: Ticket, script: Anthropic.Beta.BetaMessage[]) {
       seen.handovers.push({ reason, tags });
     },
     wholesaleCatalog: async () => [
-      { title: "Habibi", handle: "habibi", retailPrice: "36.00", currency: "USD", sizes: [{ size: "M", sku: "TC-HAB-WHT-M", available: 40 }] },
+      {
+        title: "Habibi", handle: "habibi", retailPrice: "36.00", currency: "USD",
+        sizes: [
+          { size: "M", sku: "TC-HAB-WHT-M", variantId: "gid://shopify/ProductVariant/1", available: 40 },
+          { size: "L", sku: "TC-HAB-WHT-L", variantId: "gid://shopify/ProductVariant/2", available: 200 },
+        ],
+      },
     ],
     customerOrders: async () => [],
     locationStock: async (id) => {
       seen.stockAsked.push(id);
       return [{ product: "Habibi", size: "M", sku: "TC-HAB-WHT-M", available: 6 }];
+    },
+    // AED retail is 135 in the UAE market; USD 36 elsewhere.
+    variantPrices: async (ids, country) =>
+      new Map(ids.map((id) => [id, country === "AE" ? { amount: "135.00", currency: "AED" } : { amount: "36.00", currency: "USD" }])),
+    createWholesaleDraftOrder: async (input) => {
+      seen.drafts.push(input);
+      return { id: "gid://shopify/DraftOrder/9", name: "#D9", invoiceUrl: "https://shop.example/invoices/abc" };
+    },
+    completeDraftAsPending: async (id) => {
+      seen.pending.push(id);
+      return { orderId: "5001", orderName: "#5001" };
+    },
+    markOrderPaid: async (id) => {
+      seen.markedPaid.push(id);
+    },
+    orderShipTo: async () => ({
+      name: "Ana Ruiz", company: "Sunset Gifts", phone: "+15125550100", email: "ana@sunset.example",
+      street: ["1 Congress Ave"], city: "Austin", state: "TX", postalCode: "78701", country: "US",
+    }),
+    fulfilWithTracking: async (orderId, tracking) => {
+      seen.fulfilled.push({ orderId, tracking });
+    },
+    bookShipment: async (input) => {
+      if (seen.fedexDown) throw new Error("FedEx answered 503: try later");
+      seen.shipments.push(input);
+      return { trackingNumber: "794600000001", documents: [{ kind: "label", pdf: Buffer.from("%PDF label").toString("base64") }] };
     },
     converse: async (params) => {
       seen.calls.push(structuredClone(params));
@@ -110,6 +152,7 @@ describe("wholesale bot", () => {
     await handleTicket("101");
 
     expect(toolNames(seen.calls[0])).toEqual(["get_catalog", "get_display_stock", "get_orders", "hand_to_person"]);
+    expect(toolNames(seen.calls[0])).not.toContain("quote_order");
     expect(seen.stockAsked).toEqual(["42"]);
     expect(seen.calls[0].system).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining("Omar (owner) at Marina Resort Boutique") })]));
     expect(seen.replies).toHaveLength(1);
@@ -247,4 +290,160 @@ it("keeps one conversation per ticket", async () => {
   await handleTicket("109");
   const d = await db();
   expect(await d.select().from(botConversations).where(eq(botConversations.gorgiasTicketId, "109"))).toHaveLength(1);
+});
+
+describe("stockist orders", () => {
+  const none: Ticket = { id: "0", channel: "whatsapp", messages: [] };
+
+  async function stockist(currency = "AED", customerId = "777") {
+    return createWholesaler({
+      name: "Sunset Gifts", currency, shopifyCustomerId: customerId, stockist: true, displayPartner: false,
+      contactName: "Ana", phone: PHONE, email: "ana@sunset.example",
+    });
+  }
+  const orderRow = async (ref: string) => {
+    const d = await db();
+    return (await d.select().from(wholesaleOrders).where(eq(wholesaleOrders.ref, ref)))[0];
+  };
+  const paidWebhook = (ref: string, financial_status = "paid") => ({
+    id: 5001, name: "#5001", currency: "AED", line_items: [], tags: `wholesale, wholesale-order:${ref}`, financial_status,
+  });
+
+  it("prices a basket at the tier for its size, in the stockist's currency", async () => {
+    fakes(none, []);
+    const w = await stockist();
+    const q = await quoteOrder(w.id, [{ sku: "tc-hab-wht-m", quantity: 20 }, { sku: "TC-HAB-WHT-L", quantity: 80 }]);
+    expect(q).toMatchObject({ currency: "AED", units: 100, discountBps: 4500, status: "quoted" });
+    // 135 AED retail, 45% off = 74.25 a shirt; 100 shirts.
+    expect(q.lines.map((l) => [l.sku, l.quantity, l.unit])).toEqual([["TC-HAB-WHT-M", 20, "74.25"], ["TC-HAB-WHT-L", 80, "74.25"]]);
+    expect(q.subtotal).toBe("7425.00");
+  });
+
+  it("refuses baskets under the minimum, with unknown SKUs or more than is in stock", async () => {
+    fakes(none, []);
+    const w = await stockist();
+    await expect(quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 10 }])).rejects.toThrow(/minimum order is 24/);
+    await expect(quoteOrder(w.id, [{ sku: "TC-NOPE-WHT-L", quantity: 30 }])).rejects.toThrow(/Not in the wholesale catalog/);
+    await expect(quoteOrder(w.id, [{ sku: "TC-HAB-WHT-M", quantity: 50 }])).rejects.toThrow(/Not enough stock.*40 left/);
+  });
+
+  it("only lets active stockists quote", async () => {
+    fakes(none, []);
+    const partner = await createWholesaler({
+      name: "Resort", currency: "AED", shopifyCustomerId: "1", stockist: false, displayPartner: true, contactName: "O", phone: "", email: "o@r.example",
+    });
+    await expect(quoteOrder(partner.id, [{ sku: "TC-HAB-WHT-L", quantity: 30 }])).rejects.toThrow(/Only active stockists/);
+  });
+
+  it("places a quote as a draft order at the quoted prices, then ships it by FedEx once paid by card", async () => {
+    const seen = fakes(none, []);
+    const w = await stockist();
+    const q = await quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 30 }]);
+    const placed = await placeOrder(w.id, q.ref, "card");
+
+    expect(placed.payUrl).toBe("https://shop.example/invoices/abc");
+    expect(seen.drafts[0]).toMatchObject({
+      shopifyCustomerId: "777", currency: "AED", tags: ["wholesale", `wholesale-order:${q.ref}`],
+      lines: [expect.objectContaining({ variantId: "gid://shopify/ProductVariant/2", quantity: 30, unit: "81.00" })],
+    });
+    await expect(placeOrder(w.id, q.ref, "card")).rejects.toThrow(/no open quote/);
+
+    await recordWholesaleShopifyOrder(paidWebhook(q.ref));
+    const shipped = await orderRow(q.ref);
+    expect(shipped).toMatchObject({ status: "shipped", shopifyOrderId: "5001", trackingNumber: "794600000001", shippingProblem: null });
+    expect(shipped.documents).toEqual([{ kind: "label", key: expect.stringContaining(`wholesale/${q.ref}/`) }]);
+    expect(seen.shipments[0]).toMatchObject({ units: 30, currency: "AED", customsValue: "2430.00", reference: "#5001" });
+    expect(seen.fulfilled).toEqual([{ orderId: "5001", tracking: "794600000001" }]);
+
+    // A repeated webhook books nothing new.
+    await recordWholesaleShopifyOrder(paidWebhook(q.ref));
+    expect(seen.shipments).toHaveLength(1);
+
+    const d = await db();
+    const subjects = (await d.select().from(emails)).map((e) => e.subject);
+    expect(subjects).toEqual([`Your Truecolors order ${q.ref}: how to pay`, "Your Truecolors order #5001 has shipped"]);
+  });
+
+  it("holds bank transfers as orders awaiting payment until the team marks them paid", async () => {
+    process.env.WHOLESALE_BANK_DETAILS = "Bank: Example Bank\\nIBAN: AE00 0000";
+    resetConfig();
+    try {
+      const seen = fakes(none, []);
+      const w = await stockist();
+      const q = await quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 24 }]);
+      const placed = await placeOrder(w.id, q.ref, "bank_transfer");
+      expect(placed).toMatchObject({ reference: "#5001", bankDetails: "Bank: Example Bank\nIBAN: AE00 0000" });
+      expect(seen.pending).toEqual(["gid://shopify/DraftOrder/9"]);
+
+      await recordWholesaleShopifyOrder(paidWebhook(q.ref, "pending"));
+      expect((await orderRow(q.ref)).status).toBe("awaiting_payment");
+      expect(seen.shipments).toEqual([]);
+
+      await markBankTransferPaid((await orderRow(q.ref)).id);
+      expect(seen.markedPaid).toEqual(["5001"]);
+      expect((await orderRow(q.ref)).status).toBe("shipped");
+    } finally {
+      delete process.env.WHOLESALE_BANK_DETAILS;
+      resetConfig();
+    }
+  });
+
+  it("keeps a FedEx failure on the order and ships on retry", async () => {
+    const seen = fakes(none, []);
+    const w = await stockist();
+    const q = await quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 24 }]);
+    await placeOrder(w.id, q.ref, "card");
+    seen.fedexDown = true;
+    await recordWholesaleShopifyOrder(paidWebhook(q.ref));
+    expect(await orderRow(q.ref)).toMatchObject({ status: "paid", shippingProblem: "FedEx answered 503: try later" });
+
+    seen.fedexDown = false;
+    await shipOrder((await orderRow(q.ref)).id, { retry: true });
+    expect((await orderRow(q.ref)).status).toBe("shipped");
+  });
+
+  it("won't place a lapsed quote, or one from another account", async () => {
+    fakes(none, []);
+    const w = await stockist();
+    const other = await createWholesaler({
+      name: "Other", currency: "USD", shopifyCustomerId: "8", stockist: true, displayPartner: false, contactName: "X", phone: "", email: "x@o.example",
+    });
+    const q = await quoteOrder(w.id, [{ sku: "TC-HAB-WHT-L", quantity: 24 }], new Date(Date.now() - 49 * 3_600_000));
+    await expect(placeOrder(other.id, q.ref, "card")).rejects.toThrow(/no open quote/);
+    await expect(placeOrder(w.id, q.ref, "card")).rejects.toThrow(/lapsed/);
+    expect((await orderRow(q.ref)).status).toBe("cancelled");
+  });
+
+  it("gives stockists the quote and order tools in WhatsApp, priced from our quote only", async () => {
+    await stockist("USD");
+    const ticket: Ticket = { id: "200", channel: "whatsapp", messages: [customer("30 Habibi in L please, card")] };
+    const seen = fakes(ticket, [
+      call("quote_order", { lines: [{ sku: "TC-HAB-WHT-L", quantity: 30 }] }),
+      text("That's 30 shirts at $21.60, $648.00 in total. Shall I place it?"),
+    ]);
+    await handleTicket("200");
+    expect(toolNames(seen.calls[0])).toEqual(["get_catalog", "get_orders", "hand_to_person", "place_order", "quote_order"]);
+    const result = (seen.calls[1].messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[])[0];
+    expect(JSON.parse(result.content as string)).toMatchObject({ total: "648.00", currency: "USD" });
+    expect(seen.drafts).toEqual([]);
+  });
+});
+
+describe("FedEx shipment request", () => {
+  const shipTo = { name: "Ana", street: ["1 Congress Ave"], city: "Austin", state: "TX", postalCode: "78701", country: "US" };
+
+  it("packs 50 shirts to a carton and bills duties to Truecolors on shipments abroad", () => {
+    expect(cartons(120)).toEqual([50, 50, 20]);
+    const req = shipmentRequest({ shipTo, units: 120, currency: "MXN", customsValue: "18000.00", reference: "#5001", date: new Date("2026-11-04") });
+    const s = req.requestedShipment;
+    expect(s.requestedPackageLineItems).toHaveLength(3);
+    expect(s.shippingChargesPayment).toEqual({ paymentType: "SENDER" });
+    expect(s.customsClearanceDetail?.dutiesPayment).toEqual({ paymentType: "SENDER" });
+    expect(s.customsClearanceDetail?.commodities[0]).toMatchObject({ quantity: 120, customsValue: { amount: 18000, currency: "NMP" } });
+  });
+
+  it("leaves customs out of shipments within Mexico", () => {
+    const req = shipmentRequest({ shipTo: { ...shipTo, country: "MX" }, units: 30, currency: "MXN", customsValue: "4500.00", reference: "#1", date: new Date() });
+    expect(req.requestedShipment.customsClearanceDetail).toBeUndefined();
+  });
 });

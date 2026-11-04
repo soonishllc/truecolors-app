@@ -392,3 +392,46 @@ export const botMessages = pgTable("bot_messages", {
   body: text("body").notNull(),
   createdAt: createdAt(),
 });
+
+export type WholesaleLine = {
+  variantId: string;
+  sku: string;
+  title: string;
+  size: string;
+  quantity: number;
+  // Per shirt, in the order's currency, as decimal strings.
+  retail: string;
+  unit: string;
+};
+
+// A stockist order, from quote to shipment. The quote fixes the lines and prices on our side, so the bot and
+// portal can only place what was quoted. Shopify holds the draft order, the order and the payment.
+export const wholesaleOrders = pgTable("wholesale_orders", {
+  id: id(),
+  // Short code the stockist sees on the quote: Q-7F3K2.
+  ref: text("ref").notNull().unique(),
+  wholesalerId: uuid("wholesaler_id").notNull().references(() => wholesalers.id),
+  status: text("status")
+    .$type<"quoted" | "awaiting_payment" | "paid" | "shipped" | "cancelled">()
+    .notNull()
+    .default("quoted"),
+  currency: text("currency").$type<"AED" | "USD" | "MXN">().notNull(),
+  lines: jsonb("lines").$type<WholesaleLine[]>().notNull(),
+  units: integer("units").notNull(),
+  discountBps: integer("discount_bps").notNull(),
+  subtotal: text("subtotal").notNull(),
+  paymentMethod: text("payment_method").$type<"card" | "bank_transfer">(),
+  draftOrderId: text("draft_order_id"),
+  shopifyOrderId: text("shopify_order_id"),
+  shopifyOrderName: text("shopify_order_name"),
+  payUrl: text("pay_url"),
+  trackingNumber: text("tracking_number"),
+  // FedEx labels and the commercial invoice, as stored files.
+  documents: jsonb("documents").$type<{ kind: "label" | "commercial_invoice"; key: string }[]>().notNull().default([]),
+  // Why shipping hasn't happened yet, for the Admin page.
+  shippingProblem: text("shipping_problem"),
+  expiresAt: ts("expires_at").notNull(),
+  paidAt: ts("paid_at"),
+  shippedAt: ts("shipped_at"),
+  createdAt: createdAt(),
+});
