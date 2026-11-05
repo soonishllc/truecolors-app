@@ -11,8 +11,8 @@ embedded = false
 # Charging saved cards when a campaign funds: payment_mandate and customer_payment_methods (protected: request
 # access for both in the Dev Dashboard). Orders, cancels and refunds: orders. Friend codes, rewards, two-pack:
 # discounts. Wholesale: draft_orders, inventory, locations, merchant_managed_fulfillment_orders. Store sign-in:
-# customers.
-scopes = "read_products,write_products,write_purchase_options,read_publications,write_publications,read_orders,write_orders,write_payment_mandate,read_customer_payment_methods,write_discounts,write_draft_orders,read_inventory,write_inventory,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_customers"
+# customers. The store page needs write_app_proxy; the fulfillments/create webhook needs read_fulfillments.
+scopes = "read_products,write_products,write_purchase_options,read_publications,write_publications,read_orders,write_orders,write_payment_mandate,read_customer_payment_methods,write_discounts,write_draft_orders,read_inventory,write_inventory,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_customers,read_fulfillments,write_app_proxy"
 
 [auth]
 redirect_urls = ["https://app.truecolors.global/api/shopify/callback"]
