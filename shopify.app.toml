@@ -2,7 +2,7 @@
 # `shopify app deploy` then sends this configuration and the checkout extension (extensions/) to Shopify.
 
 name = "Truecolors"
-client_id = ""
+client_id = "5eabda5f952dc5966a9260b191afbe90"
 application_url = "https://app.truecolors.global"
 embedded = false
 
