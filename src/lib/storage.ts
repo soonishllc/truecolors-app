@@ -29,6 +29,8 @@ function s3() {
       new S3Client({
         region: c.S3_REGION,
         endpoint: c.S3_ENDPOINT || undefined,
+        // Supabase Storage (and R2) take the bucket in the path, not as a subdomain; AWS itself doesn't need it.
+        forcePathStyle: Boolean(c.S3_ENDPOINT),
         credentials: { accessKeyId: c.S3_ACCESS_KEY_ID!, secretAccessKey: c.S3_SECRET_ACCESS_KEY! },
         // Only send checksums S3 requires; some S3-compatible stores reject the SDK's optional ones.
         requestChecksumCalculation: "WHEN_REQUIRED",
