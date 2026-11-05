@@ -2,6 +2,9 @@
 // on start to read a .ts config.
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  // Shopify's app proxy asks for /proxy/ with a trailing slash; Next.js would answer with a redirect to /proxy,
+  // which Shopify hands to the shopper's browser on the store's domain, where /proxy doesn't exist.
+  skipTrailingSlashRedirect: true,
   serverExternalPackages: ["sharp", "ffmpeg-static", "@electric-sql/pglite"],
   experimental: { serverActions: { bodySizeLimit: "12mb" } },
   // Only the store may frame the app (its design and wholesale pages are store pages that embed it).
