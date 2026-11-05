@@ -7,7 +7,7 @@ databases:
 
 services:
   - type: web
-    name: truecolors-design
+    name: truecolors-app
     runtime: docker
     plan: standard
     region: virginia
@@ -78,4 +78,4 @@ services:
       - key: APP_URL
         value: https://app.truecolors.global
       - key: CRON_SECRET
-        fromService: { type: web, name: truecolors-design, envVarKey: CRON_SECRET }
+        fromService: { type: web, name: truecolors-app, envVarKey: CRON_SECRET }

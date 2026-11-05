@@ -96,7 +96,7 @@ The site runs on [Render](https://render.com) as one Docker web service, a manag
 
 1. **R2 bucket.** In Cloudflare, go to R2, create a bucket (e.g. `truecolors-files`), then create an API token with Object Read & Write on that bucket. Note the endpoint `https://<account id>.r2.cloudflarestorage.com`. The bucket stays private: the site serves files through `/api/files`.
 2. **Push this repo to GitHub** (a private repo).
-3. **Render blueprint.** Dashboard → New → Blueprint → choose the repo. Render creates `truecolors-db`, the `truecolors-design` web service and the `truecolors-tick` cron job, and generates `SESSION_SECRET` and `CRON_SECRET`. It asks once for each secret marked `sync: false`:
+3. **Render blueprint.** Dashboard → New → Blueprint → choose the repo. Render creates `truecolors-db`, the `truecolors-app` web service and the `truecolors-tick` cron job, and generates `SESSION_SECRET` and `CRON_SECRET`. It asks once for each secret marked `sync: false`:
    - `PAYOUT_ENCRYPTION_KEY`: make one with `openssl rand -base64 32`, keep a copy in your password manager, and never change it.
    - `OPENAI_API_KEY`, the four `S3_*` values, the Shopify keys and `RESEND_API_KEY`.
    - `DESIGNER_AGREEMENT_VERSION`: leave blank until the agreement is signed.
