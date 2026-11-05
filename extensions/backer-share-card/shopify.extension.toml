@@ -5,6 +5,7 @@ api_version = "2026-10"
 [[extensions]]
 name = "Backer share card"
 handle = "backer-share-card"
+uid = "37f94194-470f-00c5-de82-dd9ceacf72e0e547db5d"
 type = "ui_extension"
 
 [[extensions.targeting]]
