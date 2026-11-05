@@ -26,8 +26,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
-        {/* Inside the store (framed by a store page) or the mobile app, the store's own header, menu and footer replace the site's. */}
-        <script dangerouslySetInnerHTML={{ __html: "if(self!==top||/TruecolorsApp/.test(navigator.userAgent))document.documentElement.classList.add('in-app')" }} />
+        {/* Inside the store (framed by a store page) or the mobile app, the store's own header, menu and footer replace the site's.
+            In the mobile app its tab bar also replaces the app's own menu pills. */}
+        <script dangerouslySetInnerHTML={{ __html: "if(self!==top||/TruecolorsApp/.test(navigator.userAgent))document.documentElement.classList.add('in-app');if(/TruecolorsApp/.test(navigator.userAgent))document.documentElement.classList.add('native-app')" }} />
       </head>
       <body>
         <Suspense><FrameBridge stores={storeOrigins()} /></Suspense>

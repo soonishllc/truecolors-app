@@ -632,6 +632,8 @@ html.in-app {
 .store-only { display: none; }
 .in-app .store-only { display: grid; }
 .in-app .site-only { display: none; }
+/* The mobile app has its own tab bar for these; the back link and the wholesale menu stay. */
+.native-app .app-nav:not(.app-nav-back):not(.on-wholesale) { display: none; }
 /* In a store page's frame, which is exactly as tall as the page: nothing inside scrolls, the store page does. */
 html.in-store-frame, html.in-store-frame body { overflow: hidden; }
 .page-loading { height: 3px; margin: 0 0 24px; background: var(--sun); background-size: 200% 100%; animation: loading-bar 1s linear infinite; border-radius: 2px; }
