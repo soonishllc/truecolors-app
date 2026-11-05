@@ -6,11 +6,15 @@
   - The footer's columns shrink to the phone's width instead of the long email and WhatsApp links pushing them off,
     and the logo gets its own row so it doesn't run over the first column's heading.
   - Every page gets the home page's black header (pair it with the colour logo in the header settings).
+  - The header stays at the top of the screen as the page scrolls.
 
   Add to layout/theme.liquid, just before </body>:  {% render 'tc-phone-store' %}
 {%- endcomment -%}
 <style>
-  .site-header { background: var(--c-dark, #111); border-bottom: 0; }
+  /* The header stays at the top while the page scrolls. The theme makes .site-header sticky, but inside a wrapper
+     only as tall as itself, so it scrolled away; the wrapper is what sticks. */
+  .shopify-section-group-header-group { position: sticky; top: 0; z-index: 100; }
+  .site-header { position: relative; background: var(--c-dark, #111); border-bottom: 0; }
   .site-header .site-nav a, .site-header .header-actions a { color: #fff; }
   .site-header .cart-btn { background: #ffffff24; color: #fff; white-space: nowrap; }
   /* Sections reached by a link stop below the sticky header, not under it. */

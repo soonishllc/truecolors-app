@@ -61,7 +61,10 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
   // sun sweeps as designs scroll into view (the frame itself never scrolls). Any element may be the one scrolling.
   var viewport = function () {
     if (!frame.contentWindow) return;
-    frame.contentWindow.postMessage({ type: "tc-viewport", top: -frame.getBoundingClientRect().top, height: window.innerHeight }, app);
+    // The store's header stays pinned at the top, so the part of the screen under it doesn't count as visible.
+    var head = document.querySelector(".shopify-section-group-header-group");
+    var covered = head ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
+    frame.contentWindow.postMessage({ type: "tc-viewport", top: covered - frame.getBoundingClientRect().top, height: window.innerHeight - covered }, app);
   };
   var queued = false;
   var onScroll = function () {
