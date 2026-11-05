@@ -64,6 +64,27 @@ services:
         sync: false
       - key: DESIGNER_AGREEMENT_VERSION
         sync: false
+      # Wholesale: the WhatsApp order bot (Claude, through Gorgias' WhatsApp inbox), stock and FedEx from Cancún.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GORGIAS_DOMAIN
+        sync: false
+      - key: GORGIAS_USERNAME
+        sync: false
+      - key: GORGIAS_API_KEY
+        sync: false
+      - key: GORGIAS_WEBHOOK_SECRET
+        sync: false
+      - key: WHOLESALE_LOCATION_ID
+        sync: false
+      - key: WHOLESALE_BANK_DETAILS
+        sync: false
+      - key: FEDEX_API_KEY
+        sync: false
+      - key: FEDEX_SECRET_KEY
+        sync: false
+      - key: FEDEX_ACCOUNT_NUMBER
+        sync: false
 
   # Closes campaigns, charges funded ones, sends milestone emails and issues fan rewards.
   - type: cron
