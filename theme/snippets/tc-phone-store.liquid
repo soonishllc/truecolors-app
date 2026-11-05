@@ -14,6 +14,9 @@
   /* The header stays at the top while the page scrolls. The theme makes .site-header sticky, but inside a wrapper
      only as tall as itself, so it scrolled away; the wrapper is what sticks. */
   .shopify-section-group-header-group { position: sticky; top: 0; z-index: 100; }
+  /* The theme's overflow-x: hidden on html and body makes the body its own scroll box, which traps anything sticky.
+     clip hides sideways overflow just the same without that (the open menu still locks the page, below). */
+  html, body { overflow-x: clip; overflow-y: visible; }
   .site-header { position: relative; background: var(--c-dark, #111); border-bottom: 0; }
   .site-header .site-nav a, .site-header .header-actions a { color: #fff; }
   .site-header .cart-btn { background: #ffffff24; color: #fff; white-space: nowrap; }
