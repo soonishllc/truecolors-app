@@ -896,7 +896,14 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
   .in-app .app-nav-back { border-bottom: 0; margin-bottom: 8px; }
   .in-app .app-nav-back a { font-size: 14px !important; }
 }
-.in-app .app-nav a.nav-design:not([aria-current="page"]) { border-color: transparent; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+/* "Design your own" carries the sun: a sun-edged pill on phones; on wider screens, where the menu is plain text
+   links, sun-coloured text (a sun border there drew a square box round it). */
+@media (max-width: 720px) {
+  .in-app .app-nav a.nav-design:not([aria-current="page"]) { border-color: transparent; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+}
+@media (min-width: 721px) {
+  .in-app .app-nav a.nav-design:not([aria-current="page"]) { background: var(--sun); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
 
 /* Explore: the "Design your own" door, right under the heading. */
 .design-cta { display: flex; align-items: center; gap: 14px; margin: 0 0 22px; padding: 16px 18px; border-radius: 16px; text-decoration: none; background: var(--surface); border: 1px solid var(--line); }
