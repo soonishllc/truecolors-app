@@ -1,6 +1,7 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+// Plain JavaScript, not TypeScript: the production image has no TypeScript, and Next.js would try to install it
+// on start to read a .ts config.
+/** @type {import("next").NextConfig} */
+const nextConfig = {
   serverExternalPackages: ["sharp", "ffmpeg-static", "@electric-sql/pglite"],
   experimental: { serverActions: { bodySizeLimit: "12mb" } },
   // Only the store may frame the app (its design and wholesale pages are store pages that embed it).
