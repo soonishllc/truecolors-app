@@ -1,0 +1,44 @@
+{%- comment -%}
+  Truecolors: a card on the Wholesale page for the display programme, with the Tower render, leading to the
+  displays page in the app. Needs tc-display-tower.jpg in the theme's assets (shopify-theme/assets/).
+
+  Add to the Wholesale page template, right after its first section:  {% render 'tc-displays-card' %}
+{%- endcomment -%}
+<style>
+  .tc-dcard { max-width: 1180px; margin: 32px auto; padding: 0 20px; }
+  .tc-dcard-in { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: center; overflow: hidden; border-radius: 8px; background: #111; color: #fff; }
+  .tc-dcard-art { position: relative; height: 100%; min-height: 320px; background: #d9d6d2; }
+  .tc-dcard-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+  .tc-dcard-copy { padding: 32px; }
+  .tc-dcard-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #f29a0c; }
+  .tc-dcard h2 { margin: 10px 0 12px; font-family: var(--font); font-size: clamp(28px, 4vw, 44px); line-height: 1.02; letter-spacing: -.02em; color: #fff; }
+  .tc-dcard h2 em { font-style: normal; background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tc-dcard p { margin: 0 0 18px; color: #bdbab3; font-size: 15px; line-height: 1.6; }
+  .tc-dcard-points { list-style: none; margin: 0 0 22px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .tc-dcard-points li { padding: 6px 12px; border: 1px solid #ffffff2e; border-radius: 999px; font-size: 13px; }
+  .tc-dcard-ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .tc-dcard-ctas a { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 22px; border-radius: 4px; font-family: var(--font); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; }
+  .tc-dcard-ctas .go { background: var(--gradient); color: #fff; }
+  .tc-dcard-ctas .ghost { border: 1.5px solid #ffffff59; color: #fff; }
+  @media (max-width: 760px) {
+    .tc-dcard-in { grid-template-columns: 1fr; }
+    .tc-dcard-art { min-height: 0; aspect-ratio: 4 / 3; }
+    .tc-dcard-copy { padding: 22px 20px 24px; }
+    .tc-dcard-ctas a { flex: 1 1 100%; }
+  }
+</style>
+<section class="tc-dcard" aria-label="Retail displays">
+  <div class="tc-dcard-in">
+    <div class="tc-dcard-art"><img src="{{ 'tc-display-tower.jpg' | asset_url }}" alt="The Tower display: a gallery of designs lit by its own sun, and stock by size" loading="lazy"></div>
+    <div class="tc-dcard-copy">
+      <div class="tc-dcard-eyebrow">Hotels · airports · attractions</div>
+      <h2>Host a display. <em>It sells itself in the sun.</em></h2>
+      <p>Every display carries its own UV light, so guests press a button and watch the shirt change. We supply the display and the stock; you sell it and keep a share.</p>
+      <ul class="tc-dcard-points"><li>No upfront cost</li><li>Consignment</li><li>Three sizes, countertop to shop-in-shop</li></ul>
+      <div class="tc-dcard-ctas">
+        <a class="go" href="{{ routes.root_url | append: '/' | replace: '//', '/' }}apps/truecolors/wholesale/displays">See the displays →</a>
+        <a class="ghost" href="{{ routes.root_url | append: '/' | replace: '//', '/' }}apps/truecolors/wholesale">Partner sign-in</a>
+      </div>
+    </div>
+  </div>
+</section>

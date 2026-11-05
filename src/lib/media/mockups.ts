@@ -121,7 +121,20 @@ async function sunMask(t: Template, photo: Buffer): Promise<Buffer> {
 // UV ink in real sun prints a little softer than the file on screen (see templates/style/camel-sun.jpg).
 const asInk = (art: Buffer) => sharp(art).modulate({ saturation: 0.9 }).png().toBuffer();
 
-export async function renderMockup(t: Template, shadeArt: Buffer, sunArt: Buffer, view: "shade" | "sun"): Promise<Buffer> {
+// Where on the template the art goes for each placement. Front and back use the whole print box (the templates are
+// front views, so a back print is shown at its size on the same shirt); a left-chest emblem sits small on the
+// wearer's left, the viewer's right.
+function placedFor(t: Template, placement: "front" | "back" | "chest" = "front"): Template {
+  if (placement !== "chest") return t;
+  const { x, y, w, h } = t.print;
+  const size = Math.round(w * 0.3);
+  return { ...t, print: { x: Math.round(x + w * 0.62), y: Math.round(y + h * 0.04), w: size, h: size } };
+}
+
+export async function renderMockup(
+  template: Template, shadeArt: Buffer, sunArt: Buffer, view: "shade" | "sun", placement?: "front" | "back" | "chest",
+): Promise<Buffer> {
+  const t = placedFor(template, placement);
   const photo = await base(t);
   sunArt = await asInk(sunArt);
   const shade = await sharp(photo).composite(await placed(t, photo, shadeArt)).png().toBuffer();

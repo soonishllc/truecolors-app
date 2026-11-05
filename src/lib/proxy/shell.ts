@@ -1,4 +1,5 @@
 import { config } from "../config";
+import type { ShareMeta } from "./share-meta";
 
 // The page Shopify renders inside the store's theme for every /apps/truecolors path: the store's own header, menu
 // and footer around the app's page for that path, framed. The frame reports its height and current page, so the
@@ -6,10 +7,18 @@ import { config } from "../config";
 
 export { appPathFor, proxyPathFor } from "./paths";
 
+// A Liquid string literal: no quotes or tags can break out of it.
+const liquid = (v: string) => `"${v.replace(/["{}%<>]/g, "")}"`;
+const shareAssigns = (m: ShareMeta) =>
+  `{% assign tc_title = ${liquid(m.title)} %}{% assign tc_description = ${liquid(m.description)} %}` +
+  (m.image ? `{% assign tc_image = ${liquid(m.image)} %}` : "");
+
 const json = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c");
 
 // `query` is the store page's own query string (e.g. a referral code), passed on to the app page.
-export function storeShell(input: { prefix: string; appPath: string; query: string; handoff: string }) {
+// `meta`, for a page worth a share card (a campaign), is handed to the theme as Liquid variables: the template is
+// rendered before the layout, so theme.liquid's <head> can pass them to snippets/tc-share-meta.liquid.
+export function storeShell(input: { prefix: string; appPath: string; query: string; handoff: string; meta?: ShareMeta }) {
   const app = new URL(config().APP_URL).origin;
   const src = new URL(input.appPath, app);
   new URLSearchParams(input.query).forEach((v, k) => src.searchParams.append(k, v));
@@ -17,9 +26,10 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
   start.searchParams.set("t", input.handoff);
   start.searchParams.set("next", src.pathname + src.search);
   // The Liquid here is ours, not user content: the market comes from the store so prices and checkout links match it.
-  return `<div class="tc-embed" style="max-width:1280px;margin:0 auto;padding:24px 20px 48px">
-  <iframe id="tc-app" title="Truecolors" scrolling="no" data-src="${start.toString().replace(/"/g, "&quot;")}" style="display:block;width:100%;min-height:80vh;border:0;overflow:hidden"></iframe>
-</div>
+  // The app's pages are dark, so the band around the frame is too, edge to edge (the same colour as html.in-app's --bg).
+  return `${input.meta ? shareAssigns(input.meta) : ""}<div style="background:oklch(0.16 0.01 80)"><div class="tc-embed" style="max-width:1280px;margin:0 auto;padding:24px 20px 48px">
+  <iframe id="tc-app" title="Truecolors" scrolling="no" allow="clipboard-write; web-share" data-src="${start.toString().replace(/"/g, "&quot;")}" style="display:block;width:100%;min-height:80vh;border:0;overflow:hidden;color-scheme:dark"></iframe>
+</div></div>
 <script>
 (function () {
   var frame = document.getElementById("tc-app");

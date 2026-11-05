@@ -8,7 +8,7 @@ export const DEMO_CUSTOMERS: Record<string, { email: string; firstName: string; 
   "9101": { email: "designer@demo.example", firstName: "Maya", label: "Maya · designer" },
   "9102": { email: "stockist@demo.example", firstName: "Sara", label: "Sara · stockist" },
   "9103": { email: "partner@demo.example", firstName: "Lucía", label: "Lucía · display partner" },
-  // A store customer who isn't a designer yet, to try joining the studio (invite code DEMO-INVITE).
+  // A store customer who isn't a designer yet, to try joining the studio.
   "9104": { email: "noor@demo.example", firstName: "Noor", label: "Noor · shopper, joining as a designer" },
 };
 

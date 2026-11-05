@@ -32,6 +32,7 @@ export type OrderPayload = {
   currency: string;
   presentment_currency?: string;
   note_attributes?: { name: string; value: string }[];
+  discount_codes?: { code: string }[];
   line_items: OrderLine[];
   email?: string | null;
   contact_email?: string | null;
@@ -77,6 +78,11 @@ export function lineTaxCents(line: OrderLine): number {
 
 export const refundSubtotalCents = (item: RefundPayload["refund_line_items"][number]) => paid(item.subtotal, item.subtotal_set);
 
+// Whose link the order came through: the cart attribute the store sets from ?ref, or else the friend code applied
+// at checkout (FRIEND-<ref>), which the buy button carries when it skips the product page.
 export function refCode(order: OrderPayload): string | undefined {
-  return order.note_attributes?.find((a) => a.name === REF_ATTRIBUTE)?.value?.trim().toLowerCase() || undefined;
+  const attr = order.note_attributes?.find((a) => a.name === REF_ATTRIBUTE)?.value?.trim().toLowerCase();
+  if (attr) return attr;
+  const friend = order.discount_codes?.map((d) => d.code.trim()).find((c) => /^FRIEND-/i.test(c));
+  return friend ? friend.slice("FRIEND-".length).toLowerCase() : undefined;
 }

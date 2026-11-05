@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
 import { makeHandoff } from "@/lib/proxy/handoff";
+import { campaignShareMeta } from "@/lib/proxy/share-meta";
 import { appPathFor, storeShell } from "@/lib/proxy/shell";
 import { verifyProxyQuery } from "@/lib/proxy/signature";
 
@@ -15,7 +16,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
   // Only the store page's own query (a referral code, a filter) goes on to the app; Shopify's signed fields don't.
   const own = new URLSearchParams(url.searchParams);
   for (const k of ["shop", "logged_in_customer_id", "path_prefix", "timestamp", "signature"]) own.delete(k);
+  const slug = /^\/c\/([a-z0-9-]+)$/.exec(appPath)?.[1];
   const body = storeShell({
+    meta: slug ? await campaignShareMeta(slug).catch(() => undefined) : undefined,
     prefix: url.searchParams.get("path_prefix") || config().PROXY_PATH,
     appPath,
     query: own.toString(),

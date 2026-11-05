@@ -42,6 +42,7 @@ const schema = z.object({
   SHOPIFY_PLUS: bool,
   // Publications behind the "United Arab Emirates" and "United States" market catalogs, and the USA's price list,
   // so pre-orders are listed in both markets and priced in USD for the USA.
+  SHOPIFY_ONLINE_STORE_PUBLICATION_ID: z.string().optional(),
   SHOPIFY_AE_PUBLICATION_ID: z.string().optional(),
   SHOPIFY_US_PUBLICATION_ID: z.string().optional(),
   SHOPIFY_US_PRICE_LIST_ID: z.string().optional(),
@@ -85,9 +86,6 @@ const schema = z.object({
   WHOLESALE_COLLECTION_HANDLE: z.string().default("wholesale-catalog"),
   // The Shopify location of the Cancún hub, which stockist orders ship from. Blank = stock across all locations.
   WHOLESALE_LOCATION_ID: z.string().optional(),
-  // Where display restocks come from, by region: Quiqup (UAE, GCC) and Shipdudes (US, Canada, islands).
-  QUIQUP_LOCATION_ID: z.string().optional(),
-  SHIPDUDES_LOCATION_ID: z.string().optional(),
   // Wholesaler portal sign-in: a confidential client from Shopify's Customer Account API settings, with
   // APP_URL/wholesale/callback as its callback URL.
   SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: z.string().optional(),
@@ -148,5 +146,7 @@ export function productionProblems(c: Config = config()): string[] {
   if (c.WHOLESALE_DEMO) problems.push("WHOLESALE_DEMO must be off");
   if (!c.SHOPIFY_PROXY_SECRET) problems.push("SHOPIFY_PROXY_SECRET is required (the store's design and wholesale pages)");
   if (!c.STORE_URL.startsWith("https://")) problems.push("STORE_URL must be the store's https:// address");
+  if (!c.SHOPIFY_WEBHOOK_SECRET) problems.push("SHOPIFY_WEBHOOK_SECRET is required (the app's client secret), or no order is recorded");
+  if (!c.SHOPIFY_ONLINE_STORE_PUBLICATION_ID) problems.push("SHOPIFY_ONLINE_STORE_PUBLICATION_ID is required, or launched campaigns aren't on the store");
   return problems;
 }

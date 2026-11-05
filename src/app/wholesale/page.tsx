@@ -1,9 +1,10 @@
+import Link from "next/link";
 import {
   portalDesignRequestAction, portalDesignResponseAction, portalFaultAction, portalRestockAction, portalSalesAction,
 } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { CONTACT } from "@/lib/brand";
-import { SIZES } from "@/lib/rules";
+import { PARTNER_MSRP_MULTIPLE, PARTNER_PRICE, SIZES } from "@/lib/rules";
 import { config } from "@/lib/config";
 import { StoreSignIn } from "@/components/StoreSignIn";
 import { date, money } from "@/lib/format";
@@ -71,8 +72,27 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
                 <p className="notice">{ERRORS.off}</p>
               )}
             </div>
+            {/* Not a partner yet: the two ways to become one, the display first because it's the easy yes. */}
+            <h2 className="join-ways-title">Not a partner yet?</h2>
+            <Link href="/wholesale/displays" className="ways-card displays-way">
+              <img src="/displays/tc-display-tower.jpg" alt="" />
+              <span>
+                <span className="eyebrow">Hotels · airports · attractions</span>
+                <b>Host a display</b>
+                <span className="muted">It brings its own sun, so guests watch the shirts change. No upfront cost.</span>
+                <span className="ways-go">See the displays →</span>
+              </span>
+            </Link>
+            <a href={`${config().STORE_URL.replace(/\/$/, "")}/pages/wholesale`} target="_parent" className="ways-card">
+              <span>
+                <span className="eyebrow">Shops and resellers</span>
+                <b>Stock our shirts</b>
+                <span className="muted">Custom designs for your location, or picks from our catalogue. Terms agreed with you.</span>
+                <span className="ways-go">See wholesale →</span>
+              </span>
+            </a>
             <p className="small muted">
-              Not a wholesaler yet? Message us on WhatsApp at <a href={CONTACT.whatsapp.href} target="_blank" rel="noreferrer">{CONTACT.whatsapp.label}</a>.
+              Or message us on WhatsApp at <a href={CONTACT.whatsapp.href} target="_blank" rel="noreferrer">{CONTACT.whatsapp.label}</a>.
             </p>
           </>
         )}
@@ -142,8 +162,13 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
         </>
       )}
 
-      <h2>Orders</h2>
-      <Orders orders={orders} />
+      {/* Display partners don't order: their shirts arrive as restocks, below. */}
+      {w.stockist && (
+        <>
+          <h2>Orders</h2>
+          <Orders orders={orders} />
+        </>
+      )}
 
       {w.displayPartner && (
         <>
@@ -155,6 +180,9 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
               <p className="small">
                 This period ends {date(s.periodEnds)}. Sold so far: {s.soldThisPeriod} shirts
                 {s.owedSoFar !== undefined && <>, {showMoney(s.owedSoFar, s.currency)} owed so far</>}.
+                {PARTNER_PRICE[s.currency] !== undefined && (
+                  <> Shelf price {showMoney(String(PARTNER_PRICE[s.currency]! * PARTNER_MSRP_MULTIPLE), s.currency)}, you pay {showMoney(String(PARTNER_PRICE[s.currency]), s.currency)} a shirt sold.</>
+                )}
                 {s.overdue && <strong> Please send your sales for the period that ended.</strong>}
               </p>
               {s.restocksPaused && <p className="notice small">Restocks are paused until the last period&apos;s sales are in.</p>}

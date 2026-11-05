@@ -1,0 +1,1 @@
+ALTER TABLE "pledges" ADD COLUMN "charge_reference" text;

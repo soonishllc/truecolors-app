@@ -7,16 +7,23 @@ export type DB = NodePgDatabase<typeof schema>;
 
 const MIGRATIONS = path.join(process.cwd(), "drizzle");
 
-let current: Promise<DB> | undefined;
+// One database for the whole server process. Kept on globalThis because the dev server loads this module once per
+// bundle (pages, server actions, route handlers): a module-level variable would open the PGlite folder several
+// times at once, and two PGlite instances writing one folder corrupt it.
+const g = globalThis as unknown as { __tcDb?: Promise<DB> };
 
 // Postgres when DATABASE_URL is set, otherwise an embedded PGlite database on disk.
 export function db(): Promise<DB> {
-  current ??= open(config().DATABASE_URL);
-  return current;
+  // A failed open isn't kept, so the next request tries again.
+  g.__tcDb ??= open(config().DATABASE_URL).catch((e) => {
+    g.__tcDb = undefined;
+    throw e;
+  });
+  return g.__tcDb;
 }
 
 export function useDb(next: Promise<DB>) {
-  current = next;
+  g.__tcDb = next;
 }
 
 async function open(url: string | undefined): Promise<DB> {

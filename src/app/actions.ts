@@ -10,11 +10,13 @@ import {
 } from "@/lib/campaigns/service";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
-import { colourDesign, createDesign, refineDesign, renderMedia, UserError } from "@/lib/design/service";
-import { createBatch, markBatch } from "@/lib/production/batch";
+import { colourDesign, createDesign, designOptions, recomposeDesign, refineDesign, renderMedia, UserError } from "@/lib/design/service";
+import { createBatch, markBatch, type Destination } from "@/lib/production/batch";
+import { saveQuiqupInbound } from "@/lib/production/quiqup";
 import { markPayoutPaid, preparePayouts } from "@/lib/royalties/ledger";
 import { eq, sql } from "drizzle-orm";
-import { currentFan, joinWaitlist, leaveWaitlist, sendFanLink, signOutFan } from "@/lib/fans";
+import { currentFan, leaveWaitlist, requestWaitlist, sendFanLink, signOutFan } from "@/lib/fans";
+import { throttleEmail } from "@/lib/ratelimit";
 import { createChallenge, enterChallenge, toggleVote } from "@/lib/challenges";
 import { savePayoutMethod } from "@/lib/payouts/methods";
 import { activateWholesaler, addContact, addOutlet, createWholesaler, updateOutletSettings } from "@/lib/wholesale/accounts";
@@ -26,6 +28,7 @@ import { assignBrief, makeLocationProduct, requestDesign, respondToDesign, submi
 import { markBankTransferPaid, placeOrder, quoteOrder, shipOrder } from "@/lib/wholesale/orders";
 import { addDisplay, reportFault, resolveFault } from "@/lib/wholesale/service";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
+import { track, type EventName } from "@/lib/analytics";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
 
@@ -37,9 +40,14 @@ async function attempt(fn: () => Promise<FormState | void>): Promise<FormState> 
     return (await fn()) ?? undefined;
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
+    // A tampered or stale id that isn't even a UUID: Postgres refuses the cast (22P02).
+    if (badId(e)) return { error: "That isn't there any more. Reload the page and try again." };
     throw e;
   }
 }
+
+const badId = (e: unknown): boolean =>
+  typeof e === "object" && e !== null && ((e as { code?: string }).code === "22P02" || badId((e as { cause?: unknown }).cause));
 
 export async function joinAction(_: FormState, f: FormData): Promise<FormState> {
   // Someone signed in to the store, or back from Google, Apple, X or Instagram, is logged straight in.
@@ -47,14 +55,18 @@ export async function joinAction(_: FormState, f: FormData): Promise<FormState> 
   const store = via ? undefined : await storeIdentity();
   let joined = false;
   const res = await attempt(async () => {
+    // Without a store or social sign-in, joining emails a login link.
+    if (!via && !store) await throttleEmail(text(f, "email"));
     const link = await signUp({
-      email: store?.email ?? via?.profile.email ?? text(f, "email"), name: text(f, "name"), invite: text(f, "invite"),
+      email: store?.email ?? via?.profile.email ?? text(f, "email"), name: text(f, "name"), invite: text(f, "invite") || undefined,
       acceptAgreement: f.get("agree") === "on", via, fromStore: Boolean(store),
     });
     if (via || store) joined = true;
     else return { message: "Account created. We've sent you a login link.", link };
   });
-  if (joined) redirect("/studio?welcome=1");
+  if (!res?.error) await track("designer_joined", { path: "/join", props: { via: via?.provider ?? (store ? "store" : "email") } });
+  // Straight into their first design.
+  if (joined) redirect("/studio/new");
   return res;
 }
 
@@ -64,8 +76,11 @@ export async function cancelSocialJoinAction() {
 }
 
 export async function loginAction(_: FormState, f: FormData): Promise<FormState> {
-  const link = await sendLoginLink(text(f, "email"));
-  return { message: "If that email has an account, a login link is on its way.", link };
+  return attempt(async () => {
+    await throttleEmail(text(f, "email"));
+    const link = await sendLoginLink(text(f, "email"));
+    return { message: "If that email has an account, a login link is on its way.", link };
+  });
 }
 
 export async function acceptAgreementAction() {
@@ -80,9 +95,11 @@ export async function createDesignAction(_: FormState, f: FormData): Promise<For
   const res = await attempt(async () => {
     const file = f.get("sketch");
     const sketch = file instanceof File && file.size ? Buffer.from(await file.arrayBuffer()) : undefined;
-    const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea"), sketch });
+    const options = designOptions({ text: text(f, "text"), placement: text(f, "placement"), detail: text(f, "detail") });
+    const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea"), sketch, options });
     id = design.id;
   });
+  if (id) await track("design_drawn", { userId: user.id, props: { designId: id } });
   if (id) redirect(`/studio/designs/${id}`);
   return res;
 }
@@ -93,13 +110,20 @@ export async function designStepAction(_: FormState, f: FormData): Promise<FormS
   const step = text(f, "step");
   const res = await attempt(async () => {
     if (step === "refine") await refineDesign(user.id, designId, text(f, "instruction"));
-    else if (step === "colour") await colourDesign(user.id, designId);
+    else if (step === "colour") await colourDesign(user.id, designId, { palette: text(f, "palette") || undefined, glow: f.get("glow") === "on" });
     else if (step === "media") await renderMedia(user.id, designId);
+    // Free: remakes the shade, sun view, print files and mockups from the stored colouring with the current look.
+    else if (step === "refresh") {
+      await recomposeDesign(user.id, designId);
+      await renderMedia(user.id, designId);
+    }
     else if (step === "launch") {
       await submitCampaign(user.id, designId, { title: text(f, "title"), story: text(f, "story") });
       return { message: "Sent for review. Truecolors will approve it before it goes live." };
     }
   });
+  const tracked: Record<string, EventName> = { colour: "design_coloured", media: "media_made", launch: "sent_for_review" };
+  if (!res?.error && tracked[step]) await track(tracked[step], { userId: user.id, props: { designId } });
   revalidatePath(`/studio/designs/${designId}`);
   return res;
 }
@@ -161,8 +185,21 @@ export async function batchAction(_: FormState, f: FormData): Promise<FormState>
 
 export async function markBatchAction(f: FormData) {
   await requireAdmin();
-  await markBatch(text(f, "batchId"), text(f, "status") as "sent" | "received");
+  await markBatch(text(f, "batchId"), text(f, "step") as "sent" | Destination);
   revalidatePath("/admin");
+}
+
+export async function quiqupInboundAction(_: FormState, f: FormData): Promise<FormState> {
+  await requireAdmin();
+  const res = await attempt(async () => {
+    await saveQuiqupInbound(text(f, "batchId"), {
+      invoiceNo: text(f, "invoiceNo"), consignor: text(f, "consignor"), consignorAddress: text(f, "consignorAddress"),
+      unitValue: text(f, "unitValue"), arrivesAt: text(f, "arrivesAt"), cartons: text(f, "cartons"),
+    });
+    return { message: "Saved. Check the totals against the FedEx master airbill." };
+  });
+  revalidatePath("/admin");
+  return res;
 }
 
 export async function preparePayoutsAction(): Promise<FormState> {
@@ -232,7 +269,7 @@ export async function addOutletAction(_: FormState, f: FormData): Promise<FormSt
   const res = await attempt(() =>
     addOutlet({
       wholesalerId: text(f, "wholesalerId"), name: text(f, "name"), city: text(f, "city"), country: text(f, "country"),
-      shopifyLocationId: text(f, "shopifyLocationId"), supplyRoute: text(f, "supplyRoute"),
+      shopifyLocationId: text(f, "shopifyLocationId"),
       parPerSku: Number(text(f, "parPerSku") || 6), settlementDays: Number(text(f, "settlementDays") || 15),
     }),
   );
@@ -476,13 +513,12 @@ export async function portalPlaceAction(_: FormState, f: FormData): Promise<Form
 
 // ---- Fans: waitlists, referral links, votes ---------------------------------------------------------
 
-const TARGET = /^(designer|campaign):[0-9a-f-]{36}$/;
-
+// Someone not yet confirmed in this browser gets an email first, so nobody can sign up an address that isn't theirs.
 export async function waitlistAction(_: FormState, f: FormData): Promise<FormState> {
   return attempt(async () => {
     const target = text(f, "target");
-    if (!TARGET.test(target)) throw new UserError("Something went wrong. Reload the page and try again.");
-    await joinWaitlist(text(f, "email"), target);
+    const res = await requestWaitlist(text(f, "email"), target, text(f, "next") || "/me");
+    if (!res.joined) return { message: "Check your email to confirm.", link: res.link };
     return { message: target.startsWith("designer:") ? "You're on the list. We'll email you when they launch." : "Done. If it comes back, you'll hear first." };
   });
 }
@@ -494,6 +530,7 @@ export async function fanEmailAction(_: FormState, f: FormData): Promise<FormSta
       vote: "vote for your favourite designs",
       orders: "see your pre-orders",
     }[text(f, "why")] ?? "get your own link";
+    await throttleEmail(text(f, "email"));
     const link = await sendFanLink(text(f, "email"), text(f, "next"), why);
     return { message: "Check your email and tap the link to carry on.", link };
   });

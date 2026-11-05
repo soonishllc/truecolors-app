@@ -123,7 +123,7 @@ export async function signOut() {
 const handleOf = (name: string) =>
   name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "").slice(0, 20) || "designer";
 
-// Someone back from a sign-in provider whose account isn't linked to a designer yet: they still need an invite.
+// Someone back from a sign-in provider whose account isn't linked to a designer yet: they finish signing up on /join.
 export type PendingSignUp = { provider: Provider; profile: Profile };
 
 export async function pendingSignUp() {
@@ -134,18 +134,22 @@ export async function clearPendingSignUp() {
   (await cookies()).delete(PENDING_COOKIE);
 }
 
-// Returns the link in dev so it can be shown on screen. Signing up through a provider, or with the store account
-// (whose email Shopify has already confirmed), logs straight in instead.
+// Anyone can sign up and start designing; every design is reviewed before it goes on pre-order. An invite code is
+// optional (the team's own outreach), and is marked used when given. Returns the link in dev so it can be shown on
+// screen. Signing up through a provider, or with the store account (whose email Shopify has already confirmed),
+// logs straight in instead.
 export async function signUp(input: {
-  email: string; name: string; invite: string; acceptAgreement: boolean; via?: PendingSignUp; fromStore?: boolean;
+  email: string; name: string; invite?: string; acceptAgreement: boolean; via?: PendingSignUp; fromStore?: boolean;
 }): Promise<string | undefined> {
   if (!input.acceptAgreement) throw new UserError("Accept the designer agreement to continue.");
   const d = await db();
   const email = input.email.trim().toLowerCase();
   const [existing] = await d.select().from(users).where(eq(users.email, email));
   if (existing) throw new UserError("That email already has an account. Log in instead.");
-  const [invite] = await d.select().from(invites).where(and(eq(invites.code, input.invite.trim()), isNull(invites.usedBy)));
-  if (!invite) throw new UserError("That invite code isn't valid or has been used.");
+  if (!input.name.trim()) throw new UserError("Enter your name.");
+  const code = input.invite?.trim();
+  const [invite] = code ? await d.select().from(invites).where(and(eq(invites.code, code), isNull(invites.usedBy))) : [];
+  if (code && !invite) throw new UserError("That invite code isn't valid or has been used.");
 
   let handle = handleOf(input.name);
   for (let n = 2; (await d.select().from(users).where(eq(users.handle, handle))).length; n++) {
@@ -159,7 +163,7 @@ export async function signUp(input: {
       agreementVersion: agreement || "draft", agreementAcceptedAt: new Date(),
     })
     .returning();
-  await d.update(invites).set({ usedBy: user.id, usedAt: new Date() }).where(eq(invites.code, invite.code));
+  if (invite) await d.update(invites).set({ usedBy: user.id, usedAt: new Date() }).where(eq(invites.code, invite.code));
   if (input.fromStore) return void (await startSession(user.id));
   if (!input.via) return sendLoginLink(email);
   await linkIdentity(user.id, input.via.provider, input.via.profile);
@@ -186,7 +190,8 @@ export async function sendLoginLink(emailInput: string): Promise<string | undefi
     tokenHash: hash(token), userId: user.id, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000),
   });
   const link = `${config().APP_URL}/auth/verify?token=${token}`;
-  console.log(`[login link] ${email}: ${link}`);
+  // Server logs aren't private: only print the link where it's needed to log in locally.
+  if (process.env.NODE_ENV !== "production") console.log(`[login link] ${email}: ${link}`);
   await sendEmail({
     to: email,
     subject: "Your Truecolors login link",

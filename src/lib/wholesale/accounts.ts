@@ -9,7 +9,6 @@ import { WHOLESALE_CURRENCIES, type WholesaleCurrency } from "../rules";
 
 type Kinds = { stockist: boolean; displayPartner: boolean };
 
-const ROUTES = ["quiqup", "shipdudes", "cancun"] as const;
 
 function checkKinds(k: Kinds) {
   if (!k.stockist && !k.displayPartner) throw new UserError("Pick stockist, display partner or both.");
@@ -92,21 +91,21 @@ function checkOutletSettings(parPerSku: number, settlementDays: number) {
 }
 
 export async function addOutlet(input: {
-  wholesalerId: string; name: string; city: string; country: string; shopifyLocationId: string; supplyRoute: string;
+  wholesalerId: string; name: string; city: string; country: string; shopifyLocationId: string;
   parPerSku?: number; settlementDays?: number;
 }) {
   if (!input.name || !input.city || !input.country) throw new UserError("Enter the outlet's name, city and country.");
   const parPerSku = input.parPerSku ?? 6;
   const settlementDays = input.settlementDays ?? 15;
   checkOutletSettings(parPerSku, settlementDays);
-  if (!(ROUTES as readonly string[]).includes(input.supplyRoute)) throw new UserError("Pick where restocks come from.");
   const d = await db();
   const [w] = await d.select().from(wholesalers).where(eq(wholesalers.id, input.wholesalerId));
   if (!w?.displayPartner) throw new UserError("Outlets are for display partners.");
   await d.insert(outlets).values({
     wholesalerId: w.id, name: input.name, city: input.city, country: input.country,
     shopifyLocationId: input.shopifyLocationId.replace(/\D/g, "") || null,
-    supplyRoute: input.supplyRoute as (typeof ROUTES)[number],
+    // All wholesale ships from the Cancún hub.
+    supplyRoute: "cancun",
     parPerSku, settlementDays,
   });
 }

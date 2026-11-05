@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 import { signProxyQuery } from "@/lib/proxy/signature";
 import { DEMO_CUSTOMERS } from "@/lib/shopify/customers";
 import { ensureDemoAccounts } from "@/lib/wholesale/demo";
+import { patchFooter, patchMarket, patchPage } from "../theme-patches";
 
 // Local demo only: plays Shopify's part for the store pages, so the design and wholesale pages can be seen inside
 // the real truecolors.global header, menu and footer before the app proxy is set up. Store pages are fetched from
@@ -79,7 +80,13 @@ export async function GET(req: Request, { params }: Ctx) {
       customer, market, here, false, 404,
     );
   }
-  return html(await finish(await live.text(), customer, market, here, pretend !== null));
+  // The theme changes proposed for this page (theme-patches.ts), as they'd look once made.
+  let doc = patchPage(path.join("/"), await live.text());
+  // The store's wholesale page: the displays card (theme/snippets/tc-displays-card.liquid), after the opening section.
+  if (path.join("/") === "pages/wholesale") {
+    doc = doc.replace(/(<\/header>)(<section class="os-section tcw-open)/, `$1${await displaysCard()}$2`);
+  }
+  return html(await finish(doc, customer, market, here, pretend !== null));
 }
 
 // The market switch posts here, as it would to the store's /localization.
@@ -89,7 +96,8 @@ export async function POST(req: Request, { params }: Ctx) {
   if (path[0] !== "localization") return new Response("Not found", { status: 404 });
   const form = await req.formData();
   (await cookies()).set(MARKET, form.get("country_code") === "US" ? "US" : "AE", { path: "/" });
-  const back = String(form.get("return_to") ?? "");
+  // Back to the same page in the market just picked: a USA address (/en-us/…) would put the visitor back in the USA.
+  const back = String(form.get("return_to") ?? "").replace(new RegExp(`^/${US_PATH}(?=/|$)`), "") || "/";
   const to = back.startsWith(BASE) ? back : back.startsWith("/") ? `${BASE}${back}` : req.headers.get("referer") ?? BASE;
   return Response.redirect(new URL(to, req.url), 303);
 }
@@ -132,9 +140,21 @@ async function page(body: string, customer: string, market: string, here: string
   const start = shell.html.indexOf('<main id="main-content"');
   const open = shell.html.indexOf(">", start) + 1;
   const end = shell.html.indexOf("</main>", open);
-  const doc = shell.html.slice(0, open) + body + shell.html.slice(end);
+  // The proxy page's share card (tc_title etc), as theme.liquid would render snippets/tc-share-meta.liquid.
+  const vars: Record<string, string> = {};
+  body = body.replace(/\{% assign (tc_\w+) = "([^"]*)" %\}/g, (_, k: string, v: string) => ((vars[k] = v), ""));
+  let doc = shell.html.slice(0, open) + body + shell.html.slice(end);
+  if (vars.tc_title) {
+    const esc = (v = "") => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    doc = doc.replace(/<meta (property="og:[^"]*"|name="twitter:[^"]*"|name="description")[^>]*>\s*/g, "").replace("</head>",
+      `<meta property="og:title" content="${esc(vars.tc_title)}"><meta property="og:description" content="${esc(vars.tc_description)}">` +
+      `<meta name="description" content="${esc(vars.tc_description)}">` +
+      (vars.tc_image ? `<meta property="og:image" content="${esc(vars.tc_image)}"><meta name="twitter:image" content="${esc(vars.tc_image)}">` : "") +
+      "</head>");
+  }
   // The page's own title comes from the app once it loads; until then, the store's name, not "our-story".
-  return html(await finish(doc.replace(/<title>[\s\S]*?<\/title>/, "<title>Truecolors</title>"), customer, market, here, reset), status);
+  const title = vars.tc_title ? vars.tc_title.replace(/</g, "") : "Truecolors";
+  return html(await finish(doc.replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`), customer, market, here, reset), status);
 }
 
 // A store page as the preview serves it: links kept in the preview, and the market picked by location.
@@ -142,37 +162,56 @@ async function finish(doc: string, customer: string, market: string, here: strin
   return rewrite(doc, customer, market, here).replace("</body>", `${await marketSnippet(market, reset)}</body>`);
 }
 
-let detect: string | undefined;
+// The theme snippets are read on every request, so edits to them show straight away in this preview.
 
-// The theme snippet that picks the market by location, as the live theme would render it.
+// The displays card snippet as the theme would render it: its render from the app, its links in this preview.
+async function displaysCard() {
+  return (await readFile(join(process.cwd(), "theme/snippets/tc-displays-card.liquid"), "utf8"))
+    .replace(/\{%-? comment -?%\}[\s\S]*?\{%-? endcomment -?%\}/, "")
+    .replace("{{ 'tc-display-tower.jpg' | asset_url }}", `${config().APP_URL}/displays/tc-display-tower.jpg`)
+    .replaceAll("{{ routes.root_url | append: '/' | replace: '//', '/' }}", "/");
+}
+
+// The theme snippets this preview adds to every store page, as the live theme would render them: the market by
+// location, and the header and footer on phones.
 async function marketSnippet(market: string, reset: boolean) {
-  detect ??= await readFile(join(process.cwd(), "theme/snippets/tc-market-from-location.liquid"), "utf8");
+  const detect = await readFile(join(process.cwd(), "theme/snippets/tc-market-from-location.liquid"), "utf8");
+  const phone = (await readFile(join(process.cwd(), "theme/snippets/tc-phone-store.liquid"), "utf8"))
+    .replace(/\{%-? comment -?%\}[\s\S]*?\{%-? endcomment -?%\}/, "");
   const js = detect
     .replace(/\{%-? comment -?%\}[\s\S]*?\{%-? endcomment -?%\}/, "")
     .replaceAll("{{ localization.country.iso_code }}", market)
     .replaceAll("{{ routes.root_url | append: '/' | replace: '//', '/' }}", `${BASE}/`);
   // Pretending to be somewhere new: forget the earlier choice so detection runs again.
-  return (reset ? `<script>try{localStorage.removeItem("tc_market_chosen")}catch(e){}</script>` : "") + js;
+  return (reset ? `<script>try{localStorage.removeItem("tc_market_chosen")}catch(e){}</script>` : "") + js + phone;
 }
 
 function rewrite(doc: string, customer: string, market: string, here: string) {
   const name = DEMO_CUSTOMERS[customer]?.firstName;
   const proxy = config().PROXY_PATH;
-  return doc
+  return patchMarket(patchFooter(doc), market === "US" ? "US" : "AE")
     // The market is kept by the preview (a cookie), so the USA store's links lose their /en-us.
     .replace(new RegExp(`(href|action)="/${US_PATH}(?=[/"?#])/?`, "g"), '$1="/')
-    // What the store's menu and footer would hold: Design, and Wholesale on the new wholesale pages.
-    .replace('<li ><a href="/pages/wholesale">Wholesale</a></li>', `<li ><a href="${proxy}">Design</a></li><li ><a href="${proxy}/wholesale">Wholesale</a></li>`)
+    // What the store's menu and footer would hold: Design next to the store's own Wholesale page, which links on
+    // to the wholesale portal.
+    .replace('<li ><a href="/pages/wholesale">Wholesale</a></li>', `<li ><a href="${proxy}">Design</a></li><li ><a href="/pages/wholesale">Wholesale</a></li>`)
     .replace('<a href="/collections/all">All Drops</a>', `<a href="/collections/all">All Drops</a><a href="${proxy}">Community designs</a>`)
-    .replaceAll('<a href="/#wholesale">Wholesale</a>', `<a href="${proxy}/wholesale">Wholesale</a>`)
+    .replaceAll('<a href="/#wholesale">Wholesale</a>', '<a href="/pages/wholesale">Wholesale</a>')
+    // The colour logo, for the black header on every page (see theme/snippets/tc-phone-store.liquid).
+    .replace(/(class="header-logo"[^>]*><img src="[^"]*)TrueColors_1line_color_black_[^"?]*\.png/, "$1TRUECOLORSNEW.png")
+    // The market switch returns to the page it was used on (an app page's shell is another store page).
+    .replace(/(name="return_to" value=")[^"]*"/g, `$1${here.replace(/"/g, "&quot;")}"`)
     // The live theme draws header links (Cart) dark on their dark button, off the home page; this is the
     // one-line fix the theme needs, applied here so the preview is usable.
-    .replace("</head>", "<style>.site-header a.cart-btn{color:#fff}</style></head>")
+    .replace("</head>", `<style>.site-header a.cart-btn{color:#fff}
+</style></head>`)
     // An account link, which the store's header doesn't have yet.
     // It returns to the page it was opened from.
-    .replace('<a href="/cart" class="cart-btn"', `<a href="/account/login?return_url=${encodeURIComponent(here)}" class="cart-btn">${name ? `Hi, ${name}` : "Sign in"}</a> <a href="/cart" class="cart-btn"`)
+    .replace('<a href="/cart" class="cart-btn"', `<a href="/account/login?return_url=${encodeURIComponent(here)}" class="cart-btn tc-account">${name ? `Hi, ${name}` : "Sign in"}</a> <a href="/cart" class="cart-btn"`)
     // The market switch shows the market this visitor is in.
     .replace(/(tc-market-switch__trigger"[^>]*>)\s*UAE\s*</g, `$1 ${market === "US" ? "US" : "UAE"} <`)
+    .replace(/value="(AE|US)"(\s*role="option"\s*)aria-selected="(?:true|false)"(\s*class="tc-market-switch__option)(?: is-current)?"/g,
+      (_, v, a, b) => `value="${v}"${a}aria-selected="${v === market}"${b}${v === market ? " is-current" : ""}"`)
     // Store links stay in this preview; the cart and checkout open the live store in a new tab.
     .replace(/(href|action)="\/(?!\/)(?!cart|checkout)/g, `$1="${BASE}/`)
     .replace(/(href|action)="\/(cart|checkout)/g, `target="_blank" $1="${LIVE}/$2`);

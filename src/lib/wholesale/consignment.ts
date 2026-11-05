@@ -52,10 +52,10 @@ function requireLocation(o: Outlet): string {
   return o.shopifyLocationId;
 }
 
-function supplyLocation(o: Outlet): string {
-  const c = config();
-  const id = { quiqup: c.QUIQUP_LOCATION_ID, shipdudes: c.SHIPDUDES_LOCATION_ID, cancun: c.WHOLESALE_LOCATION_ID }[o.supplyRoute];
-  if (!id) throw new UserError(`The ${o.supplyRoute} stock location isn't set up yet.`);
+// All wholesale ships from the Cancún hub, display restocks included.
+function supplyLocation(_o: Outlet): string {
+  const id = config().WHOLESALE_LOCATION_ID;
+  if (!id) throw new UserError("The Cancún stock location isn't set up yet.");
   return id;
 }
 

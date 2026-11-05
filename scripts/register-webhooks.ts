@@ -1,7 +1,7 @@
 import { config } from "../src/lib/config";
 import { admin, ok, type UserErrors } from "../src/lib/shopify/client";
 
-const TOPICS = ["ORDERS_CREATE", "ORDERS_CANCELLED", "REFUNDS_CREATE", "FULFILLMENTS_CREATE"];
+const TOPICS = ["ORDERS_CREATE", "ORDERS_PAID", "ORDERS_CANCELLED", "REFUNDS_CREATE", "FULFILLMENTS_CREATE"];
 
 async function main() {
   const callbackUrl = `${config().APP_URL}/api/webhooks/shopify`;
@@ -10,7 +10,7 @@ async function main() {
       `mutation($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
         webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) { userErrors { field message } }
       }`,
-      { topic, sub: { callbackUrl, format: "JSON" } },
+      { topic, sub: { uri: callbackUrl, format: "JSON" } },
     );
     ok(res.webhookSubscriptionCreate, topic);
     console.log(`${topic} -> ${callbackUrl}`);

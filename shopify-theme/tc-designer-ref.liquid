@@ -7,7 +7,7 @@
 <script>
   (function () {
     var ref = new URLSearchParams(location.search).get('ref');
-    if (!ref || !/^[a-z0-9]{1,24}$/i.test(ref)) return;
+    if (!ref || !/^[a-z0-9_-]{1,32}$/i.test(ref)) return;
     fetch('{{ routes.cart_update_url }}.js', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

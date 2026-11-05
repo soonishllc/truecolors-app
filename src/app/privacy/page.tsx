@@ -19,7 +19,7 @@ export default function Privacy() {
       <ul>
         <li><strong>Fans:</strong> your email when you follow a designer, ask for a design back, confirm your email to vote or get your own link; the votes you cast; and pre-orders that came through your link.</li>
         <li><strong>Pre-orders:</strong> from our store, the order details needed to run campaigns: order number, email, size, quantity, city, payment status and which link it came through. We never see or store your card details; the store&rsquo;s payment provider handles them.</li>
-        <li><strong>Designers:</strong> your name, handle, email and invite; the prompts, sketches and designs you create; and campaign and earnings records.</li>
+        <li><strong>Designers:</strong> your name, handle and email (and invite code, if you used one); the prompts, sketches and designs you create; and campaign and earnings records.</li>
         <li><strong>Connected social accounts:</strong> if you sign in with or connect Google, Apple, X, Instagram or TikTok, your account ID, username, profile name and picture, and public follower count. We don&rsquo;t receive your passwords, don&rsquo;t keep access tokens after sign-in and can&rsquo;t post for you.</li>
         <li><strong>Payout details:</strong> the PayPal email, bank account or USDC wallet you choose for payouts, stored encrypted and shown only to the people who make payments.</li>
         <li><strong>Technical data:</strong> basic server logs (IP address, browser, pages requested) kept for security and troubleshooting.</li>

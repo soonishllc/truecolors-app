@@ -107,6 +107,36 @@ The server refuses to start in production if a setting is still a local default 
 
 Keep the web service at one instance: the cron tick's no-overlap guard lives in the server process.
 
+### Backer share card (Thank you and Order status pages)
+
+`extensions/backer-share-card` is a checkout UI extension. When an order holds a community pre-order (a `tc-campaign` product), the card shows the backer's edition numbers, "Friends get 10% off with your link", and a button back to the design in the store. The button uses the backer's own `?backed=` link, under `/en-us` for USA orders. The card gets these from the app's `GET /api/checkout/backer`, which checks the extension's session token against `SHOPIFY_PROXY_SECRET`. While the order's webhook is still on its way, the endpoint answers `pending` and the card asks again for about 15 seconds. Any other order shows nothing.
+
+The extension belongs to the same Shopify app as the app proxy, because the endpoint checks tokens with that app's secret. It's deployed with the Shopify CLI rather than Render, and the web service must already be live at `https://app.truecolors.global` (`APP_URL` in `src/BackerCard.tsx`).
+
+1. **Link the app.** From the repo root, run:
+   ```bash
+   npx @shopify/cli@latest app config link
+   ```
+   Choose the app that owns the `apps/truecolors` proxy. This writes `shopify.app.toml`. Check that its proxy, scopes and webhooks match what's live before you go on, because `deploy` also pushes that file.
+2. **Allow network access.** In the Dev Dashboard, under the app's API access settings, switch on network access for checkout and customer account UI extensions. Without it, the card can't reach the app.
+3. **Install the extension's packages:**
+   ```bash
+   cd extensions/backer-share-card && npm install
+   ```
+4. **Try it on a dev store** (optional):
+   ```bash
+   npx @shopify/cli@latest app dev
+   ```
+   Place a test pre-order and check the Thank you page.
+5. **Deploy:**
+   ```bash
+   npx @shopify/cli@latest app deploy
+   ```
+   This creates a new app version and releases it to the store.
+6. **Place the block.** Go to Settings → Checkout → Customize. On the Thank you page, add the "Backer share card" app block. Then switch to the Order status page (customer accounts) and add it there too. Save.
+
+The friend discount itself is the `FRIEND-<ref>` code the cron tick creates in Shopify, so the 10% only works once that backer's code exists.
+
 Expected cost: about $25/month for the Standard web service (2 GB of memory, enough for image and video work), $6/month for Postgres and about $1/month for the cron job. R2 is free up to 10 GB.
 
 ## Not in Phase 1

@@ -5,6 +5,7 @@ node_modules/
 storage/
 .pglite/
 .pglite-demo/
+.pglite-demo-*/
 *.tsbuildinfo
 next-env.d.ts
 

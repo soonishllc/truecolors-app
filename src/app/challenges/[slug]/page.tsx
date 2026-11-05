@@ -13,7 +13,7 @@ import { currentFan } from "@/lib/fans";
 import { date, daysLeft } from "@/lib/format";
 import { ShareKit } from "@/components/ShareKit";
 import { onShirts } from "@/lib/media/shots";
-import { fileUrl } from "@/lib/storage";
+import { fileUrl, thumbUrl } from "@/lib/storage";
 import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
@@ -81,8 +81,8 @@ export default async function ChallengePage({
         {list.map((e, i) => (
           <div key={e.id} className={`entry${p === "closed" && i === 0 && e.votes > 0 ? " winner" : ""}`}>
             <a href={`#entry-${e.id}`} className="tile-art" aria-label={`See ${e.title} up close`}>
-              {e.lineArt && <img className="art" src={fileUrl(e.lineArt)} alt="" />}
-              {e.art && <img className="art tile-sun" src={fileUrl(e.art)} alt="" />}
+              {e.lineArt && <img className="art" src={thumbUrl(e.lineArt, 320)} loading="lazy" decoding="async" alt="" />}
+              {e.art && <img className="art tile-sun" src={thumbUrl(e.art, 320)} loading="lazy" decoding="async" alt="" />}
               {p === "closed" && i === 0 && e.votes > 0 && <span className="winner-badge">☀ Winner</span>}
             </a>
             {/* Opens over the page when its link is followed (CSS :target), so it works without any script. */}
@@ -92,7 +92,7 @@ export default async function ChallengePage({
                 <a href="#" className="entry-zoom-close" aria-label="Close">×</a>
                 {e.lineArt && e.art
                   ? <ShadeSun shade={fileUrl(e.lineArt)} sun={fileUrl(e.art)} alt={e.title} />
-                  : e.art && <img className="art" src={fileUrl(e.art)} alt={e.title} />}
+                  : e.art && <img className="art" src={thumbUrl(e.art, 320)} loading="lazy" decoding="async" alt={e.title} />}
                 <div className="entry-row">
                   <div>
                     <div className="name">{e.title}</div>

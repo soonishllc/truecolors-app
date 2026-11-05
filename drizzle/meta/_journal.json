@@ -57,6 +57,48 @@
       "when": 1793814239855,
       "tag": "0007_pledge_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793843414079,
+      "tag": "0008_friend_codes_selling_plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793843984868,
+      "tag": "0009_batch_destinations",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793850570794,
+      "tag": "0010_design_options_ai_lock",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793883520940,
+      "tag": "0011_design_outline_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793892335056,
+      "tag": "0012_charge_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793892412657,
+      "tag": "0013_events",
+      "breakpoints": true
     }
   ]
 }

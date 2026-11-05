@@ -263,7 +263,7 @@ a.social-button:hover { border-color: var(--ink); transform: translateY(-1px); b
 .status-in_review { background: var(--notice-bg); color: var(--notice-ink); }
 .status-missed, .status-rejected { background: #f6dcd9; color: #8c2a22; }
 
-.share-kit { margin-top: 14px; display: grid; gap: 10px; }
+.share-kit { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .share-link { display: flex; align-items: center; gap: 8px; padding: 5px 5px 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); }
 .share-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .share-link button { padding: 6px 14px; font-size: 13px; }
@@ -301,8 +301,6 @@ a.social-button:hover { border-color: var(--ink); transform: translateY(-1px); b
 .tips ol { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; color: var(--muted); }
 
 /* ---- Campaign page: edition, live feed, goals, fan link ---- */
-.edition-badge { display: inline-block; margin: 4px 0 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
-.edition-badge b { color: var(--gold-text); }
 .live-feed { margin-top: 20px; display: flex; gap: 14px; align-items: flex-start; }
 .live-feed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .live-feed li { display: flex; gap: 8px; align-items: center; animation: feed-in 0.6s both; }
@@ -432,7 +430,7 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
 
 @media (max-width: 1000px) {
   .kpis { grid-template-columns: 1fr 1fr; }
-  .dash { grid-template-columns: 1fr; }
+  .dash { grid-template-columns: minmax(0, 1fr); }
   .dash-rail { position: static; margin-top: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 }
 
@@ -459,7 +457,7 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .dash-head.photo::after { background: linear-gradient(rgba(23, 22, 20, 0.6), rgba(23, 22, 20, 0.9)); }
   .kpis { grid-template-columns: 1fr 1fr; }
   .kpi-num { font-size: 28px; }
-  .dash { grid-template-columns: 1fr; }
+  .dash { grid-template-columns: minmax(0, 1fr); }
   .dash-rail { position: static; margin-top: 8px; }
   .campaign { grid-template-columns: 1fr; }
   .campaign-art { max-width: 220px; }
@@ -509,7 +507,6 @@ button.vote:active span { display: inline-block; animation: pop 0.3s; }
   .sticky-buy { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--dark); color: var(--dark-ink); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3); transform: translateY(110%); transition: transform 0.25s ease; }
   .sticky-buy.on { transform: none; }
   body:has(.sticky-buy) .foot { padding-bottom: 96px; }
-  .sticky-buy > div { display: grid; gap: 2px; min-width: 0; }
   .sticky-buy .small { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sticky-buy .countdown { font-size: 11px; }
   .sticky-buy .button { background: var(--sun); border-color: transparent; color: #fff; padding: 11px 22px; flex: none; }
@@ -598,27 +595,27 @@ body:has(.app-preview) > .top, body:has(.app-preview) > .foot { display: none; }
 .app-tries { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; }
 .app-tries .sim-try { width: max-content; max-width: 240px; white-space: normal; font-size: 13px; padding: 8px 12px; }
 
-/* Inside the store (and the mobile app built from it): the store theme's own tokens, so the design and wholesale
-   pages read as part of truecolors.global. The store is light only, so its colours win over dark mode. */
+/* Inside the store (and the mobile app built from it): the store theme's fonts and its dark home-page look, so the
+   shirts' colour is the brightest thing on the page. Dark always, whatever the visitor's setting. */
 html.in-app {
-  color-scheme: light;
-  --bg: oklch(0.985 0.006 85);
-  --surface: #ffffff;
-  --ink: oklch(0.18 0.01 80);
-  --muted: oklch(0.38 0.015 80);
-  --line: oklch(0.88 0.012 80);
-  --dark: oklch(0.16 0.01 80);
+  color-scheme: dark;
+  --bg: oklch(0.16 0.01 80);
+  --surface: oklch(0.205 0.01 80);
+  --ink: oklch(0.97 0.006 85);
+  --muted: oklch(0.72 0.012 80);
+  --line: oklch(0.3 0.01 80);
+  --dark: oklch(0.12 0.008 80);
   --dark-ink: #ffffff;
-  --gold: oklch(0.72 0.17 55);
-  --gold-text: oklch(0.52 0.15 50);
-  --good: #1f7a46;
-  --warn: #a35a00;
-  --bad: #b8322a;
-  --notice-bg: oklch(0.93 0.06 70);
-  --notice-ink: oklch(0.3 0.06 60);
-  --sim-me-bg: #d9fdd3;
-  --sim-me-ink: #111b21;
-  --sim-chat-bg: #efeae2;
+  --gold: oklch(0.8 0.15 65);
+  --gold-text: oklch(0.82 0.14 70);
+  --good: #5cc98a;
+  --warn: #e8a64a;
+  --bad: #ef6b60;
+  --notice-bg: oklch(0.27 0.045 65);
+  --notice-ink: oklch(0.92 0.06 80);
+  --sim-me-bg: #005c4b;
+  --sim-me-ink: #e9edef;
+  --sim-chat-bg: #0b141a;
   --font-body: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -640,13 +637,13 @@ html.in-store-frame, html.in-store-frame body { overflow: hidden; }
 .page-loading { height: 3px; margin: 0 0 24px; background: var(--sun); background-size: 200% 100%; animation: loading-bar 1s linear infinite; border-radius: 2px; }
 @keyframes loading-bar { from { background-position: 0 0; } to { background-position: -200% 0; } }
 
-/* Inside the store, the studio's welcome reads like the store's own light pages rather than the old dark banner. */
+/* Inside the store, the studio's welcome is a plain panel rather than the old photo banner. */
 .in-app .dash-head { background: var(--surface); color: var(--ink); margin: 0 0 24px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--radius); }
 .in-app .dash-head-bg, .in-app .dash-head.photo::after { display: none; }
 .in-app .dash-head h1 { font-size: clamp(30px, 4vw, 44px); margin: 6px 0 14px; }
 .in-app .pill-stat { color: var(--muted); border-color: var(--line); background: var(--bg); border-radius: var(--radius); backdrop-filter: none; }
 .in-app .pill-stat b { color: var(--ink); }
-.in-app .dash-head .button { background: var(--ink); color: #fff; }
+.in-app .dash-head .button { background: var(--ink); color: var(--bg); }
 /* Disclosures (Report sales, Report a problem) as the store's quiet buttons. */
 .in-app details > summary { display: inline-block; cursor: pointer; list-style: none; padding: 10px 18px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .in-app details > summary::-webkit-details-marker { display: none; }
@@ -675,6 +672,7 @@ html.in-store-frame, html.in-store-frame body { overflow: hidden; }
 /* The campaign's buy column: price, the first-backer offer, sizes and one big button. */
 .price-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 18px 0 2px; }
 .price-line s { font-size: 18px; }
+.price-line .was { font-size: 15px; margin-right: 2px; }
 .save-tag { padding: 3px 8px; border-radius: 999px; background: var(--notice-bg); color: var(--gold-text); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .spec-line { margin: 0 0 16px; }
 html:not(.in-app) .spec-line .site-only { display: block; margin-top: 4px; }
@@ -685,7 +683,6 @@ html:not(.in-app) .spec-line .site-only { display: block; margin-top: 4px; }
 .size-pick button { min-width: 52px; padding: 10px 0; border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0; }
 .size-pick button:hover { border-color: var(--ink); transform: none; box-shadow: none; opacity: 1; }
 .size-pick button.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
-.size-pick .size-help { margin-left: auto; color: var(--muted); }
 .size-pick.nudge { animation: nudge 0.4s; }
 @keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 .size-ask { margin: 0; color: var(--bad); }
@@ -724,3 +721,322 @@ html:not(.in-app) .spec-line .site-only { display: block; margin-top: 4px; }
   html.in-store-frame .tile-art .tile-sun { animation: none; clip-path: circle(0% at 85% 15%); }
   html.in-store-frame .tile-art.seen .tile-sun { clip-path: circle(150% at 85% 15%); }
 }
+
+/* The campaign's buy column as one calm column: big title and price, then plain lines rather than boxes. */
+.buy-col h1 { font-size: clamp(44px, 6.2vw, 80px); line-height: 0.95; letter-spacing: -0.045em; margin: 10px 0 12px; }
+.buy-col .price-line { gap: 12px; margin: 22px 0 4px; }
+.buy-col .price-line .stat { font-size: 36px; font-weight: 600; color: var(--ink); }
+.buy-col .first-backers { margin: 18px 0 4px; padding: 0; border: 0; background: none; font-size: 15px; }
+.buy-col .buy-box { margin: 22px 0 6px; gap: 12px; }
+.buy-col .buy-box .size-pick button { min-width: 58px; padding: 12px 0; background: transparent; }
+.buy-col .buy-box .size-pick button.on { background: var(--ink); color: var(--bg); }
+.buy-col .buy-button { padding: 19px 24px; font-size: 15px; box-shadow: 0 10px 40px -12px rgba(232, 118, 42, 0.6); }
+.buy-col .risk-line { margin: 4px 0 0; }
+/* The dates as one thin line with a dot at each step. */
+.buy-col .timeline { gap: 0; margin: 26px 0 8px; }
+.buy-col .timeline li { position: relative; padding: 16px 12px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.buy-col .timeline li::before { content: ""; position: absolute; top: -4px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.buy-col .timeline b { font-size: 15px; margin-bottom: 2px; }
+.buy-col .story { margin-top: 28px; font-size: 17px; line-height: 1.6; color: var(--ink); }
+.buy-col .promise { margin-top: 18px; }
+
+/* The size row: sizes, then the guide at the far end. */
+.size-row { display: flex; align-items: center; gap: 8px; }
+.size-row .size-help { margin-left: auto; color: var(--muted); }
+/* The phone bar: a note on top, then the sizes and the button on one row. */
+@media (max-width: 720px) {
+  .sticky-buy { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 10px; padding-top: 8px; }
+  .sticky-buy .sticky-note { grid-column: 1 / -1; font-size: 12px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sticky-sizes { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .sticky-sizes button { min-width: 0; width: 38px; padding: 10px 0; border: 1.5px solid rgba(255, 255, 255, 0.25); border-radius: var(--radius); background: transparent; color: var(--dark-ink); font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+  .sticky-sizes button.on { background: var(--dark-ink); color: var(--dark); border-color: var(--dark-ink); }
+  .sticky-buy .button { justify-self: stretch; text-align: center; padding: 11px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sticky-buy .sticky-note b { color: var(--dark-ink); }
+  .sticky-buy.soon .button { grid-column: 1 / -1; }
+}
+
+/* Wholesale: hosting a display. */
+.displays .lede { font-size: 18px; line-height: 1.55; max-width: 60ch; }
+.displays h1 { font-size: clamp(38px, 6vw, 68px); line-height: 0.98; letter-spacing: -0.04em; }
+.displays-hero { margin: 28px 0 8px; max-width: 640px; }
+.steps-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 14px; }
+.steps-list li { counter-increment: step; position: relative; padding-left: 44px; color: var(--muted); }
+.steps-list li::before { content: counter(step); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 14px; }
+.steps-list b { color: var(--ink); }
+.displays-cta { margin-top: 48px; padding: 28px 22px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+.displays-cta h2 { margin-top: 0; }
+.sun-button { background: var(--sun) !important; border-color: transparent !important; color: #fff !important; }
+@media (max-width: 720px) { .displays .row .button { width: 100%; text-align: center; } }
+
+/* The designer, as a person rather than a byline. */
+.designer-chip { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; text-decoration: none; }
+.designer-chip .avatar { width: 40px; height: 40px; font-size: 18px; }
+.designer-chip > span:nth-child(2) { display: grid; line-height: 1.25; }
+.designer-chip b { font-weight: 600; }
+.designer-chip .designer-more { margin-left: auto; }
+.hot-line { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; font-weight: 600; }
+
+/* Taps answer back: buttons give a little, a picked size pops. */
+@media (prefers-reduced-motion: no-preference) {
+  .button:active, button:active { transform: scale(0.97); transition-duration: 0.06s; }
+  .size-pick button.on { animation: size-pop 0.22s ease-out; }
+  @keyframes size-pop { 50% { transform: scale(1.08); } }
+}
+
+/* Phone pass: tap targets of at least 44px, labels of at least 12px, and the buy block on the first screen. */
+.in-app .eyebrow { font-size: 12px; }
+.app-nav-back a { font-size: 12px !important; color: var(--ink) !important; }
+.in-app .app-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; }
+.sun-reveal .sun-toggle { min-height: 44px; padding: 0 18px; font-size: 12px; background: rgba(20, 19, 17, 0.72); backdrop-filter: blur(6px); }
+.compare-label { font-size: 12px; }
+.save-tag { font-size: 11px; }
+.size-row .size-help { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; }
+.chip { min-height: 44px; padding: 0 16px; }
+.countdown { font-size: 12px; }
+.shared-by { margin: 0 0 10px; padding: 10px 12px; border-radius: var(--radius); background: var(--notice-bg); color: var(--notice-ink); }
+.now-link { margin: 10px 0 0; }
+.share-line { margin: 40px 0 0; }
+.explore-lede { max-width: 560px; margin: 0 0 16px; }
+.explore-grid .meta { font-family: var(--font-body); font-size: 14px; letter-spacing: 0; text-transform: none; }
+.explore-grid.few { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+@media (max-width: 720px) {
+  /* The hero as a square crop, so the price and sizes are on the first screen (inside the store frame, vh is the
+     whole page, so the crop is by width). */
+  .pair .sun-reveal img.art { aspect-ratio: 1; height: auto; object-fit: cover; object-position: 50% 40%; }
+  .pair .sun-reveal img.sun-reveal-sun { height: 100%; max-height: none; aspect-ratio: auto; }
+  .buy-col h1 { font-size: 44px; margin: 6px 0 10px; }
+  .buy-col .price-line { margin-top: 14px; }
+  .buy-col .buy-box { margin-top: 14px; }
+  .sticky-sizes button { width: 42px; min-height: 44px; }
+  .sticky-buy .button { min-height: 44px; }
+  .sticky-buy .countdown { font-size: 12px; }
+  .explore-grid.few { max-width: none; }
+}
+
+.table-scroll { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.order-cards { display: grid; gap: 12px; }
+.order-card { margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface, var(--bg)); }
+.order-card legend { padding: 0 4px; font-weight: 600; }
+.order-card p { margin: 0 0 8px; }
+.order-sizes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.order-sizes label { display: grid; gap: 4px; justify-items: center; margin: 0; font-weight: 600; }
+.order-sizes input { width: 100%; min-height: 44px; text-align: center; font-size: 16px; }
+.order-tally { position: sticky; bottom: 0; z-index: 5; display: grid; gap: 2px; margin-top: 12px; padding: 12px 16px; border-radius: var(--radius); background: var(--dark); color: var(--dark-ink); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3); }
+/* Inside the store the frame never scrolls, so it pins to the bottom of the screen the way the buy bar does. */
+html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; bottom: auto; top: var(--screen-bottom, 100%); transform: translateY(calc(-100% - 12px)); margin: 0; }
+
+/* The displays: a stat strip, a card per display with its render and a press-for-sun clip, and the FAQ. */
+.displays section { margin-top: 48px; }
+.displays h2 { margin-top: 6px; }
+.display-stats { list-style: none; padding: 0; margin: 20px 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.display-stats li { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); font-size: 13px; line-height: 1.35; }
+.display-stats b { display: block; color: var(--ink); font-family: var(--font-display); font-size: 16px; margin-bottom: 4px; }
+.display-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+.display-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.display-media { position: relative; aspect-ratio: 2 / 3; background: #d9d6d2; }
+.display-media img, .display-media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.display-media img { z-index: 1; }
+.display-tabs { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(20, 19, 17, 0.6); backdrop-filter: blur(6px); }
+.display-tabs button { min-height: 32px; padding: 0 12px !important; border: 0 !important; border-radius: 999px !important; background: transparent !important; color: #fff !important; font-family: var(--font-body) !important; font-size: 13px !important; letter-spacing: 0 !important; text-transform: none !important; }
+.display-tabs button[aria-selected="true"] { background: #fff !important; color: #111 !important; }
+.press-sun { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); min-height: 44px; padding: 0 20px !important; border: 0 !important; border-radius: 999px !important; background: var(--sun) !important; color: #fff !important; font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: 0.08em; text-transform: uppercase; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.press-sun { z-index: 2; }
+.display-body { padding: 18px; }
+.display-body h3 { margin: 4px 0 8px; font-size: 28px; }
+.display-body p { margin: 0 0 12px; }
+.display-specs { margin: 0 0 12px; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.display-specs div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.display-specs dt { color: var(--muted); }
+.display-specs dd { margin: 0; text-align: right; }
+.bring-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+.bring-grid > div { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); }
+.bring-grid h3 { margin: 0 0 10px; }
+.bring-grid ul { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 6px; }
+.place-chips { list-style: none; padding: 0; margin: 16px 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.place-chips li { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; }
+.walk-video { width: 100%; max-width: 640px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--radius); display: block; }
+.faq { border-top: 1px solid var(--line); }
+.in-app .faq details > summary, .faq details > summary { display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 12px 0; border: 0; border-radius: 0; font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; list-style: none; }
+.faq details > summary::after { content: "+"; color: var(--muted); font-size: 20px; }
+.faq details[open] > summary::after { content: "–"; }
+.in-app .faq details[open] > summary { margin-bottom: 0; }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq details p { margin: 0 0 14px; color: var(--muted); }
+@media (max-width: 720px) {
+  .display-stats { grid-template-columns: 1fr; }
+  .display-stats li { display: flex; gap: 10px; align-items: baseline; }
+  .display-stats b { margin: 0; flex: none; }
+  .display-cards { grid-template-columns: 1fr; }
+  .bring-grid { grid-template-columns: 1fr; }
+}
+
+/* One shirt or a two-pack, above the sizes. */
+.pack-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pack-pick button { display: grid; gap: 2px; justify-items: start; min-height: 56px; padding: 10px 14px !important; border: 1.5px solid var(--line) !important; border-radius: var(--radius) !important; background: transparent !important; color: var(--ink) !important; text-align: left; text-transform: none !important; letter-spacing: 0 !important; font-family: var(--font-body) !important; }
+.pack-pick button b { font-family: var(--font-display); font-size: 15px; }
+.pack-pick button span { font-size: 13px; color: var(--muted); }
+.pack-pick button.on { border-color: var(--ink) !important; box-shadow: inset 0 0 0 1px var(--ink); }
+.pack-note { margin: 0; }
+#buy-form { margin: 0; }
+#buy-form .buy-button { width: 100%; }
+/* Back from checkout: their numbers and their link, first thing. */
+.backed-card { margin: 0 0 18px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--gold); }
+.backed-no { margin: 4px 0 6px; font-family: var(--font-display); font-size: 40px; font-weight: 600; letter-spacing: -0.03em; background: var(--sun); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ---- The design app on phones: one clear menu, two clear ways in, one step at a time. ---- */
+
+/* The app menu as tap-sized pills; "Design your own" carries the sun. Wholesale stays off shoppers' phones. */
+@media (max-width: 720px) {
+  .in-app .app-nav { gap: 8px; margin: 0 0 20px; padding: 2px 0 12px; border-bottom: 1px solid var(--line); mask-image: linear-gradient(to right, #000 88%, transparent); }
+  .in-app .app-nav a { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--font-body); font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink); white-space: nowrap; }
+  .in-app .app-nav a[aria-current="page"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .in-app .app-nav:not(.on-wholesale) .app-nav-more { display: none; }
+  .in-app .app-nav-back { border-bottom: 0; margin-bottom: 8px; }
+  .in-app .app-nav-back a { font-size: 14px !important; }
+}
+.in-app .app-nav a.nav-design:not([aria-current="page"]) { border-color: transparent; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+
+/* Explore: the "Design your own" door, right under the heading. */
+.design-cta { display: flex; align-items: center; gap: 14px; margin: 0 0 22px; padding: 14px 16px; border-radius: var(--radius); text-decoration: none; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+.design-cta-art { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--sun); color: #fff; font-size: 20px; }
+.design-cta-text { display: grid; gap: 2px; min-width: 0; }
+.design-cta-text b { font-family: var(--font-display); font-size: 17px; }
+.design-cta-text span { font-size: 14px; color: var(--muted); }
+.design-cta-go { margin-left: auto; font-size: 22px; color: var(--muted); }
+
+/* Design your own (/join). */
+.design-own { max-width: 640px; }
+.design-own h1 { font-size: clamp(36px, 7vw, 60px); line-height: 1; letter-spacing: -0.04em; }
+.design-own .lede { font-size: 17px; line-height: 1.55; }
+.design-own-art { margin: 20px 0; }
+.how-steps { list-style: none; counter-reset: how; margin: 8px 0 28px; padding: 0; display: grid; gap: 14px; }
+.how-steps li { counter-increment: how; position: relative; display: grid; gap: 2px; padding-left: 46px; min-height: 34px; }
+.how-steps li::before { content: counter(how); position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); color: #fff; font-family: var(--font-display); font-weight: 700; }
+.how-steps b { font-family: var(--font-display); font-size: 17px; }
+.how-steps span { color: var(--muted); }
+.start-card { padding: 20px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); display: grid; gap: 12px; }
+.start-card h2 { margin: 0; }
+.start-card form .button, .start-card form button[type="submit"], .start-card .store-only .button { width: 100%; text-align: center; }
+
+/* A design, one step at a time. */
+.design-flow { max-width: 760px; }
+.stepper { list-style: none; margin: 4px 0 18px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; counter-reset: step; }
+.stepper li { counter-increment: step; padding-top: 8px; border-top: 3px solid var(--line); font-size: 12px; color: var(--muted); }
+.stepper li::before { content: counter(step) ". "; }
+.stepper li.done { border-top-color: var(--gold); color: var(--ink); }
+.stepper li.on { border-image: var(--sun) 1; border-top-width: 3px; border-top-style: solid; color: var(--ink); font-weight: 600; }
+.design-flow textarea { min-height: 110px; }
+.design-flow form .button, .design-flow form button[type="submit"] { width: 100%; text-align: center; }
+@media (max-width: 720px) { .design-flow .pair { gap: 14px; } }
+
+/* The studio's empty state: the one thing to do. */
+.first-design { display: grid; gap: 6px; padding: 20px; border-radius: var(--radius); text-decoration: none; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+.first-design b { font-family: var(--font-display); font-size: 20px; }
+.first-design .button { justify-self: start; margin-top: 6px; }
+.start-jump { display: block; text-align: center; }
+@media (min-width: 721px) { .start-jump { display: inline-block; } }
+/* Changing an earlier step: one tap away, out of the way of the next one. */
+.in-app .design-flow details.step-change > summary, .design-flow details.step-change > summary { display: flex; align-items: center; min-height: 44px; padding: 0; border: 0; border-radius: 0; font-family: var(--font-body); font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; list-style: none; }
+.design-flow details.step-change { margin: 6px 0 8px; }
+.design-flow details.step-change[open] > summary { color: var(--ink); }
+.design-flow h2 { margin-top: 32px; }
+.print-check { display: grid; gap: 4px; margin: 12px 0 4px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+.print-check.ok b { color: var(--good); }
+.print-check.bad b { color: var(--bad); }
+.print-check ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* The animated hero inside the store: a contained band under the app menu rather than full bleed. */
+.in-app .hero { margin: 0 0 18px; padding: 28px 20px; border-radius: var(--radius); }
+.in-app .hero.photo.short { min-height: 340px; justify-content: flex-end; }
+.in-app .hero.short h1 { font-size: clamp(34px, 9vw, 56px); }
+@media (max-width: 720px) {
+  .in-app .hero-bg video { max-width: none; width: 100%; -webkit-mask-image: none; mask-image: none; object-position: 65% 20%; }
+  .in-app .hero-bg::after { background: linear-gradient(rgba(23, 22, 20, 0.1), rgba(23, 22, 20, 0.92) 70%); }
+}
+
+/* Wholesale portal, signed out: the two ways to become a partner, as cards. */
+.join-ways-title { margin: 36px 0 12px; font-size: 22px; }
+.ways-card { display: block; margin: 0 0 12px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-decoration: none; }
+.ways-card > span { display: grid; gap: 4px; padding: 16px 18px 18px; }
+.ways-card b { font-family: var(--font-display); font-size: 22px; }
+.ways-go { margin-top: 6px; font-weight: 600; color: var(--gold-text); }
+.displays-way { background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+.displays-way img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: 50% 35%; background: #d9d6d2; }
+
+/* While the AI draws: a card in the middle of the screen. Inside the store frame (which never scrolls), "the
+   screen" is the part of the page the store says is on screen. */
+.busy-screen { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(12, 11, 10, 0.72); backdrop-filter: blur(4px); }
+html.in-store-frame .busy-screen { position: absolute; inset: auto 0 auto 0; top: var(--screen-top, 0); height: var(--screen-h, 100vh); }
+.busy-card { display: grid; justify-items: center; gap: 10px; max-width: 320px; padding: 24px 22px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: center; }
+.busy-card b { font-family: var(--font-display); font-size: 18px; }
+.busy-sun { width: 54px; height: 54px; border-radius: 50%; background: var(--sun); box-shadow: 0 0 0 0 rgba(232, 118, 42, 0.5); animation: busy-sun 1.6s ease-out infinite; }
+@keyframes busy-sun { 0% { box-shadow: 0 0 0 0 rgba(232, 118, 42, 0.55); } 100% { box-shadow: 0 0 0 26px rgba(232, 118, 42, 0); } }
+@media (prefers-reduced-motion: reduce) { .busy-sun { animation: none; } }
+
+/* ---- New design and editor: the designer's choices ---- */
+.counted { display: grid; gap: 4px; }
+.counted .counter { justify-self: end; color: var(--muted); }
+.counted .counter.near { color: var(--warn); }
+.sketch-picker { display: grid; gap: 6px; }
+.sketch-picker.has .dropzone { border-style: solid; }
+.sketch-chosen { display: flex; align-items: center; gap: 12px; }
+.sketch-chosen img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius); background: #fff; }
+.sketch-chosen > span { display: grid; gap: 2px; min-width: 0; }
+.sketch-chosen .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+/* Styles as cards, grouped, two across on a phone. */
+.style-cards { display: grid; gap: 14px; }
+.style-group { display: grid; gap: 8px; }
+.style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.style-card { position: relative; display: grid; gap: 2px; align-content: start; min-height: 72px; padding: 12px; border: 1.5px solid var(--line); border-radius: var(--radius); cursor: pointer; font-weight: 400; }
+.style-card input { position: absolute; opacity: 0; pointer-events: none; }
+.style-card b { font-family: var(--font-display); font-size: 15px; }
+.style-card:has(input:checked) { border-color: transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; }
+.style-card:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* Pick-one rows: placement, detail. */
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented legend { width: 100%; }
+.segmented label { display: block; font-weight: 400; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented span { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 999px; cursor: pointer; font-size: 14px; }
+.segmented input:checked + span { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.segmented input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* Sun colours. */
+.palette-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.palette-pick legend { grid-column: 1 / -1; }
+.palette-pick label { position: relative; display: grid; justify-items: center; gap: 6px; padding: 10px 4px; border: 1.5px solid var(--line); border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 400; text-align: center; }
+.palette-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.palette-pick label:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.swatch { width: 100%; max-width: 72px; height: 18px; border-radius: 999px; }
+.swatch-natural { background: linear-gradient(90deg, #6a9e4f, #d9a441, #4f86b0, #c0603a); }
+.swatch-sunset { background: linear-gradient(90deg, #c8336a, #ef6f5a, #f29a0c, #f2c200); }
+.swatch-tropical { background: linear-gradient(90deg, #1fc8c0, #8ad13b, #ff4f9a, #ffd23f); }
+.swatch-desert { background: linear-gradient(90deg, #e2c290, #e39b3c, #b5553a, #1f6f78); }
+.swatch-ocean { background: linear-gradient(90deg, #5fd3e0, #2a5bd7, #8fe3c8, #e9f6ff); }
+.swatch-neon { background: linear-gradient(90deg, #ff2fb3, #b6ff2f, #8a2be2, #ff8a00); }
+/* The editor. */
+.design-facts { margin: -6px 0 6px; }
+.idea-full { margin-bottom: 8px; }
+.in-app .idea-full > summary, .idea-full > summary { display: inline-block; min-height: 0; padding: 0; border: 0; text-transform: none; letter-spacing: 0; font-family: var(--font-body); font-weight: 400; text-decoration: underline; cursor: pointer; }
+.layer-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.layer-pair figure { margin: 0; display: grid; gap: 4px; }
+.launched p { margin: 0 0 6px; }
+
+/* A checkbox that's a whole row to tap, for phones. */
+.toggle-row { min-height: 44px; align-items: center; padding: 6px 0; }
+.toggle-row input[type="checkbox"] { width: 22px; height: 22px; flex: none; }
+
+/* Explore when little is live: a zero-backer bar that invites, then funded designs and other ways in. */
+.progress.empty { background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px); }
+.be-first { color: var(--ink); font-weight: 700; }
+.explore-more { margin-top: 32px; display: grid; gap: 16px; }
+.explore-more-head { font-family: var(--font-display); font-size: 22px; margin: 0; }
+.explore-ways { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 8px; }
+.way-card { position: relative; display: grid; gap: 4px; padding: 16px 44px 16px 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); text-decoration: none; color: var(--ink); transition: transform 0.2s; }
+.way-card:hover { transform: translateY(-2px); }
+.way-card b { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.way-card > span:not(.eyebrow):not(.way-go) { font-size: 14px; color: var(--muted); }
+.way-go { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--muted); }
+.way-shop { background: linear-gradient(135deg, rgba(232, 118, 42, 0.1), rgba(196, 178, 0, 0.1)), var(--surface); }
+.way-design { background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }

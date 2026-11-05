@@ -8,11 +8,28 @@ export type Size = (typeof SIZES)[number];
 export const GARMENT: {
   fabric?: string;
   fit?: string;
+  care?: string;
   sizeChart?: ({ label: string } & Record<Size, string>)[];
 } = {
-  // As the store describes its tees. Fit and the size chart are still to come from Truecolors.
-  fabric: "Premium 200 GSM cotton",
+  fabric: "100% cotton",
+  // American Cotton's men's crew neck (style TCOMADC), from its size guide. Chest is measured flat across, armpit
+  // to armpit; the guide's tolerance is ±1.9 cm across and ±2.5 cm in length.
+  fit: "Classic unisex crew neck, true to size. Between sizes, or want it relaxed? Go one up.",
+  care: "Wash it like any cotton tee. The print lasts as long as the shirt does.",
+  sizeChart: [
+    { label: "Chest, flat (cm)", S: "47", M: "51", L: "56", XL: "61" },
+    { label: "Length (cm)", S: "70", M: "73", L: "76", XL: "78" },
+    { label: "Chest, flat (in)", S: "18", M: "20", L: "22", XL: "24" },
+    { label: "Length (in)", S: "27¾", M: "28¾", L: "29¾", XL: "30¾" },
+  ],
 };
+
+// Delivery as set in the store's shipping settings (Shopify: General profile), shown next to prices. UAE orders go
+// out next day from Dubai; the USA's rate is set in AED in Shopify (AED 36.69, free from AED 250), shown in dollars.
+export const SHIPPING = {
+  AE: "Next-day UAE delivery: AED 25, free over AED 200. Gulf: AED 99 with customs included",
+  US: "US shipping from Las Vegas: $9.99, free over $68",
+} as const;
 
 // Pre-orders sell in both of the store's markets, as one campaign with one goal counted across both. The UAE pays
 // the store's base price in AED; the USA pays from its own price list in USD. Compare-at is the "later" price
@@ -65,7 +82,13 @@ export const RETURN_WINDOW_DAYS = 7;
 export const PAYOUT_BUFFER_DAYS = 7;
 
 // A fan's own link: every this many pre-orders it brings in (once charged) earns them a free tee.
-export const REFERRALS_PER_REWARD = 5;
+export const REFERRALS_PER_REWARD = 3;
+// The friend who arrives on someone's link gets this much off their pre-order (a Shopify code per link). And two
+// or more of the same design are this much off each (one automatic discount per campaign product). Placeholders
+// until Truecolors confirms them; the two don't stack, the bigger applies.
+export const FRIEND_DISCOUNT_PERCENT = 10;
+export const TWO_PACK_PERCENT = 10;
+export const friendCode = (ref: string) => `FRIEND-${ref.toUpperCase()}`;
 
 // Design challenges: how many designs one designer can enter in a challenge.
 export const CHALLENGE_ENTRIES_PER_DESIGNER = 2;
@@ -83,6 +106,10 @@ export const PRINT = {
   widthIn: 14,
   heightIn: 16,
   dpi: 300,
+  // As Cancún confirmed: grey in the black layer and the sun colour are both halftoned at 55 lines per inch, and
+  // the black prints first, with the sun colour over it.
+  halftoneLpi: 55,
+  blackFirst: true,
 };
 
 export function shareBps(viaDesignerLink: boolean): number {

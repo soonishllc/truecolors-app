@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   // Public handle, also the code on the designer's share link (?ref=handle).
   handle: text("handle").notNull().unique(),
   credits: integer("credits").notNull().default(0),
+  // While an AI job of theirs is running (one at a time, so a second tap can't start and charge another).
+  aiBusyUntil: ts("ai_busy_until"),
   agreementVersion: text("agreement_version"),
   agreementAcceptedAt: ts("agreement_accepted_at"),
   createdAt: createdAt(),
@@ -68,16 +70,32 @@ export const designs = pgTable("designs", {
   title: text("title").notNull(),
   preset: text("preset").notNull(),
   prompt: text("prompt").notNull(),
+  // What shows in the shade. Once coloured, these are the lines taken from the colour image, so the two line up
+  // (see colourLines); the drawing the designer approved is kept in outlineKey.
   lineArtKey: text("line_art_key"),
+  // The approved drawing, once coloured: it bounds the colour, and redraws and recolours start from it.
+  outlineKey: text("outline_key"),
   colourKey: text("colour_key"),
   compositeKey: text("composite_key"),
   printLineKey: text("print_line_key"),
   printColourKey: text("print_colour_key"),
   printReport: jsonb("print_report").$type<PrintReport>(),
+  // What the designer chose beyond the idea: exact words, where it's printed, how detailed, and its sun colours.
+  options: jsonb("options").$type<DesignOptions>().notNull().default({}),
   flags: jsonb("flags").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+export type Placement = "front" | "back" | "chest";
+export type DesignOptions = {
+  text?: string;
+  placement?: Placement;
+  detail?: "bold" | "detailed";
+  palette?: string;
+  // A painted backdrop (sky, glow) around the drawing in the sun; otherwise colour stays inside the lines.
+  glow?: boolean;
+};
 
 export type PrintReport = {
   ok: boolean;
@@ -85,6 +103,8 @@ export type PrintReport = {
   maxColours: number;
   widthPx: number;
   heightPx: number;
+  // The artwork's own width before it was enlarged to the print size.
+  sourcePx?: number;
   problems: string[];
 };
 
@@ -141,6 +161,8 @@ export const campaigns = pgTable("campaigns", {
   shopifyProductId: text("shopify_product_id"),
   shopifyHandle: text("shopify_handle"),
   sellingPlanGroupId: text("selling_plan_group_id"),
+  // The pre-order plan itself (numeric), so the buy button can put the shirt in the store's cart on that plan.
+  sellingPlanId: text("selling_plan_id"),
   variantIds: jsonb("variant_ids").$type<Record<string, string>>(),
   reviewNote: text("review_note"),
   reviewedBy: text("reviewed_by"),
@@ -156,7 +178,8 @@ export const campaigns = pgTable("campaigns", {
   createdAt: createdAt(),
 });
 
-export type PledgeStatus = "pledged" | "charged" | "charge_failed" | "cancelled" | "refunded";
+// charge_pending: the card charge was sent and Shopify hasn't said yet whether it went through.
+export type PledgeStatus = "pledged" | "charge_pending" | "charged" | "charge_failed" | "cancelled" | "refunded";
 
 // One pre-order line on a Shopify order.
 export const pledges = pgTable(
@@ -188,6 +211,8 @@ export const pledges = pgTable(
     firstChargeAt: ts("first_charge_at"),
     nextChargeAt: ts("next_charge_at"),
     lastChargeError: text("last_charge_error"),
+    // Shopify's reference for the charge in flight, to ask whether it went through.
+    chargeReference: text("charge_reference"),
     chargedAt: ts("charged_at"),
     fulfilledAt: ts("fulfilled_at"),
     needsAttention: text("needs_attention"),
@@ -236,10 +261,33 @@ export const payouts = pgTable("payouts", {
 
 export const batches = pgTable("batches", {
   id: id(),
+  // "received" once every 3PL the batch ships to has received its share.
   status: text("status").$type<"draft" | "sent" | "received">().notNull().default("draft"),
   note: text("note"),
+  lasVegasReceivedAt: ts("las_vegas_received_at"),
+  quiqupReceivedAt: ts("quiqup_received_at"),
+  // What Quiqup's packing list and commercial invoice need, entered once Cancún has packed the UAE cartons.
+  quiqupInbound: jsonb("quiqup_inbound").$type<QuiqupInbound>(),
   createdAt: createdAt(),
 });
+
+export type QuiqupCarton = {
+  box: string;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  weightKg: number;
+  contents: Record<string, number>;
+};
+
+export type QuiqupInbound = {
+  invoiceNo: string;
+  consignor: string;
+  consignorAddress: string;
+  unitValueCents: number; // declared per shirt, USD
+  arrivesAt: string; // ISO date
+  cartons: QuiqupCarton[];
+};
 
 export const webhookEvents = pgTable("webhook_events", {
   id: text("id").primaryKey(),
@@ -288,6 +336,14 @@ export const fanRewards = pgTable("fan_rewards", {
   id: id(),
   fanId: uuid("fan_id").notNull().references(() => fans.id),
   code: text("code").notNull(),
+  createdAt: createdAt(),
+});
+
+// Friend codes in Shopify, one per referral link (a fan's code or a designer's handle): a friend who arrives on
+// that link gets it applied at checkout, and the code on the order says whose link it was.
+export const friendCodes = pgTable("friend_codes", {
+  ref: text("ref").primaryKey(),
+  code: text("code").notNull().unique(),
   createdAt: createdAt(),
 });
 
@@ -568,4 +624,21 @@ export const serviceTickets = pgTable("service_tickets", {
   resolution: text("resolution"),
   createdAt: createdAt(),
   resolvedAt: ts("resolved_at"),
+});
+
+// First-party analytics: one row per funnel step (see src/lib/analytics.ts for the names).
+export const events = pgTable("events", {
+  id: id(),
+  name: text("name").notNull(),
+  path: text("path"),
+  ref: text("ref"),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  // Set null on delete: a tidy-up of a campaign or user never gets blocked by its analytics.
+  campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  anonId: text("anon_id"),
+  props: jsonb("props").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: createdAt(),
 });

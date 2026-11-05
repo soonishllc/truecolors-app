@@ -1,0 +1,21 @@
+# The backer share card: after checkout, a community pre-order's edition numbers and a button back to the design
+# so the backer can share it. Asks the app (APP_URL in src/BackerCard.tsx) for the order's backings.
+api_version = "2026-10"
+
+[[extensions]]
+name = "Backer share card"
+handle = "backer-share-card"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/ThankYou.tsx"
+target = "purchase.thank-you.block.render"
+
+[[extensions.targeting]]
+module = "./src/OrderStatus.tsx"
+target = "customer-account.order-status.block.render"
+
+[extensions.capabilities]
+# Calls the app's /api/checkout/backer. Needs "Allow network access in checkout and account UI extensions"
+# switched on for the app in the Dev Dashboard (API access).
+network_access = true

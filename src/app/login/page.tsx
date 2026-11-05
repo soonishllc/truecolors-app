@@ -25,7 +25,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
           <p className="muted">
             You&apos;re signed in to the store as <strong>{store.email}</strong>, which isn&apos;t a designer account yet.
           </p>
-          <Link className="button" href="/join">Join with your invite code</Link>
+          <Link className="button" href="/join">Start designing</Link>
         </div>
       ) : (
         <StoreSignIn back="/studio">
@@ -39,7 +39,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <label>Email<input name="email" type="email" required /></label>
       </ActionForm>
       </div>
-      {!store && <p className="small muted">New here? <Link href="/join">Join with your invite code</Link>.</p>}
+      {!store && <p className="small muted">New here? <Link href="/join">Design your own shirt</Link>.</p>}
     </div>
   );
 }

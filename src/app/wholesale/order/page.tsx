@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { portalPlaceAction, portalQuoteAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { OrderTally } from "@/components/OrderTally";
 import { config } from "@/lib/config";
 import { CURRENCY_COUNTRY, WHOLESALE_MIN_UNITS, WHOLESALE_TIERS } from "@/lib/rules";
 import { catalogFor } from "@/lib/shopify/wholesale";
@@ -96,28 +97,37 @@ export default async function WholesaleOrder({ searchParams }: { searchParams: P
       {catalog.length === 0 ? (
         <p className="notice">The catalog couldn&apos;t be loaded right now.</p>
       ) : (
+        <div id="order-form">
         <ActionForm action={portalQuoteAction} submit="Get my quote" pendingText="Pricing…">
-          <table>
-            <thead><tr><th>Design</th><th>Retail</th>{catalog[0].sizes.map((s) => <th key={s.size}>{s.size}</th>)}</tr></thead>
-            <tbody>
-              {catalog.map((p) => {
-                const price = prices.get(p.sizes[0]?.variantId);
-                return (
-                  <tr key={p.handle}>
-                    <td>{p.title}</td>
-                    <td>{price ? showMoney(price.amount, price.currency) : "—"}</td>
+          {/* One card per design, sizes side by side: fits a phone without scrolling sideways. */}
+          <div className="order-cards">
+            {catalog.map((p) => {
+              const price = prices.get(p.sizes[0]?.variantId);
+              return (
+                <fieldset key={p.handle} className="order-card">
+                  <legend>{p.title}</legend>
+                  {price && (
+                    <p className="small">
+                      {showMoney(String((Number(price.amount) * (10_000 - WHOLESALE_TIERS[0].discountBps)) / 10_000), price.currency)}
+                      <span className="muted"> your price, {WHOLESALE_TIERS[0].fromUnits}+ · retail {showMoney(price.amount, price.currency)}</span>
+                    </p>
+                  )}
+                  <div className="order-sizes">
                     {p.sizes.map((s) => (
-                      <td key={s.sku}>
-                        <input name={`qty:${s.sku}`} type="number" min={0} max={s.available} placeholder="0" aria-label={`${p.title} ${s.size}`} style={{ width: 72 }} />
-                        <div className="small muted">{s.available} left</div>
-                      </td>
+                      <label key={s.sku}>
+                        <span>{s.size}</span>
+                        <input name={`qty:${s.sku}`} type="number" inputMode="numeric" min={0} max={s.available} placeholder="0" aria-label={`${p.title} ${s.size}`} data-price={price?.amount ?? 0} />
+                        <span className="small muted">{s.available} left</span>
+                      </label>
                     ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  </div>
+                </fieldset>
+              );
+            })}
+          </div>
         </ActionForm>
+        <OrderTally formId="order-form" tiers={WHOLESALE_TIERS} min={WHOLESALE_MIN_UNITS} currency={w.currency} />
+        </div>
       )}
     </>
   );

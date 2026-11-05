@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             ) : (
               <>
                 <Link href="/login">Log in</Link>
-                <Link href="/join" className="button small wide-only">Join with invite</Link>
+                <Link href="/join" className="button small wide-only">Design your own</Link>
               </>
             )}
           </nav>
@@ -70,7 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
             <nav aria-label="Designers">
               <h3>Designers</h3>
-              <Link href="/join">Join with invite</Link>
+              <Link href="/join">Design your own</Link>
               <Link href="/login">Log in</Link>
               <Link href="/designer-agreement">Designer agreement</Link>
             </nav>

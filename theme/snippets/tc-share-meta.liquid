@@ -1,0 +1,22 @@
+{%- comment -%}
+  Truecolors app pages: the share card for a campaign link (WhatsApp, Instagram, iMessage). The app's proxy page
+  sets tc_title, tc_description and tc_image; the store's own tags stay for every other page.
+  Install: in layout/theme.liquid, inside <head> and BEFORE the theme's own meta-tags render, add
+    {% render 'tc-share-meta', title: tc_title, description: tc_description, image: tc_image %}
+  and wrap the theme's own og:title / og:description / og:image / twitter:* tags in {% unless tc_title %} … {% endunless %}
+  so crawlers don't see two sets.
+{%- endcomment -%}
+{%- if title != blank -%}
+  <meta property="og:type" content="product">
+  <meta property="og:title" content="{{ title | escape }}">
+  <meta property="og:description" content="{{ description | escape }}">
+  <meta name="description" content="{{ description | escape }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ title | escape }}">
+  <meta name="twitter:description" content="{{ description | escape }}">
+  {%- if image != blank -%}
+    <meta property="og:image" content="{{ image | escape }}">
+    <meta property="og:image:secure_url" content="{{ image | escape }}">
+    <meta name="twitter:image" content="{{ image | escape }}">
+  {%- endif -%}
+{%- endif -%}

@@ -178,12 +178,12 @@ describe("wholesale bot", () => {
       name: "Marina Resort Boutique", currency: "AED", shopifyCustomerId: "555", stockist: false, displayPartner: true,
       contactName: "Omar", phone: "+971 50 123 4567", email: "omar@marina.example",
     });
-    await addOutlet({ wholesalerId: w.id, name: "Lobby shop", city: "Dubai", country: "AE", shopifyLocationId: "gid://shopify/Location/42", supplyRoute: "quiqup" });
+    await addOutlet({ wholesalerId: w.id, name: "Lobby shop", city: "Dubai", country: "AE", shopifyLocationId: "gid://shopify/Location/42" });
     const other = await createWholesaler({
       name: "Other Hotel", currency: "AED", shopifyCustomerId: "", stockist: false, displayPartner: true,
       contactName: "Lina", phone: "+971 55 000 0000", email: "",
     });
-    await addOutlet({ wholesalerId: other.id, name: "Pool bar", city: "Dubai", country: "AE", shopifyLocationId: "99", supplyRoute: "quiqup" });
+    await addOutlet({ wholesalerId: other.id, name: "Pool bar", city: "Dubai", country: "AE", shopifyLocationId: "99" });
 
     const ticket: Ticket = { id: "101", channel: "whatsapp", messages: [customer("How many M do we have left?")] };
     const seen = fakes(ticket, [call("get_display_stock"), text("You have 6 Habibi in M at the lobby shop.")]);
@@ -301,7 +301,7 @@ describe("wholesale accounts", () => {
       contactName: "S", phone: "", email: "s@example.com",
     });
     await expect(
-      addOutlet({ wholesalerId: w.id, name: "Shop", city: "Austin", country: "US", shopifyLocationId: "", supplyRoute: "shipdudes" }),
+      addOutlet({ wholesalerId: w.id, name: "Shop", city: "Austin", country: "US", shopifyLocationId: "" }),
     ).rejects.toThrow(/display partners/);
   });
 });
@@ -502,7 +502,7 @@ describe("display partners", () => {
       contactName: "Lucía", phone: PHONE, email: "lucia@playa.example",
     });
     await addOutlet({
-      wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42", supplyRoute: "cancun", parPerSku: 6,
+      wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42", parPerSku: 6,
     });
     const d = await db();
     const [o] = await d.update(outlets).set({ periodStart: start }).where(eq(outlets.wholesalerId, w.id)).returning();
@@ -738,7 +738,7 @@ describe("display faults", () => {
       name: "Hotel Playa", currency: "MXN", shopifyCustomerId: "321", stockist: false, displayPartner: true,
       contactName: "Lucía", phone: PHONE, email: "lucia@playa.example",
     });
-    await addOutlet({ wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42", supplyRoute: "cancun" });
+    await addOutlet({ wholesalerId: w.id, name: "Lobby shop", city: "Cancún", country: "MX", shopifyLocationId: "42" });
     const [o] = await (await db()).select().from(outlets);
     await serviceLib.addDisplay({ outletId: o.id, kind: "tower", serial: "tw-0042", installedAt: "2026-10-01" });
 

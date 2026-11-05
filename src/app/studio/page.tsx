@@ -1,10 +1,9 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
-import { acceptAgreementAction, createDesignAction, relaunchAction, submitBriefAction } from "@/app/actions";
+import { acceptAgreementAction, relaunchAction, submitBriefAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { ShareKit } from "@/components/ShareKit";
 import { ProviderIcon } from "@/components/SocialButtons";
-import { PRESETS } from "@/lib/ai/presets";
 import { enabledProviders, providerLabel, type Provider } from "@/lib/auth/oauth";
 import { connectedAccounts, requireUser } from "@/lib/auth/session";
 import { campaignStats } from "@/lib/campaigns/service";
@@ -12,11 +11,11 @@ import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, media, pledges } from "@/lib/db/schema";
 import { ago, compact, daysLeft, money, moneyEach, nextStretch } from "@/lib/format";
-import { CREDIT_COST, FUNDING_GOAL } from "@/lib/rules";
+import { FUNDING_GOAL } from "@/lib/rules";
 import { payoutMethod } from "@/lib/payouts/methods";
 import { designerEarnings } from "@/lib/royalties/ledger";
 import { siteImageUrl } from "@/lib/site-images";
-import { fileUrl } from "@/lib/storage";
+import { fileUrl, thumbUrl } from "@/lib/storage";
 import { briefsForDesigner } from "@/lib/wholesale/designs";
 import { publicUrl } from "@/lib/links";
 
@@ -81,7 +80,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
   const reach = accounts.reduce((sum, a) => sum + (a.followers ?? 0), 0);
   const agreement = config().DESIGNER_AGREEMENT_VERSION;
   const ids = myCampaigns.map((c) => c.id);
-  const counted = inArray(pledges.status, ["pledged", "charged", "charge_failed"]);
+  const counted = inArray(pledges.status, ["pledged", "charge_pending", "charged", "charge_failed"]);
 
   const since = new Date(Date.now() - (SPARK_DAYS - 1) * 86_400_000);
   since.setHours(0, 0, 0, 0);
@@ -135,12 +134,12 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <div className="row">
             <span className="pill-stat"><b>{user.credits}</b> credits</span>
             <Link className="pill-stat" href={`/d/${user.handle}`}>Your page <b>/d/{user.handle}</b></Link>
-            <a className="button small" href="#new">＋ New design</a>
+            <Link className="button small" href="/studio/new">＋ New design</Link>
           </div>
         </div>
       </section>
 
-      {q.welcome && <p className="notice">Welcome to the studio. Start with an idea or a sketch below.</p>}
+      {q.welcome && <p className="notice">Welcome to the studio. <Link href="/studio/new">Start your first design →</Link></p>}
       {q.connected && <p className="notice good-notice">Connected {providerLabel(q.connected as Provider)}.</p>}
       {q.connect === "taken" && <p className="notice">That account is already connected to another designer.</p>}
       {agreement && user.agreementVersion !== agreement && (
@@ -150,6 +149,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         </form>
       )}
 
+      {/* The numbers once there's something to count; before that they're four boxes of zeros. */}
+      {myCampaigns.length > 0 && (
       <div className="kpis">
         <div className="kpi">
           <div className="eyebrow">Pre-orders</div>
@@ -173,15 +174,11 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <div className="kpi-note">{mine.length} design{mine.length === 1 ? "" : "s"} in your studio</div>
         </div>
       </div>
+      )}
 
       <div className="dash">
         <div className="dash-main">
-          <div className="section-head"><h2>Live campaigns</h2></div>
-          {live.length === 0 && (
-            <div className="empty card">
-              <p>No campaigns live yet. Finish a design, then launch it: it goes live once Truecolors approves it.</p>
-            </div>
-          )}
+          {live.length > 0 && <div className="section-head"><h2>Live campaigns</h2></div>}
           {live.map(({ c, s }) => {
             const design = designOf(c.designId);
             const files = liveMedia.filter((m) => m.designId === c.designId);
@@ -194,8 +191,8 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
             return (
               <article key={c.id} className="campaign card">
                 <div className="campaign-art tile-art">
-                  {design?.lineArtKey && <img className="art" src={fileUrl(design.lineArtKey)} alt="" />}
-                  {design?.compositeKey && <img className="art tile-sun" src={fileUrl(design.compositeKey)} alt="" />}
+                  {design?.lineArtKey && <img className="art" src={thumbUrl(design.lineArtKey, 320)} alt="" loading="lazy" decoding="async" width={320} height={320} />}
+                  {design?.compositeKey && <img className="art tile-sun" src={thumbUrl(design.compositeKey, 320)} alt="" loading="lazy" decoding="async" width={320} height={320} />}
                 </div>
                 <div className="campaign-body">
                   <div className="campaign-top">
@@ -256,15 +253,21 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
 
           <div className="section-head">
             <h2>Your designs</h2>
-            <a href="#new" className="button small secondary">＋ New design</a>
+            <Link href="/studio/new" className="button small secondary">＋ New design</Link>
           </div>
-          {mine.length === 0 && <p className="muted">Nothing yet. Start with an idea or a sketch below.</p>}
+          {mine.length === 0 && (
+            <Link href="/studio/new" className="first-design">
+              <b>Design your first shirt</b>
+              <span className="muted">Describe an idea or snap a sketch. The AI draws it in under a minute.</span>
+              <span className="button">Start →</span>
+            </Link>
+          )}
           <div className="grid designs">
             {mine.map((x) => (
               <Link key={x.id} href={`/studio/designs/${x.id}`} className="tile">
                 <div className="tile-art">
-                  {x.lineArtKey && <img className="art" src={fileUrl(x.lineArtKey)} alt="" />}
-                  {x.compositeKey && <img className="art tile-sun" src={fileUrl(x.compositeKey)} alt="" />}
+                  {x.lineArtKey && <img className="art" src={thumbUrl(x.lineArtKey, 320)} alt="" loading="lazy" decoding="async" width={320} height={320} />}
+                  {x.compositeKey && <img className="art tile-sun" src={thumbUrl(x.compositeKey, 320)} alt="" loading="lazy" decoding="async" width={320} height={320} />}
                 </div>
                 <div className="name">{x.title}</div>
                 <div className="meta">
@@ -272,31 +275,6 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
                 </div>
               </Link>
             ))}
-          </div>
-
-          <h2 id="new">New design</h2>
-          <div className="card new-design">
-            <ActionForm action={createDesignAction} submit={`Draw the line art (${CREDIT_COST.line_art} credit)`} pendingText="Drawing… this takes up to a minute">
-              <div className="two">
-                <label>Title<input name="title" required maxLength={60} placeholder="Dubai Marina Sunset" /></label>
-                <label>Style
-                  <select name="preset">
-                    {[...new Set(PRESETS.map((p) => p.group))].map((g) => (
-                      <optgroup key={g} label={g}>
-                        {PRESETS.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label>Your idea<textarea name="idea" required maxLength={600} placeholder="A dhow sailing past the Burj Al Arab at sunset, with palm trees" /></label>
-              <label className="dropzone">
-                <input type="file" name="sketch" accept="image/*" />
-                <span className="dz-title">✎ Got a sketch? Add it (optional)</span>
-                <span className="small muted">A photo of your drawing works. The AI keeps your idea and redraws it as clean, print-ready line art.</span>
-              </label>
-              <p className="small muted">No brands, logos, celebrities, real people or political figures.</p>
-            </ActionForm>
           </div>
 
           {myCampaigns.length > 0 && (

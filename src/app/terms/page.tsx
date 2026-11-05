@@ -19,7 +19,7 @@ export default function Terms() {
 
       <h2>1. What the site does</h2>
       <p>
-        {BRAND} is where invited designers create colour-changing shirt designs and run pre-order campaigns for them.
+        {BRAND} is where designers create colour-changing shirt designs and run pre-order campaigns for them.
         Shirts are printed with UV-reactive ink that shows grey line art in the shade and full colour in direct sunlight.
         A design is only printed if enough people pre-order it before its campaign ends.
       </p>

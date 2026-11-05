@@ -14,7 +14,7 @@ import { addDisplay } from "./service";
 // with sample data held in memory, and WhatsApp is the simulator page. Paying a draft order goes through a
 // demo checkout link that marks it paid, so an order can be followed all the way to its FedEx label.
 
-export const DEMO_LOCATIONS = { cancun: "9001", quiqup: "9002", shipdudes: "9003", outlet: "9010" };
+export const DEMO_LOCATIONS = { cancun: "9001", outlet: "9010" };
 export const DEMO_CUSTOMER = "9100";
 export const DEMO_PHONES = { stockist: "971500000001", partner: "529980000002" };
 
@@ -45,8 +45,6 @@ function store(): Store {
   const fill = (loc: string, f: (code: string, size: string) => number) =>
     stock.set(loc, new Map(DESIGNS.flatMap(([code]) => SIZES.map((s) => [sku(code, s), f(code, s)] as const))));
   fill(DEMO_LOCATIONS.cancun, () => 120);
-  fill(DEMO_LOCATIONS.quiqup, () => 40);
-  fill(DEMO_LOCATIONS.shipdudes, () => 40);
   // The partner's Tower: a few of each, running low on the favourites.
   fill(DEMO_LOCATIONS.outlet, (code, s) => (code === "HAB" || code === "BCH" ? (s === "M" || s === "L" ? 1 : 3) : 4));
   g.__tcDemo = { tickets: new Map(), stock, products: [], seq: 1000 };
@@ -197,7 +195,7 @@ export async function ensureDemoAccounts() {
   });
   await addOutlet({
     wholesalerId: partner.id, name: "Lobby Boutique", city: "Cancún", country: "MX", shopifyLocationId: DEMO_LOCATIONS.outlet,
-    supplyRoute: "cancun", parPerSku: 6, settlementDays: 15,
+    parPerSku: 6, settlementDays: 15,
   });
   const [outlet] = await d.select().from(outlets).where(eq(outlets.wholesalerId, partner.id));
   await addDisplay({ outletId: outlet.id, kind: "tower", serial: "DEMO-TOWER-1", installedAt: "2026-10-01" });

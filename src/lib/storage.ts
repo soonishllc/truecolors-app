@@ -66,3 +66,9 @@ export async function get(key: string): Promise<Buffer> {
 export function fileUrl(key: string): string {
   return `/api/files/${key}`;
 }
+
+// A smaller WebP of an image file, for grids and thumbnails on phones (the originals are print-sized PNGs).
+export const THUMB_WIDTHS = [320, 640] as const;
+export function thumbUrl(key: string, width: (typeof THUMB_WIDTHS)[number] = 640): string {
+  return /\.(png|jpe?g|webp)$/i.test(key) ? `${fileUrl(key)}?w=${width}` : fileUrl(key);
+}

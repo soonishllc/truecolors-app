@@ -49,7 +49,7 @@ describe("provider handshake", () => {
 });
 
 describe("social sign-in", () => {
-  it("asks a new person for an invite, then signs them up and logs them straight in", async () => {
+  it("sends a new person to finish signing up, then signs them up and logs them straight in", async () => {
     const next = await session.completeSocialSignIn("x", { subject: "x-1", name: "Sara K", username: "sarak" });
     expect(next).toBe("/join");
     const via = await session.pendingSignUp();
@@ -120,5 +120,16 @@ describe("signing in through the store", () => {
     const d = await db();
     const [noor] = await d.select().from(users).where(eq(users.email, "new@example.com"));
     expect(loggedInAs()).toBe(noor.id);
+  });
+});
+
+describe("open sign-up", () => {
+  it("lets anyone join without an invite, and still checks an invite code when one is given", async () => {
+    await session.signUp({ email: "open@example.com", name: "Open Door", acceptAgreement: true, fromStore: true });
+    const d = await (await import("../src/lib/db/client")).db();
+    const { users } = await import("../src/lib/db/schema");
+    expect((await d.select().from(users)).map((u) => u.email)).toContain("open@example.com");
+    await expect(session.signUp({ email: "bad@example.com", name: "Bad Code", invite: "NOPE", acceptAgreement: true, fromStore: true }))
+      .rejects.toThrow(/invite code/);
   });
 });

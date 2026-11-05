@@ -5,7 +5,7 @@ import {
 } from "../src/lib/campaigns/service";
 import { resetConfig } from "../src/lib/config";
 import { db } from "../src/lib/db/client";
-import { campaigns, pledges, royaltyEntries } from "../src/lib/db/schema";
+import { campaigns, designs, emails, media, pledges, royaltyEntries } from "../src/lib/db/schema";
 import { designerEarnings, preparePayouts } from "../src/lib/royalties/ledger";
 import { fakeShopify, freshDb, order, readyDesigner, type FakeShopify } from "./helpers";
 
@@ -72,6 +72,72 @@ describe("campaign lifecycle", () => {
     await tick(at(2 * DAY));
     expect(shop.charges).toHaveLength(11);
     expect(await campaignStats(c.id)).toEqual({ pledged: 102, charged: 102 });
+  });
+
+  it("counts a charge only once Shopify confirms it went through", async () => {
+    const { c } = await liveCampaign();
+    const slow = order(c.shopifyProductId!, 10);
+    shop.processing.add(String(slow.id));
+    for (let i = 0; i < 9; i++) await recordOrder(order(c.shopifyProductId!, 10));
+    await recordOrder(slow);
+    await tick(at(DAY));
+    // Still processing: counts towards the goal, but isn't charged, earns nothing and doesn't fund it yet.
+    expect(await campaignStats(c.id)).toEqual({ pledged: 100, charged: 90 });
+    expect((await statusOf(c.id)).fundedAt).toBeNull();
+    const d = await db();
+    const [p] = await d.select().from(pledges).where(eq(pledges.shopifyOrderId, String(slow.id)));
+    expect(p.status).toBe("charge_pending");
+    expect(await d.select().from(royaltyEntries).where(eq(royaltyEntries.pledgeId, p.id))).toHaveLength(0);
+
+    shop.processing.delete(String(slow.id));
+    await tick(at(DAY + HOUR));
+    expect(await campaignStats(c.id)).toEqual({ pledged: 100, charged: 100 });
+    expect((await statusOf(c.id)).fundedAt).toEqual(at(DAY + HOUR));
+    expect(shop.charges.filter((ch) => ch.orderId === String(slow.id))).toHaveLength(1);
+  });
+
+  it("retries a card that's declined after the charge was accepted", async () => {
+    const { c } = await liveCampaign();
+    const late = order(c.shopifyProductId!, 1);
+    shop.declineLater.add(String(late.id));
+    for (let i = 0; i < 10; i++) await recordOrder(order(c.shopifyProductId!, 10));
+    await recordOrder(late);
+    await tick(at(DAY));
+    const d = await db();
+    const [p] = await d.select().from(pledges).where(eq(pledges.shopifyOrderId, String(late.id)));
+    expect(p.status).toBe("charge_failed");
+    expect(p.lastChargeError).toBe("Declined by the bank");
+
+    shop.declineLater.delete(String(late.id));
+    await tick(at(DAY + 12 * HOUR));
+    expect(await campaignStats(c.id)).toEqual({ pledged: 101, charged: 101 });
+  });
+
+  it("keeps the designer posted: live kit, first backers, daily tally, last 48 hours, funded", async () => {
+    const { c } = await liveCampaign();
+    await recordOrder(order(c.shopifyProductId!, 1));
+    for (let i = 0; i < 5; i++) await recordOrder(order(c.shopifyProductId!, 10));
+    await tick(at(DAY));
+    for (let i = 0; i < 5; i++) await recordOrder(order(c.shopifyProductId!, 10));
+    await tick(at(20 * DAY));
+    await tick(at(21 * DAY));
+    const d = await db();
+    const sent = (await d.select().from(emails).where(eq(emails.to, "maya@example.com"))).map((e) => e.key);
+    expect(sent).toEqual(expect.arrayContaining([
+      `designer-live:${c.id}`, `designer-backer:${c.id}:1`, `designer-backer:${c.id}:3`,
+      `designer-daily:${c.id}:${at(DAY).toISOString().slice(0, 10)}`, `designer-funded:${c.id}`,
+    ]));
+    expect(sent).not.toContain(`designer-backer:${c.id}:4`);
+  });
+
+  it("tells the designer when a campaign misses, with how to bring it back", async () => {
+    const { c } = await liveCampaign();
+    await recordOrder(order(c.shopifyProductId!, 3));
+    await tick(at(19.5 * DAY));
+    await tick(at(21 * DAY));
+    const d = await db();
+    const sent = (await d.select().from(emails).where(eq(emails.to, "maya@example.com"))).map((e) => e.key);
+    expect(sent).toEqual(expect.arrayContaining([`designer-48h:${c.id}`, `designer-missed:${c.id}`]));
   });
 
   it("closes as funded at the deadline", async () => {
@@ -264,9 +330,22 @@ describe("UAE and USA pre-orders", () => {
 describe("launch rules", () => {
   it("blocks a third open campaign", async () => {
     const { user, design } = await readyDesigner();
+    const d = await db();
+    const copy = async () => {
+      const { id: _id, createdAt: _at, ...rest } = design;
+      const [x] = await d.insert(designs).values(rest).returning();
+      await d.insert(media).values({ designId: x.id, kind: "video", template: "reveal", view: "reveal", key: "v.mp4" });
+      return x;
+    };
     await submitCampaign(user.id, design.id, { title: "One", story: "" });
-    await submitCampaign(user.id, design.id, { title: "Two", story: "" });
-    await expect(submitCampaign(user.id, design.id, { title: "Three", story: "" })).rejects.toThrow(/2 campaigns/);
+    await submitCampaign(user.id, (await copy()).id, { title: "Two", story: "" });
+    await expect(submitCampaign(user.id, (await copy()).id, { title: "Three", story: "" })).rejects.toThrow(/2 campaigns/);
+  });
+
+  it("launches a design only once", async () => {
+    const { user, design } = await readyDesigner();
+    await submitCampaign(user.id, design.id, { title: "One", story: "" });
+    await expect(submitCampaign(user.id, design.id, { title: "Again", story: "" })).rejects.toThrow(/already has a campaign/);
   });
 
   it("ignores duplicate order webhooks", async () => {

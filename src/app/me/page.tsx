@@ -8,9 +8,9 @@ import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { currentFan, fanFollowing, fanPreorders, fanVotes, referralStats } from "@/lib/fans";
 import { date, daysLeft } from "@/lib/format";
-import { REFERRALS_PER_REWARD } from "@/lib/rules";
+import { FRIEND_DISCOUNT_PERCENT, REFERRALS_PER_REWARD } from "@/lib/rules";
 import { onShirts } from "@/lib/media/shots";
-import { fileUrl } from "@/lib/storage";
+import { fileUrl, thumbUrl } from "@/lib/storage";
 import { publicUrl } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ function stateOf(p: { status: string }, c: { status: string; goal: number }, bac
   if (c.status === "shipped") return { label: "Shipped", tone: "funded" };
   if (c.status === "in_production") return { label: "Being printed", tone: "funded" };
   if (p.status === "charged") return { label: c.status === "funded" ? "Funded, going to print" : "Charged, goal reached", tone: "funded" };
+  if (p.status === "charge_pending") return { label: "Goal reached: charging your card", tone: "funded" };
   if (p.status === "charge_failed") return { label: "Card declined: update it on your order", tone: "missed" };
   return { label: `Waiting for ${c.goal - backed} more`, tone: "live" };
 }
@@ -60,7 +61,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
     [...new Set(orders.map((o) => o.c.id))].map(async (id) => [id, (await campaignStats(id)).pledged] as const),
   ));
   const live = [...new Map(orders.filter((o) => o.c.status === "live").map((o) => [o.c.id, o.c])).values()];
-  const shirts = orders.filter((o) => ["pledged", "charged", "charge_failed"].includes(o.p.status)).reduce((s, o) => s + o.p.quantity, 0);
+  const shirts = orders.filter((o) => ["pledged", "charge_pending", "charged", "charge_failed"].includes(o.p.status)).reduce((s, o) => s + o.p.quantity, 0);
   const toNext = REFERRALS_PER_REWARD - (referrals.charged % REFERRALS_PER_REWARD);
 
   return (
@@ -97,8 +98,8 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
           return (
             <article key={p.id} className="card order">
               <Link href={`/c/${c.slug}`} className="tile-art order-art">
-                {lineArt && <img className="art" src={fileUrl(lineArt)} alt="" />}
-                {art && <img className="art tile-sun" src={fileUrl(art)} alt="" />}
+                {lineArt && <img className="art" src={thumbUrl(lineArt, 320)} loading="lazy" decoding="async" alt="" />}
+                {art && <img className="art tile-sun" src={thumbUrl(art, 320)} loading="lazy" decoding="async" alt="" />}
               </Link>
               <div className="order-body">
                 <div className="order-top">
@@ -112,7 +113,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
                   <div className="edition-numbers">
                     {editions.map((n) => <span key={n} className="edition-no">#{n}<small> of {c.editionSize}</small></span>)}
                   </div>
-                ) : c.status === "live" && ["pledged", "charged", "charge_failed"].includes(p.status) ? (
+                ) : c.status === "live" && ["pledged", "charge_pending", "charged", "charge_failed"].includes(p.status) ? (
                   <>
                     <div className="progress"><div style={{ "--w": `${Math.min(100, (backed / c.goal) * 100)}%` } as React.CSSProperties} /></div>
                     <p className="small muted" style={{ margin: "6px 0 0" }}>
@@ -131,7 +132,8 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
           <h2>Your link</h2>
           <div className="card">
             <p className="small muted" style={{ marginTop: 0 }}>
-              Every {REFERRALS_PER_REWARD} pre-orders that come through your link earn you a free tee once they&apos;re charged.
+              Friends who use your link get {FRIEND_DISCOUNT_PERCENT}% off their pre-order, and every {REFERRALS_PER_REWARD} pre-orders that
+              come through it earn you a free tee once they&apos;re charged.
               {referrals.charged > 0 && ` ${toNext} more for the next one.`}
             </p>
             <div className="progress"><div style={{ "--w": `${((referrals.charged % REFERRALS_PER_REWARD) / REFERRALS_PER_REWARD) * 100}%` } as React.CSSProperties} /></div>

@@ -45,7 +45,7 @@ async function main() {
   } else {
     await addOutlet({
       wholesalerId: partner.id, name: "Test Lobby Shop", city: "Cancún", country: "MX",
-      shopifyLocationId: env("TEST_OUTLET_LOCATION_ID"), supplyRoute: "cancun", parPerSku: 6, settlementDays: 15,
+      shopifyLocationId: env("TEST_OUTLET_LOCATION_ID"), parPerSku: 6, settlementDays: 15,
     });
     const [created] = await d.select().from(outlets).where(eq(outlets.wholesalerId, partner.id));
     await addDisplay({ outletId: created.id, kind: "tower", serial: "TEST-TOWER-1", installedAt: "" });

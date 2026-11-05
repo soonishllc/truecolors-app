@@ -1,5 +1,5 @@
 import { config } from "../config";
-import { BASE_MARKET, PREORDER_PRICE, SIZES, sku, type PreorderMarket } from "../rules";
+import { BASE_MARKET, FRIEND_DISCOUNT_PERCENT, PREORDER_PRICE, SIZES, TWO_PACK_PERCENT, sku, type PreorderMarket } from "../rules";
 import { storefront } from "../links";
 import { admin, gid, numericId, ok, type UserErrors } from "./client";
 
@@ -13,6 +13,7 @@ export type CampaignProduct = {
   handle: string;
   variantIds: Record<string, string>;
   sellingPlanGroupId: string;
+  sellingPlanId: string;
 };
 
 export async function createCampaignProduct(input: {
@@ -84,10 +85,12 @@ export async function createCampaignProduct(input: {
   // goal is reached. The balance trigger is a backstop only; the app charges or cancels long before it.
   const backstop = new Date(input.endsAt.getTime() + 30 * 24 * 3600 * 1000);
   const plan = await admin<{
-    sellingPlanGroupCreate: { sellingPlanGroup: { id: string } | null; userErrors: UserErrors };
+    sellingPlanGroupCreate: { sellingPlanGroup: { id: string; sellingPlans: { nodes: { id: string }[] } } | null; userErrors: UserErrors };
   }>(
     `mutation($input: SellingPlanGroupInput!, $resources: SellingPlanGroupResourceInput) {
-      sellingPlanGroupCreate(input: $input, resources: $resources) { sellingPlanGroup { id } userErrors { field message } }
+      sellingPlanGroupCreate(input: $input, resources: $resources) {
+        sellingPlanGroup { id sellingPlans(first: 1) { nodes { id } } } userErrors { field message }
+      }
     }`,
     {
       input: {
@@ -114,7 +117,27 @@ export async function createCampaignProduct(input: {
       resources: { productIds: [product.id] },
     },
   );
-  const sellingPlanGroupId = ok(plan.sellingPlanGroupCreate, "sellingPlanGroupCreate").sellingPlanGroup!.id;
+  const group = ok(plan.sellingPlanGroupCreate, "sellingPlanGroupCreate").sellingPlanGroup!;
+  const sellingPlanGroupId = group.id;
+  const sellingPlanId = numericId(group.sellingPlans.nodes[0].id);
+
+  // The two-pack: two or more of this design are TWO_PACK_PERCENT off each, in every market's own currency.
+  const pack = await admin<{ discountAutomaticBasicCreate: { userErrors: UserErrors } }>(
+    `mutation($input: DiscountAutomaticBasicInput!) {
+      discountAutomaticBasicCreate(automaticBasicDiscount: $input) { userErrors { field message } }
+    }`,
+    {
+      input: {
+        title: `Two-pack: ${input.title}`,
+        startsAt: new Date().toISOString(),
+        endsAt: backstop.toISOString(),
+        minimumRequirement: { quantity: { greaterThanOrEqualToQuantity: "2" } },
+        customerGets: { value: { percentage: TWO_PACK_PERCENT / 100 }, items: { products: { productsToAdd: [product.id] } } },
+        combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true },
+      },
+    },
+  );
+  ok(pack.discountAutomaticBasicCreate, "discountAutomaticBasicCreate");
 
   // Each market's fixed price, on that market's price list (the base market needs none).
   for (const [market, priceListId] of Object.entries(marketPriceLists()) as [PreorderMarket, string][]) {
@@ -136,7 +159,10 @@ export async function createCampaignProduct(input: {
   }
 
   // Listed in both markets' catalogs, so UAE and USA shoppers can both pre-order.
-  const publications = [config().SHOPIFY_AE_PUBLICATION_ID, config().SHOPIFY_US_PUBLICATION_ID].filter(Boolean) as string[];
+  // Plus the Online Store channel itself: without it the product page 404s and /cart/add refuses the variant.
+  const publications = [
+    config().SHOPIFY_ONLINE_STORE_PUBLICATION_ID, config().SHOPIFY_AE_PUBLICATION_ID, config().SHOPIFY_US_PUBLICATION_ID,
+  ].filter(Boolean) as string[];
   if (publications.length) {
     const pub = await admin<{ publishablePublish: { userErrors: UserErrors } }>(
       `mutation($id: ID!, $input: [PublicationInput!]!) {
@@ -147,7 +173,7 @@ export async function createCampaignProduct(input: {
     ok(pub.publishablePublish, "publishablePublish");
   }
 
-  return { productId: numericId(product.id), handle: product.handle, variantIds, sellingPlanGroupId };
+  return { productId: numericId(product.id), handle: product.handle, variantIds, sellingPlanGroupId, sellingPlanId };
 }
 
 // The price list for each market that isn't the base market. Without one, Shopify would convert the AED price.
@@ -195,16 +221,33 @@ export async function chargeOrder(
   return { ok: true, reference: p.paymentReferenceId };
 }
 
+export type ChargeStatus = { state: "paid" } | { state: "failed"; error: string } | { state: "waiting" };
+
+// Charges are processed after orderCreateMandatePayment returns: this asks how the one with this reference went.
+export async function chargeStatus(orderId: string, reference: string): Promise<ChargeStatus> {
+  const res = await admin<{ orderPaymentStatus: { status: string; errorMessage: string | null } | null }>(
+    `query($orderId: ID!, $ref: String!) { orderPaymentStatus(orderId: $orderId, paymentReferenceId: $ref) { status errorMessage } }`,
+    { orderId: gid("Order", orderId), ref: reference },
+  );
+  const s = res.orderPaymentStatus;
+  if (!s) return { state: "waiting" };
+  if (["SUCCESS", "CAPTURED", "PURCHASED", "AUTHORIZED", "PARTIAL_SUCCESS"].includes(s.status)) return { state: "paid" };
+  if (["ERROR", "VOIDED", "REFUNDED"].includes(s.status)) return { state: "failed", error: s.errorMessage || `Charge ${s.status.toLowerCase()}` };
+  // INITIATED, PENDING, PROCESSING, RETRYABLE, REDIRECT_REQUIRED, UNKNOWN: ask again on the next tick.
+  return { state: "waiting" };
+}
+
 // Cancels a whole order, refunding anything already charged to the original card.
 export async function cancelOrder(orderId: string, staffNote: string) {
-  const res = await admin<{ orderCancel: { userErrors: UserErrors } }>(
+  // Cancelling runs as a job on Shopify's side; errors in the request itself come back as orderCancelUserErrors.
+  const res = await admin<{ orderCancel: { orderCancelUserErrors: UserErrors } }>(
     `mutation($orderId: ID!, $staffNote: String) {
       orderCancel(orderId: $orderId, reason: OTHER, refundMethod: { originalPaymentMethodsRefund: true },
-        restock: false, notifyCustomer: true, staffNote: $staffNote) { userErrors { field message } }
+        restock: false, notifyCustomer: true, staffNote: $staffNote) { job { id } orderCancelUserErrors { field message } }
     }`,
     { orderId: gid("Order", orderId), staffNote },
   );
-  ok(res.orderCancel, "orderCancel");
+  ok({ userErrors: res.orderCancel.orderCancelUserErrors }, "orderCancel");
 }
 
 // A single-use code worth one tee, for a fan whose link brought in enough pre-orders.
@@ -220,12 +263,35 @@ export async function createRewardCode(code: string, valueCents: number) {
         startsAt: new Date().toISOString(),
         usageLimit: 1,
         appliesOncePerCustomer: true,
-        customerSelection: { all: true },
+        context: { all: "ALL" },
         customerGets: { value: { discountAmount: { amount: dollars(valueCents), appliesOnEachItem: false } }, items: { all: true } },
       },
     },
   );
   ok(res.discountCodeBasicCreate, "discountCodeBasicCreate");
+}
+
+// A friend's code for one referral link: FRIEND_DISCOUNT_PERCENT off, once per customer, on any pre-order. A code
+// that already exists (made on an earlier run) is fine.
+export async function createFriendCode(code: string) {
+  const res = await admin<{ discountCodeBasicCreate: { userErrors: UserErrors } }>(
+    `mutation($input: DiscountCodeBasicInput!) {
+      discountCodeBasicCreate(basicCodeDiscount: $input) { userErrors { field message } }
+    }`,
+    {
+      input: {
+        title: `Friend link ${code}`,
+        code,
+        startsAt: new Date().toISOString(),
+        appliesOncePerCustomer: true,
+        context: { all: "ALL" },
+        customerGets: { value: { percentage: FRIEND_DISCOUNT_PERCENT / 100 }, items: { all: true } },
+        combinesWith: { orderDiscounts: false, productDiscounts: false, shippingDiscounts: true },
+      },
+    },
+  );
+  const errors = res.discountCodeBasicCreate.userErrors.filter((e) => !/unique|already/i.test(e.message));
+  ok({ userErrors: errors }, "discountCodeBasicCreate");
 }
 
 // The product in the given market's storefront, so the shopper checks out in that market's currency.

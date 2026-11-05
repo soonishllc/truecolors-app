@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import {
-  recordCancelledOrder, recordFulfillment, recordOrder, recordRefund,
+  recordCancelledOrder, recordFulfillment, recordOrder, recordRefund, settleCharges,
 } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
 import { webhookEvents } from "@/lib/db/schema";
 import { verifyWebhook, type OrderPayload } from "@/lib/shopify/webhooks";
+import { trackOrder } from "@/lib/analytics";
 import { recordSettlementPayment } from "@/lib/wholesale/consignment";
 import { recordWholesaleShopifyOrder } from "@/lib/wholesale/orders";
 
@@ -13,8 +14,13 @@ const HANDLERS: Record<string, (body: never) => Promise<void>> = {
   // Campaign pre-orders, wholesale orders and settlement payments all arrive here; each handler ignores the rest.
   "orders/create": async (order: OrderPayload) => {
     await recordOrder(order);
+    await trackOrder(order);
     await recordWholesaleShopifyOrder(order);
     await recordSettlementPayment(order);
+  },
+  // A pre-order's card charge went through: count it now rather than at the next tick.
+  "orders/paid": async (order: OrderPayload) => {
+    await settleCharges(new Date(), String(order.id));
   },
   "orders/cancelled": recordCancelledOrder,
   "refunds/create": recordRefund,

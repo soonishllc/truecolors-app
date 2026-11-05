@@ -82,8 +82,10 @@ if (typeof window !== "undefined" && window.self !== window.top) {
   window.addEventListener("message", (e) => {
     if (e.source !== window.parent || e.data?.type !== "tc-viewport") return;
     viewport = { top: Number(e.data.top) || 0, height: Number(e.data.height) || 0 };
-    // Where the bottom of the screen is, for bars pinned to it (see .sticky-buy).
+    // Where the screen is, for bars pinned to its bottom (see .sticky-buy) and cards centred on it (.busy-screen).
     document.documentElement.style.setProperty("--screen-bottom", `${viewport.top + viewport.height}px`);
+    document.documentElement.style.setProperty("--screen-top", `${viewport.top}px`);
+    document.documentElement.style.setProperty("--screen-h", `${viewport.height}px`);
     watchers.forEach((w) => w(viewport!));
   });
   // Design tiles sweep to colour once they come on screen, as they do with view() outside a frame.

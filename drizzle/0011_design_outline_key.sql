@@ -1,0 +1,1 @@
+ALTER TABLE "designs" ADD COLUMN "outline_key" text;

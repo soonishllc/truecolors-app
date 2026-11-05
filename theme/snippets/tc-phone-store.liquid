@@ -1,0 +1,113 @@
+{%- comment -%}
+  Truecolors: the store's header and footer on phones, and the black header on every page.
+  - On phones the menu links are hidden by the theme with nothing in their place; this adds a Menu button that
+    opens them full screen, with the account link and the UAE / USA switch, and keeps the header to one row:
+    logo, cart, menu.
+  - The footer's columns shrink to the phone's width instead of the long email and WhatsApp links pushing them off,
+    and the logo gets its own row so it doesn't run over the first column's heading.
+  - Every page gets the home page's black header (pair it with the colour logo in the header settings).
+
+  Add to layout/theme.liquid, just before </body>:  {% render 'tc-phone-store' %}
+{%- endcomment -%}
+<style>
+  .site-header { background: var(--c-dark, #111); border-bottom: 0; }
+  .site-header .site-nav a, .site-header .header-actions a { color: #fff; }
+  .site-header .cart-btn { background: #ffffff24; color: #fff; white-space: nowrap; }
+  /* Sections reached by a link stop below the sticky header, not under it. */
+  main [id] { scroll-margin-top: 96px; }
+  .footer-grid > * { min-width: 0; }
+  .footer-col a { overflow-wrap: anywhere; }
+  .tc-menu-btn, .tc-menu { display: none; }
+  @media (max-width: 820px) {
+    .site-header { height: 60px; padding: 0 16px; gap: 12px; }
+    .header-logo img { height: 22px; }
+    .header-actions { gap: 8px; }
+    /* In the menu instead. */
+    .header-actions .tc-market-switch, .header-actions a[href*="/account"] { display: none; }
+    .site-header .cart-btn { height: 38px; padding: 0 14px; }
+    .tc-menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 38px; padding: 0; border: 0; border-radius: var(--radius, 4px); background: #ffffff24; color: #fff; cursor: pointer; }
+    .tc-menu-btn svg { width: 20px; height: 20px; }
+    .tc-menu { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; padding: 16px 20px calc(24px + env(safe-area-inset-bottom)); background: var(--c-dark, #111); color: #fff; overflow-y: auto; opacity: 0; visibility: hidden; transition: opacity .2s, visibility .2s; }
+    .tc-menu.open { opacity: 1; visibility: visible; }
+    .tc-menu-top { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-bottom: 24px; }
+    .tc-menu-top img { height: 22px; width: auto; }
+    .tc-menu-close { width: 42px; height: 38px; border: 0; border-radius: var(--radius, 4px); background: #ffffff24; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+    .tc-menu nav a { display: block; padding: 14px 0; border-bottom: 1px solid #ffffff1f; color: #fff; text-decoration: none; font-family: var(--font); font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
+    .tc-menu-foot { margin-top: auto; padding-top: 28px; display: grid; gap: 14px; }
+    .tc-menu-foot .tc-menu-label { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #ffffff99; }
+    .tc-menu-markets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tc-menu-markets button, .tc-menu-account { padding: 14px; border: 1.5px solid #ffffff33; border-radius: var(--radius, 4px); background: transparent; color: #fff; font-family: var(--font); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: center; text-decoration: none; cursor: pointer; }
+    .tc-menu-markets button.on { background: #fff; color: #111; border-color: #fff; }
+    html.tc-menu-open, html.tc-menu-open body { overflow: hidden; }
+    /* Footer: the logo and blurb get their own row (the logo is wider than half the screen), then the link
+       columns in pairs, then the market switch and the legal lines stacked. */
+    .footer-grid { gap: 32px 20px; }
+    .footer-brand { grid-column: 1 / -1; }
+    .footer-brand img { max-width: 180px; height: auto; }
+    .footer-brand p { max-width: none; }
+    .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .footer-bottom p { margin: 0; }
+  }
+</style>
+<script>
+  // A link to a section of another page (the footer's SolarShift™ Ink, How It Works): land on it once the page has
+  // loaded. The theme's smooth scrolling and its late-loading images can leave the browser at the top otherwise.
+  window.addEventListener("load", function () {
+    var id = location.hash && decodeURIComponent(location.hash.slice(1));
+    var target = id && document.getElementById(id);
+    if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
+  });
+  (function () {
+    var header = document.querySelector(".site-header");
+    var actions = header && header.querySelector(".header-actions");
+    if (!actions || document.querySelector(".tc-menu")) return;
+    var form = document.getElementById("localization_form");
+    var current = form && form.querySelector('[name="country_code"][aria-selected="true"]');
+    var account = actions.querySelector('a[href*="/account"]');
+    var logo = header.querySelector(".header-logo img");
+    var el = function (tag, attrs, html) {
+      var e = document.createElement(tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      if (html) e.innerHTML = html;
+      return e;
+    };
+    var menu = el("div", { class: "tc-menu", role: "dialog", "aria-modal": "true", "aria-label": "Menu", id: "tc-menu" });
+    var top = el("div", { class: "tc-menu-top" });
+    if (logo) top.appendChild(el("img", { src: logo.src, alt: logo.alt }));
+    var close = el("button", { type: "button", class: "tc-menu-close", "aria-label": "Close menu" }, "×");
+    top.appendChild(close);
+    menu.appendChild(top);
+    var nav = el("nav", { "aria-label": "Main navigation" });
+    header.querySelectorAll(".site-nav a").forEach(function (a) { nav.appendChild(el("a", { href: a.getAttribute("href") }, a.textContent)); });
+    menu.appendChild(nav);
+    var foot = el("div", { class: "tc-menu-foot" });
+    if (form) {
+      foot.appendChild(el("div", { class: "tc-menu-label" }, "Shop from"));
+      var markets = el("div", { class: "tc-menu-markets" });
+      [["AE", "UAE · AED"], ["US", "USA · USD"]].forEach(function (m) {
+        var b = el("button", { type: "button", class: current && current.value === m[0] ? "on" : "" }, m[1]);
+        b.addEventListener("click", function () {
+          var submit = form.querySelector('[name="country_code"][value="' + m[0] + '"]');
+          if (submit && form.requestSubmit) form.requestSubmit(submit);
+        });
+        markets.appendChild(b);
+      });
+      foot.appendChild(markets);
+    }
+    if (account) foot.appendChild(el("a", { href: account.getAttribute("href"), class: "tc-menu-account" }, account.textContent.trim()));
+    menu.appendChild(foot);
+    document.body.appendChild(menu);
+    var button = el("button", { type: "button", class: "tc-menu-btn", "aria-label": "Menu", "aria-controls": "tc-menu", "aria-expanded": "false" },
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>');
+    actions.appendChild(button);
+    var set = function (open) {
+      menu.classList.toggle("open", open);
+      document.documentElement.classList.toggle("tc-menu-open", open);
+      button.setAttribute("aria-expanded", String(open));
+      (open ? close : button).focus();
+    };
+    button.addEventListener("click", function () { set(true); });
+    close.addEventListener("click", function () { set(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && menu.classList.contains("open")) set(false); });
+  })();
+</script>

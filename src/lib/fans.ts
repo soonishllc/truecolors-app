@@ -6,12 +6,13 @@ import { shopify } from "./campaigns/shopify-ops";
 import { config } from "./config";
 import { db } from "./db/client";
 import {
-  campaigns, challengeEntries, challenges, designs, fanRewards, fans, pledges, users, votes, waitlist,
+  campaigns, challengeEntries, challenges, designs, fanRewards, fans, friendCodes, pledges, users, votes, waitlist,
 } from "./db/schema";
 import { UserError } from "./design/service";
 import { sendEmail } from "./email";
-import { PRICE_CENTS, REFERRALS_PER_REWARD } from "./rules";
-import { publicUrl, safePath } from "./links";
+import { PREORDER_PRICE, PRICE_CENTS, REFERRALS_PER_REWARD, friendCode } from "./rules";
+import { publicUrl, safePath, storefront } from "./links";
+import { throttleEmail } from "./ratelimit";
 
 // Fans have no passwords: they confirm their email once from a link, and a cookie remembers them for a year.
 
@@ -37,10 +38,11 @@ export async function ensureFan(emailInput: string) {
   return fan ?? (await d.select().from(fans).where(eq(fans.email, email)))[0];
 }
 
-// Emails a link that confirms the address and brings them back to `next`. Returns the link in dev.
-export async function sendFanLink(emailInput: string, next: string, why: string): Promise<string | undefined> {
+// Emails a link that confirms the address and brings them back to `next`, joining the waitlist `join` on the way
+// if given (the token is sealed, so it can't be swapped). Returns the link in dev.
+export async function sendFanLink(emailInput: string, next: string, why: string, join?: string): Promise<string | undefined> {
   const fan = await ensureFan(emailInput);
-  const link = `${config().APP_URL}/fan/verify?token=${seal({ fanId: fan.id, next: safePath(next, "/me") }, 24 * 60)}`;
+  const link = `${config().APP_URL}/fan/verify?token=${seal({ fanId: fan.id, next: safePath(next, "/me"), join }, 24 * 60)}`;
   await sendEmail({
     to: fan.email,
     subject: "Confirm your email for Truecolors",
@@ -50,10 +52,14 @@ export async function sendFanLink(emailInput: string, next: string, why: string)
 }
 
 export async function verifyFan(token: string): Promise<string | undefined> {
-  const t = unseal<{ fanId: string; next: string }>(token);
+  const t = unseal<{ fanId: string; next: string; join?: string }>(token);
   if (!t) return;
   const d = await db();
   await d.update(fans).set({ verifiedAt: new Date() }).where(and(eq(fans.id, t.fanId), isNull(fans.verifiedAt)));
+  if (t.join && WAITLIST_TARGET.test(t.join)) {
+    const [fan] = await d.select().from(fans).where(eq(fans.id, t.fanId));
+    if (fan) await joinWaitlist(fan.email, t.join);
+  }
   (await cookies()).set(FAN_COOKIE, seal({ fanId: t.fanId }, YEAR_MINUTES), {
     httpOnly: true, sameSite: "lax", secure: config().APP_URL.startsWith("https"), path: "/", maxAge: YEAR_MINUTES * 60,
   });
@@ -68,11 +74,82 @@ export async function currentFan() {
   return fan?.verifiedAt ? fan : undefined;
 }
 
+// The backer arriving from their post-checkout email (?backed=<token>): who they are, without a cookie, which a
+// store page's frame may not keep.
+export async function fanFromBackedLink(token: string | undefined) {
+  const t = unseal<{ fanId: string }>(token);
+  if (!t) return;
+  const d = await db();
+  const [fan] = await d.select().from(fans).where(eq(fans.id, t.fanId));
+  return fan;
+}
+
+// A backer's edition numbers on a campaign: shirts are numbered in the order they were pre-ordered.
+export const backerNumbers = (campaignId: string, email: string) =>
+  editionNumbers(campaignId, (r) => r.email === email);
+
+async function editionNumbers(campaignId: string, mine: (r: { email: string | null; orderId: string }) => boolean) {
+  const d = await db();
+  const rows = await d
+    .select({ email: pledges.email, orderId: pledges.shopifyOrderId, quantity: pledges.quantity })
+    .from(pledges)
+    .where(and(eq(pledges.campaignId, campaignId), inArray(pledges.status, ["pledged", "charge_pending", "charged", "charge_failed"])))
+    .orderBy(pledges.createdAt);
+  const numbers: number[] = [];
+  let n = 0;
+  for (const r of rows) {
+    for (let i = 0; i < r.quantity; i++) {
+      n++;
+      if (mine(r)) numbers.push(n);
+    }
+  }
+  return numbers;
+}
+
+// What the Thank you and Order status pages show a backer (extensions/backer-share-card): for each design in the
+// order, its edition numbers and the backer's own link back to it, in the store of the market they paid in.
+export async function orderBackings(shopifyOrderId: string) {
+  const d = await db();
+  const rows = await d
+    .select({ c: campaigns, email: pledges.email, currency: pledges.currency })
+    .from(pledges)
+    .innerJoin(campaigns, eq(campaigns.id, pledges.campaignId))
+    .where(and(eq(pledges.shopifyOrderId, shopifyOrderId), inArray(pledges.status, ["pledged", "charge_pending", "charged", "charge_failed"])))
+    .orderBy(pledges.createdAt);
+  const byCampaign = new Map(rows.map((r) => [r.c.id, r]));
+  return Promise.all([...byCampaign.values()].map(async ({ c, email, currency }) => {
+    const fan = email ? (await d.select().from(fans).where(eq(fans.email, email)))[0] : undefined;
+    const page = `${storefront(currency === PREORDER_PRICE.US.currency ? "US" : "AE")}${config().PROXY_PATH}/c/${c.slug}`;
+    return {
+      slug: c.slug,
+      title: c.title,
+      numbers: await editionNumbers(c.id, (r) => r.orderId === shopifyOrderId),
+      url: fan ? `${page}?backed=${encodeURIComponent(seal({ fanId: fan.id }, 60 * 24 * 90))}` : page,
+    };
+  }));
+}
+
 // ---- Waitlists ---------------------------------------------------------------------------------------
 
 export const designerTarget = (userId: string) => `designer:${userId}`;
 // A campaign and its relaunch share one list, keyed by the first campaign.
 export const campaignTarget = (c: { id: string; relaunchOf: string | null }) => `campaign:${c.relaunchOf ?? c.id}`;
+
+export const WAITLIST_TARGET = /^(designer|campaign):[0-9a-f-]{36}$/;
+
+// Double opt-in: a fan already confirmed in this browser joins straight away; anyone else gets a link that confirms
+// their email and joins them. Returns whether they're on the list now, and the link in dev.
+export async function requestWaitlist(emailInput: string, target: string, next: string) {
+  if (!WAITLIST_TARGET.test(target)) throw new UserError("Something went wrong. Reload the page and try again.");
+  const email = cleanEmail(emailInput);
+  const fan = await currentFan();
+  if (fan?.email === email) {
+    await joinWaitlist(email, target);
+    return { joined: true as const };
+  }
+  await throttleEmail(email);
+  return { joined: false as const, link: await sendFanLink(email, next, "follow along", target) };
+}
 
 export async function joinWaitlist(emailInput: string, target: string) {
   const email = cleanEmail(emailInput);
@@ -113,7 +190,7 @@ export async function referralStats(fan: typeof fans.$inferSelect) {
   const own = or(isNull(pledges.email), ne(pledges.email, fan.email));
   const [row] = await d
     .select({
-      pending: sql<number>`coalesce(sum(${pledges.quantity}) filter (where ${pledges.status} in ('pledged','charge_failed')), 0)::int`,
+      pending: sql<number>`coalesce(sum(${pledges.quantity}) filter (where ${pledges.status} in ('pledged','charge_pending','charge_failed')), 0)::int`,
       charged: sql<number>`coalesce(sum(${pledges.quantity}) filter (where ${pledges.status} = 'charged'), 0)::int`,
     })
     .from(pledges)
@@ -147,6 +224,32 @@ export async function issueFanRewards(log: string[] = []) {
     }
   }
   return log;
+}
+
+// Run by the cron tick: a friend code in Shopify for every referral link that doesn't have one yet: confirmed fans'
+// codes and the handles of designers with a live campaign.
+export async function issueFriendCodes(log: string[] = []) {
+  const d = await db();
+  const have = new Set((await d.select({ ref: friendCodes.ref }).from(friendCodes)).map((r) => r.ref));
+  const fanRefs = (await d.select({ ref: fans.referralCode }).from(fans).where(sql`${fans.verifiedAt} is not null`)).map((r) => r.ref);
+  const designerRefs = (await d.selectDistinct({ ref: users.handle }).from(users)
+    .innerJoin(campaigns, eq(campaigns.userId, users.id)).where(eq(campaigns.status, "live"))).map((r) => r.ref.toLowerCase());
+  for (const ref of [...new Set([...fanRefs, ...designerRefs])]) {
+    if (have.has(ref)) continue;
+    const code = friendCode(ref);
+    await shopify().createFriendCode(code);
+    await d.insert(friendCodes).values({ ref, code }).onConflictDoNothing();
+    log.push(`friend code ${code}`);
+  }
+  return log;
+}
+
+// The friend code for a referral link, once it's live in Shopify.
+export async function friendCodeFor(ref: string | undefined) {
+  if (!ref) return;
+  const d = await db();
+  const [row] = await d.select().from(friendCodes).where(eq(friendCodes.ref, ref.toLowerCase()));
+  return row?.code;
 }
 
 export async function fanByReferralCode(code: string) {

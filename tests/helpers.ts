@@ -12,31 +12,45 @@ export async function freshDb() {
 export type FakeShopify = ShopifyOps & {
   charges: { orderId: string; amountCents?: number; currency?: string }[];
   rewardCodes: string[];
+  friendCodes: string[];
   cancelled: string[];
   failOrders: Set<string>;
+  processing: Set<string>;
+  declineLater: Set<string>;
 };
 
 export function fakeShopify(): FakeShopify {
   const fake: FakeShopify = {
     charges: [],
     rewardCodes: [],
+    friendCodes: [],
     cancelled: [],
     failOrders: new Set(),
+    processing: new Set(),
+    declineLater: new Set(),
     createCampaignProduct: async (input) => ({
       productId: `p-${input.designCode}`,
       handle: input.designCode.toLowerCase(),
       variantIds: { S: "v1", M: "v2", L: "v3", XL: "v4" },
       sellingPlanGroupId: "spg-1",
+      sellingPlanId: "701",
     }),
     chargeOrder: async (orderId, _key, amount) => {
       fake.charges.push({ orderId, amountCents: amount?.cents, currency: amount?.currency });
       return fake.failOrders.has(orderId) ? { ok: false, error: "Card declined" } : { ok: true, reference: `ref-${orderId}` };
     },
+    // Charges settle as paid unless the test says they're still processing or were declined later.
+    chargeStatus: async (orderId) =>
+      fake.processing.has(orderId) ? { state: "waiting" as const }
+        : fake.declineLater.has(orderId) ? { state: "failed" as const, error: "Declined by the bank" } : { state: "paid" as const },
     cancelOrder: async (orderId) => {
       fake.cancelled.push(orderId);
     },
     createRewardCode: async (code) => {
       fake.rewardCodes.push(code);
+    },
+    createFriendCode: async (code) => {
+      fake.friendCodes.push(code);
     },
   };
   useShopify(fake);
@@ -74,7 +88,10 @@ const MARKET_PRICES = {
 export function order(
   productId: string,
   qty: number,
-  opts: { ref?: string; size?: string; extraLine?: boolean; alsoProduct?: string; email?: string; city?: string; market?: "US" | "AE" } = {},
+  opts: {
+    ref?: string; size?: string; extraLine?: boolean; alsoProduct?: string; email?: string; city?: string; market?: "US" | "AE";
+    discountCode?: string;
+  } = {},
 ): OrderPayload {
   const id = orderSeq++;
   const m = MARKET_PRICES[opts.market ?? "US"];
@@ -94,6 +111,7 @@ export function order(
   return {
     id, name: `#${id}`, currency: "AED", presentment_currency: m.currency, line_items: lines,
     note_attributes: opts.ref ? [{ name: "tc_ref", value: opts.ref }] : [],
+    discount_codes: opts.discountCode ? [{ code: opts.discountCode }] : [],
     email: opts.email ?? `backer${id}@example.com`,
     shipping_address: { city: opts.city ?? "Austin" },
   };

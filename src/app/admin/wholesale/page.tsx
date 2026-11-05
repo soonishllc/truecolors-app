@@ -107,7 +107,7 @@ export default async function WholesaleAdmin() {
         <tbody>
           {queue.restocks.map(({ r, outlet, wholesaler }) => (
             <tr key={r.id}>
-              <td><strong>{outlet.name}</strong><br /><span className="small muted">{wholesaler.name} · from {outlet.supplyRoute}</span></td>
+              <td><strong>{outlet.name}</strong><br /><span className="small muted">{wholesaler.name}</span></td>
               <td className="small">{r.lines.map((l) => <div key={l.sku}>{l.quantity} × {l.title} {l.size}</div>)}{r.note && <div className="muted">“{r.note}”</div>}</td>
               <td>{r.units} shirts<br /><span className="badge">{r.status}</span></td>
               <td>
@@ -297,7 +297,7 @@ export default async function WholesaleAdmin() {
               <td><strong>{w.name}</strong><br /><span className="small muted">{w.currency}{w.shopifyCustomerId ? ` · customer ${w.shopifyCustomerId}` : " · no Shopify customer"}</span></td>
               <td>{[w.stockist && "Stockist", w.displayPartner && "Display partner"].filter(Boolean).join(", ")}</td>
               <td className="small">{contacts.map((c) => <div key={c.id}>{c.name} ({c.role}) {c.phone && `+${c.phone}`} {c.email}</div>)}</td>
-              <td className="small">{outlets.map((o) => <div key={o.id}>{o.name}, {o.city} · {o.supplyRoute}</div>)}</td>
+              <td className="small">{outlets.map((o) => <div key={o.id}>{o.name}, {o.city}</div>)}</td>
             </tr>
           ))}
         </tbody>
@@ -340,13 +340,7 @@ export default async function WholesaleAdmin() {
             <label>Shopify location ID<input name="shopifyLocationId" /></label>
             <label>Usual stock per design and size<input name="parPerSku" type="number" min={1} defaultValue={6} /></label>
             <label>Settle every<select name="settlementDays"><option value="15">15 days</option><option value="7">week (busy outlets)</option></select></label>
-            <label>Restocks come from
-              <select name="supplyRoute">
-                <option value="quiqup">Quiqup (UAE, GCC)</option>
-                <option value="shipdudes">Shipdudes (US, Canada, islands)</option>
-                <option value="cancun">Cancún by FedEx</option>
-              </select>
-            </label>
+            <p className="small muted">Restocks ship from Cancún by FedEx, like all wholesale.</p>
           </ActionForm>
         </div>
       </div>

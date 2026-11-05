@@ -2,20 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/LegalPage";
 import { BRAND, CONTACT } from "@/lib/brand";
-import { config } from "@/lib/config";
+import { storefront } from "@/lib/links";
 import { money } from "@/lib/format";
-import { CAMPAIGN_DAYS, CHARGE_RETRY_HOURS, FUNDING_GOAL, PREORDER_PRICE, RETURN_WINDOW_DAYS, SIZES } from "@/lib/rules";
+import { GARMENT, CAMPAIGN_DAYS, CHARGE_RETRY_HOURS, FUNDING_GOAL, PREORDER_PRICE, RETURN_WINDOW_DAYS, SIZES } from "@/lib/rules";
 
 export const metadata: Metadata = { title: `Pre-orders, shipping and returns · ${BRAND}` };
 
 export default function PreOrders() {
-  const store = config().STORE_URL;
   return (
     <LegalPage title="Pre-orders, shipping and returns">
       <p>
         Every design on {BRAND} is made to order in a numbered limited run. This page explains how that works. Orders
-        are placed through our store, so its <a href={`${new URL(store).origin}/policies/refund-policy`}>refund
-        policy</a> and <a href={`${new URL(store).origin}/policies/shipping-policy`}>shipping policy</a> also apply;
+        are placed through our store, so its <a href={`${storefront()}/policies/refund-policy`}>refund
+        policy</a> and <a href={`${storefront()}/policies/shipping-policy`}>shipping policy</a> also apply;
         where they differ for pre-orders, this page applies.
       </p>
 
@@ -44,8 +43,9 @@ export default function PreOrders() {
 
       <h2>Production and shipping</h2>
       <p>
-        Funded shirts are screen-printed in batches and usually ship 3 to 4 weeks after the campaign closes. Our UAE
-        store ships across the UAE and the Gulf from Dubai, and our USA store ships to US addresses from Las Vegas. Shipping cost and delivery time are
+        Every shirt is made in Canc&uacute;n, Mexico. Funded shirts are printed in batches and usually ship 3 to 4 weeks
+        after the campaign closes. Our UAE store ships across the UAE and the Gulf from Dubai, and our USA store ships to
+        US addresses from Las Vegas. Shipping cost and delivery time are
         shown at checkout, and you&rsquo;ll get tracking by email when your shirt ships. If production is delayed,
         we&rsquo;ll email you a new date; if the delay is more than 30 days, you can cancel for a full refund.
       </p>
@@ -59,10 +59,7 @@ export default function PreOrders() {
       </ul>
 
       <h2>Care</h2>
-      <p>
-        Wash inside out in cold water and hang to dry, out of direct sun. Don&rsquo;t bleach, tumble dry or iron the
-        print. Long hours in strong sun will slowly fade any UV-reactive ink, as with all colour-changing prints.
-      </p>
+      <p>{GARMENT.care}</p>
     </LegalPage>
   );
 }

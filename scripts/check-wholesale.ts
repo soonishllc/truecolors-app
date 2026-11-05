@@ -34,7 +34,7 @@ async function main() {
     ["ANTHROPIC_API_KEY", "the bot"], ["GORGIAS_DOMAIN", "WhatsApp"], ["GORGIAS_USERNAME", "WhatsApp"], ["GORGIAS_API_KEY", "WhatsApp"],
     ["GORGIAS_WEBHOOK_SECRET", "WhatsApp"], ["SHOPIFY_ADMIN_TOKEN", "everything"], ["SHOPIFY_WEBHOOK_SECRET", "paid orders"],
     ["SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID", "portal sign-in"], ["SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET", "portal sign-in"],
-    ["WHOLESALE_LOCATION_ID", "Cancún stock"], ["QUIQUP_LOCATION_ID", "UAE/GCC restocks"], ["SHIPDUDES_LOCATION_ID", "US restocks"],
+    ["WHOLESALE_LOCATION_ID", "Cancún stock, stockist orders and display restocks"],
     ["WHOLESALE_BANK_DETAILS", "bank transfers"], ["FEDEX_API_KEY", "shipping"], ["FEDEX_SECRET_KEY", "shipping"], ["FEDEX_ACCOUNT_NUMBER", "shipping"],
   ] as const) {
     if (c[key]) pass(key);
@@ -75,7 +75,7 @@ async function main() {
   } else if (catalog) {
     fail("Wholesale catalog", `no active products in the "${c.WHOLESALE_COLLECTION_HANDLE}" collection`);
   }
-  for (const [label, id] of [["Cancún", c.WHOLESALE_LOCATION_ID], ["Quiqup", c.QUIQUP_LOCATION_ID], ["Shipdudes", c.SHIPDUDES_LOCATION_ID]] as const) {
+  for (const [label, id] of [["Cancún", c.WHOLESALE_LOCATION_ID]] as const) {
     if (!id) continue;
     await check(`${label} location ${id}`, async () => {
       const lines = await locationStock(id);
