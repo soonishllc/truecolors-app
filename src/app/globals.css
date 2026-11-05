@@ -620,7 +620,7 @@ html.in-app {
   font-size: 15px;
   line-height: 1.5;
 }
-.in-app main { max-width: none; padding: 0 20px 24px; }
+.in-app main { max-width: 1280px; margin: 0 auto; padding: 0 20px 24px; }
 .in-app h1, .in-app h2, .in-app h3 { font-weight: 600; letter-spacing: -0.02em; }
 .in-app .eyebrow { font-size: 11px; letter-spacing: 0.1em; color: var(--gold); }
 .in-app .button, .in-app button { border-radius: var(--radius); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 13px 28px; }
@@ -956,8 +956,8 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
 
 /* The animated hero inside the store: edge to edge and most of the screen tall, like the store's home page hero.
    The frame is as tall as the page, so the height comes from the store window's (--screen-h, from FrameBridge). */
-.in-app .hero { margin: 0 calc(50% - 50vw) 18px; padding: 28px max(20px, calc(50vw - 574px)); border-radius: 0; }
-.in-app .hero.photo.short { min-height: max(420px, calc(var(--screen-h, 100vh) * 0.72)); justify-content: flex-end; }
+.in-app .hero { margin: 0 calc(50% - 50vw) 18px; padding: 40px max(20px, calc(50vw - 620px)); border-radius: 0; }
+.in-app .hero.photo.short { min-height: max(440px, calc(var(--screen-h, 100vh) * 0.86)); justify-content: flex-end; }
 .in-app .hero.short h1 { font-size: clamp(34px, 9vw, 56px); }
 @media (max-width: 720px) {
   .in-app .hero-bg video { max-width: none; width: 100%; -webkit-mask-image: none; mask-image: none; object-position: 65% 20%; }

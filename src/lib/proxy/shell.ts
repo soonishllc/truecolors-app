@@ -27,8 +27,8 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
   start.searchParams.set("next", src.pathname + src.search);
   // The Liquid here is ours, not user content: the market comes from the store so prices and checkout links match it.
   // The app's pages are dark, so the band around the frame is too, edge to edge (the same colour as html.in-app's --bg).
-  // No side padding: the app pads its own pages, so its hero can run to the screen's edges.
-  return `${input.meta ? shareAssigns(input.meta) : ""}<div style="background:oklch(0.16 0.01 80)"><div class="tc-embed" style="max-width:1280px;margin:0 auto;padding:24px 0 48px">
+  // Full width, no side padding: the app centres and pads its own pages, so its hero can run to the screen's edges.
+  return `${input.meta ? shareAssigns(input.meta) : ""}<div style="background:oklch(0.16 0.01 80)"><div class="tc-embed" style="padding:16px 0 48px">
   <iframe id="tc-app" title="Truecolors" scrolling="no" allow="clipboard-write; web-share" data-src="${start.toString().replace(/"/g, "&quot;")}" style="display:block;width:100%;min-height:80vh;border:0;overflow:hidden;color-scheme:dark"></iframe>
 </div></div>
 <script>
