@@ -99,7 +99,7 @@ export async function POST(req: Request, { params }: Ctx) {
   // Back to the same page in the market just picked: a USA address (/en-us/…) would put the visitor back in the USA.
   const back = String(form.get("return_to") ?? "").replace(new RegExp(`^/${US_PATH}(?=/|$)`), "") || "/";
   const to = back.startsWith(BASE) ? back : back.startsWith("/") ? `${BASE}${back}` : req.headers.get("referer") ?? BASE;
-  return Response.redirect(new URL(to, req.url), 303);
+  return Response.redirect(new URL(to, config().APP_URL), 303);
 }
 
 // Stands in for the store's sign-in: pick who to be.

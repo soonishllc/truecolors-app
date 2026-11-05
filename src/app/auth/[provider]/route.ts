@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import { NextResponse } from "next/server";
 import { saveHandshake } from "@/lib/auth/session";
 import { authorizeUrl, enabledProviders, isProvider } from "@/lib/auth/oauth";
@@ -6,7 +7,7 @@ import { authorizeUrl, enabledProviders, isProvider } from "@/lib/auth/oauth";
 export async function GET(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   if (!isProvider(provider) || !enabledProviders().includes(provider)) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", config().APP_URL));
   }
   const { url, handshake } = authorizeUrl(provider);
   await saveHandshake(handshake);

@@ -11,5 +11,5 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const admin = config().ADMIN_EMAILS.split(",")[0]?.trim().toLowerCase();
   await signInAsDemoUser(q.get("as") === "admin" && admin ? admin : "designer@demo.example");
-  return NextResponse.redirect(new URL(safePath(q.get("next"), "/studio"), req.url), 303);
+  return NextResponse.redirect(new URL(safePath(q.get("next"), "/studio"), config().APP_URL), 303);
 }

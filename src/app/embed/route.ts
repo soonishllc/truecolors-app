@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { IN_STORE_COOKIE, safePath } from "@/lib/links";
@@ -9,7 +10,7 @@ import { takeHandoff } from "@/lib/proxy/handoff";
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const ok = await takeHandoff(q.get("t"));
-  const to = new URL(safePath(q.get("next"), "/explore"), req.url);
+  const to = new URL(safePath(q.get("next"), "/explore"), config().APP_URL);
   const jar = await cookies();
   // Remembered for the rest of the visit: pages opened from here are in the store, in the store's market.
   jar.set(IN_STORE_COOKIE, "1", { httpOnly: true, sameSite: "lax", secure: to.protocol === "https:", path: "/" });

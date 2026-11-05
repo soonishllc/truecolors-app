@@ -8,5 +8,5 @@ export async function GET(req: Request) {
   if (!config().WHOLESALE_DEMO) return new Response("Not found", { status: 404 });
   const q = new URL(req.url).searchParams;
   await signInAsDemo(q.get("as") === "partner" ? "partner@demo.example" : "stockist@demo.example");
-  return NextResponse.redirect(new URL(safePath(q.get("next"), "/wholesale"), req.url), 303);
+  return NextResponse.redirect(new URL(safePath(q.get("next"), "/wholesale"), config().APP_URL), 303);
 }
