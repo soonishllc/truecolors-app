@@ -19,3 +19,6 @@ __pycache__/
 extensions/*/dist/
 extensions/*/manifest.json
 extensions/*/shopify.d.ts
+
+# Working copy of the Shopify theme (pulled and pushed with the Shopify CLI)
+.theme-work/
