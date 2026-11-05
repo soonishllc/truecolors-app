@@ -43,6 +43,9 @@ services:
         sync: false
       - key: S3_ENDPOINT
         sync: false
+      # "auto" for Cloudflare R2; the bucket's region (e.g. us-east-1) for AWS S3, with S3_ENDPOINT left empty.
+      - key: S3_REGION
+        sync: false
       - key: S3_ACCESS_KEY_ID
         sync: false
       - key: S3_SECRET_ACCESS_KEY
