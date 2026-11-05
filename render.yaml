@@ -51,7 +51,11 @@ services:
         sync: false
       - key: S3_SECRET_ACCESS_KEY
         sync: false
-      - key: SHOPIFY_ADMIN_TOKEN
+      # The Dev Dashboard app's credentials (Settings → Credentials). The client secret also signs the store proxy and
+      # webhooks, so SHOPIFY_PROXY_SECRET and SHOPIFY_WEBHOOK_SECRET follow it when it's set.
+      - key: SHOPIFY_CLIENT_ID
+        sync: false
+      - key: SHOPIFY_CLIENT_SECRET
         sync: false
       - key: SHOPIFY_WEBHOOK_SECRET
         sync: false

@@ -35,6 +35,11 @@ const schema = z.object({
   SHOPIFY_PROXY_SECRET: z.string().optional(),
   // The store is segmented by market: the UAE is the store's root (AED), the USA this subfolder of it (USD).
   STORE_US_PATH: z.string().default("/en-us"),
+  // The Dev Dashboard app's credentials. The app trades them for a 24-hour Admin API token (client credentials
+  // grant), and Shopify signs the store proxy, webhooks and checkout extension with the client secret, so with
+  // these set the token and the two secrets below aren't needed.
+  SHOPIFY_CLIENT_ID: z.string().optional(),
+  SHOPIFY_CLIENT_SECRET: z.string().optional(),
   SHOPIFY_ADMIN_TOKEN: z.string().optional(),
   SHOPIFY_API_VERSION: z.string().default("2026-10"),
   SHOPIFY_WEBHOOK_SECRET: z.string().optional(),
@@ -113,7 +118,12 @@ export type Config = z.infer<typeof schema>;
 let cached: Config | undefined;
 
 export function config(): Config {
-  cached ??= schema.parse(process.env);
+  if (!cached) {
+    const c = schema.parse(process.env);
+    // The client secret is what Shopify signs with, so it wins over anything set for the proxy or webhooks.
+    const signing = c.SHOPIFY_CLIENT_SECRET;
+    cached = signing ? { ...c, SHOPIFY_PROXY_SECRET: signing, SHOPIFY_WEBHOOK_SECRET: signing } : c;
+  }
   return cached;
 }
 

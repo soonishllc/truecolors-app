@@ -1,0 +1,41 @@
+# The Truecolors app in Shopify's Dev Dashboard. `shopify app config link` fills in client_id the first time;
+# `shopify app deploy` then sends this configuration and the checkout extension (extensions/) to Shopify.
+
+name = "Truecolors"
+client_id = ""
+application_url = "https://app.truecolors.global"
+embedded = false
+
+[access_scopes]
+# Campaign products, selling plans, catalogs and US prices: products, purchase_options, publications.
+# Charging saved cards when a campaign funds: payment_mandate and customer_payment_methods (protected: request
+# access for both in the Dev Dashboard). Orders, cancels and refunds: orders. Friend codes, rewards, two-pack:
+# discounts. Wholesale: draft_orders, inventory, locations, merchant_managed_fulfillment_orders. Store sign-in:
+# customers.
+scopes = "read_products,write_products,write_purchase_options,read_publications,write_publications,read_orders,write_orders,write_payment_mandate,read_customer_payment_methods,write_discounts,write_draft_orders,read_inventory,write_inventory,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_customers"
+
+[auth]
+redirect_urls = ["https://app.truecolors.global/api/shopify/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/create", "orders/paid", "orders/cancelled", "refunds/create", "fulfillments/create"]
+  uri = "https://app.truecolors.global/api/webhooks/shopify"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "https://app.truecolors.global/api/webhooks/shopify"
+
+# www.truecolors.global/apps/truecolors/* shows the app's pages inside the store.
+[app_proxy]
+url = "https://app.truecolors.global/proxy"
+subpath = "truecolors"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+include_config_on_deploy = true

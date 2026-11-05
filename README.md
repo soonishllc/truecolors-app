@@ -64,17 +64,7 @@ To see the studio dashboard with numbers in it, `npm run demo` (local database o
 
 ## Before the first live campaign
 
-- **Shopify custom app.**
-  - Create a custom app on the store with these scopes:
-    - `write_products`
-    - `write_orders`
-    - `read_orders`
-    - `write_purchase_options`
-    - `write_publications`
-    - `read_customer_payment_methods`
-    - `write_payment_mandate`
-  - Set `SHOPIFY_ADMIN_TOKEN`, `SHOPIFY_WEBHOOK_SECRET`, and `SHOPIFY_US_PUBLICATION_ID` (the publication behind the United States catalog).
-  - Run `npm run shopify:webhooks`.
+- **Shopify app (Dev Dashboard).** `shopify.app.toml` declares it: scopes, the store proxy at `/apps/truecolors`, the order webhooks and the compliance webhooks. Create the app in the Dev Dashboard (dev.shopify.com), then from this folder run `npx @shopify/cli app config link` (pick that app) and `npx @shopify/cli app deploy`, and install it on the store. Request access to the protected scopes `write_payment_mandate` and `read_customer_payment_methods` under the app's API access. Set `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET` from Settings → Credentials: the app trades them for its Admin API token, and the secret also checks the proxy and webhook signatures.
 - **Verify on a dev store.** The Shopify mutations follow the Admin GraphQL API but haven't been run against a store yet. On a development store, check all of the following:
   - `productCreate`
   - `productVariantsBulkCreate`
