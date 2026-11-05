@@ -23,7 +23,7 @@
     .header-logo img { height: 22px; }
     .header-actions { gap: 8px; }
     /* In the menu instead. */
-    .header-actions .tc-market-switch, .header-actions a[href*="/account"] { display: none; }
+    .header-actions .tc-market-switch, .header-actions a[href*="/account"], .header-actions .tc-account { display: none; }
     .site-header .cart-btn { height: 38px; padding: 0 14px; }
     .tc-menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 38px; padding: 0; border: 0; border-radius: var(--radius, 4px); background: #ffffff24; color: #fff; cursor: pointer; }
     .tc-menu-btn svg { width: 20px; height: 20px; }
@@ -63,7 +63,7 @@
     if (!actions || document.querySelector(".tc-menu")) return;
     var form = document.getElementById("localization_form");
     var current = form && form.querySelector('[name="country_code"][aria-selected="true"]');
-    var account = actions.querySelector('a[href*="/account"]');
+    var account = actions.querySelector('.tc-account, a[href*="/account"]');
     var logo = header.querySelector(".header-logo img");
     var el = function (tag, attrs, html) {
       var e = document.createElement(tag);
