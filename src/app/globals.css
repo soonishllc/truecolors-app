@@ -620,7 +620,7 @@ html.in-app {
   font-size: 15px;
   line-height: 1.5;
 }
-.in-app main { max-width: none; padding: 0 0 24px; }
+.in-app main { max-width: none; padding: 0 20px 24px; }
 .in-app h1, .in-app h2, .in-app h3 { font-weight: 600; letter-spacing: -0.02em; }
 .in-app .eyebrow { font-size: 11px; letter-spacing: 0.1em; color: var(--gold); }
 .in-app .button, .in-app button { border-radius: var(--radius); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 13px 28px; }
