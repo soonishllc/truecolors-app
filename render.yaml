@@ -51,12 +51,15 @@ services:
         sync: false
       - key: SHOPIFY_WEBHOOK_SECRET
         sync: false
+      # The Online Store sales channel (truecolors.global: 190786207986); without it campaign products aren't on the store.
+      - key: SHOPIFY_ONLINE_STORE_PUBLICATION_ID
+        value: "190786207986"
       - key: SHOPIFY_AE_PUBLICATION_ID
-        sync: false
+        value: "212825800946"
       - key: SHOPIFY_US_PUBLICATION_ID
-        sync: false
+        value: "212661010674"
       - key: SHOPIFY_US_PRICE_LIST_ID
-        sync: false
+        value: "20741030130"
       - key: RESEND_API_KEY
         sync: false
       - key: DESIGNER_AGREEMENT_VERSION
