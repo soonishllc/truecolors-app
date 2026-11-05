@@ -15,7 +15,14 @@ export default async function Challenges() {
       <p className="muted" style={{ maxWidth: 560 }}>
         Each challenge has a theme. Designers enter, you vote, and the winning design launches as a campaign.
       </p>
-      {list.length === 0 && <p className="muted">No challenges yet. The first one is coming soon.</p>}
+      {list.length === 0 && (
+        <div className="card empty-card">
+          <div className="eyebrow">Coming soon</div>
+          <h2 style={{ margin: "8px 0" }}>The first challenge drops soon</h2>
+          <p className="muted">Until then, the community&apos;s designs are live now, and every one needs backers to get printed.</p>
+          <Link href="/explore" className="button">Back a design</Link>
+        </div>
+      )}
       <div className="challenge-list">
         {list.map((ch) => {
           const p = phase(ch);

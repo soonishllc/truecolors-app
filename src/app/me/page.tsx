@@ -71,20 +71,23 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ con
           <h1>My pre-orders</h1>
           <p className="small muted">{fan.email}</p>
         </div>
-        <div className="kpis fan-kpis">
+        {/* Four zeros say nothing to someone new; the counts show once there's something to count. */}
+        {(orders.length > 0 || votes.length > 0) && <div className="kpis fan-kpis">
           <div className="kpi"><div className="eyebrow">Shirts</div><div className="kpi-num">{shirts}</div></div>
           <div className="kpi"><div className="eyebrow">Through your link</div><div className="kpi-num">{referrals.charged + referrals.pending}</div></div>
           <div className="kpi"><div className="eyebrow">Free tees</div><div className="kpi-num">{referrals.rewards.length}</div></div>
           <div className="kpi"><div className="eyebrow">Votes</div><div className="kpi-num">{votes.length}</div></div>
-        </div>
+        </div>}
       </section>
       {q.confirmed && <p className="notice good-notice">You&apos;re in. This page remembers you on this device.</p>}
 
       <h2>Pre-orders</h2>
       {orders.length === 0 && (
         <div className="card empty">
-          <p>No pre-orders with this email yet. If you used a different email at checkout, sign out and use that one.</p>
-          <p style={{ marginTop: 12 }}><Link className="button small" href="/explore">Explore designs</Link></p>
+          <h3 style={{ marginTop: 0 }}>Your first numbered tee is one click away</h3>
+          <p className="muted">Back a community design: you&apos;re only charged if it reaches its goal, and the earliest backers get the lowest numbers.</p>
+          <p className="small muted">Pre-ordered with a different email? Sign out and use that one.</p>
+          <p style={{ marginTop: 12 }}><Link className="button" href="/explore">See the live designs</Link></p>
         </div>
       )}
       <div className="orders">

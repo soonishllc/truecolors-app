@@ -47,7 +47,21 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
   var scrollToAnchor = function () {
     if (anchor !== null) scrollToY(frame.offsetTop + anchor);
   };
-  frame.addEventListener("load", function () { setTimeout(scrollToAnchor, 100); });
+  // Which part of the frame is on screen, so the app can pin its buy bar to the bottom of the screen and play its
+  // sun sweeps as designs scroll into view (the frame itself never scrolls). Any element may be the one scrolling.
+  var viewport = function () {
+    if (!frame.contentWindow) return;
+    frame.contentWindow.postMessage({ type: "tc-viewport", top: -frame.getBoundingClientRect().top, height: window.innerHeight }, app);
+  };
+  var queued = false;
+  var onScroll = function () {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; viewport(); });
+  };
+  document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+  window.addEventListener("resize", onScroll);
+  frame.addEventListener("load", function () { setTimeout(scrollToAnchor, 100); setTimeout(viewport, 150); });
   window.addEventListener("message", function (e) {
     if (e.origin !== app || !e.data || e.data.type !== "tc-frame") return;
     if (e.data.reload) {
@@ -56,6 +70,7 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
       return location.reload();
     }
     if (e.data.height) frame.style.height = e.data.height + "px";
+    if (e.data.height || e.data.viewport) onScroll();
     if (e.data.path) {
       var path = e.data.path === "/explore" ? "" : e.data.path;
       history.replaceState(null, "", root + prefix + path + (e.data.search || "") + (e.data.hash || ""));

@@ -8,6 +8,7 @@ import { listChallenges, phase } from "@/lib/challenges";
 import { onShirts } from "@/lib/media/shots";
 import { fileUrl } from "@/lib/storage";
 import { TileSweep } from "@/components/TileSweep";
+import { preorderPrice, visitorMarket } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Explore designs · Truecolors" };
@@ -43,6 +44,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
     : sort === "popular" ? b.backed - a.backed
     : b.c.createdAt.getTime() - a.c.createdAt.getTime(),
   );
+  const price = preorderPrice(await visitorMarket());
   const challenge = (await listChallenges()).find((ch) => phase(ch) !== "closed");
   const href = (p: Partial<Record<"show" | "sort" | "q", string>>) => {
     const params = new URLSearchParams({ show, sort, ...(term && { q: term }), ...p });
@@ -98,7 +100,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
                 {lineArt && <img className="art" src={fileUrl(lineArt)} alt="" />}
                 {art && <img className="art tile-sun" src={fileUrl(art)} alt={c.title} />}
                 {sweep && <TileSweep src={fileUrl(sweep)} />}
-                {c.status === "live" && days <= 3 && <span className="corner-badge">Ends in {days}d</span>}
+                {c.status === "live" && days <= 7 && <span className="corner-badge">Ends in {days}d</span>}
                 {c.editionSize && <span className="corner-badge">Edition of {c.editionSize}</span>}
               </Link>
               <div>
@@ -107,7 +109,7 @@ export default async function Explore({ searchParams }: { searchParams: Promise<
               </div>
               {c.status !== "missed" && <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>}
               <div className="meta">
-                {c.status === "live" ? `${backed} of ${c.goal} · ${days} days left`
+                {c.status === "live" ? <><b className="tile-price">{price}</b> · {Math.max(0, c.goal - backed)} to go · {days}d left</>
                   : c.status === "missed" ? `${backed} of ${c.goal} · ask for it back`
                   : `${backed} backed · funded`}
               </div>

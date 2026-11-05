@@ -44,8 +44,8 @@ export default function PreOrders() {
 
       <h2>Production and shipping</h2>
       <p>
-        Funded shirts are screen-printed in batches and usually ship 3 to 4 weeks after the campaign closes. We ship
-        pre-orders to addresses in the United States, from our Las Vegas warehouse. Shipping cost and delivery time are
+        Funded shirts are screen-printed in batches and usually ship 3 to 4 weeks after the campaign closes. Our UAE
+        store ships across the UAE and the Gulf from Dubai, and our USA store ships to US addresses from Las Vegas. Shipping cost and delivery time are
         shown at checkout, and you&rsquo;ll get tracking by email when your shirt ships. If production is delayed,
         we&rsquo;ll email you a new date; if the delay is more than 30 days, you can cancel for a full refund.
       </p>

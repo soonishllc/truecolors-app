@@ -30,6 +30,8 @@ export function FrameBridge({ stores }: { stores: string[] }) {
     const measure = () => send({ height: Math.ceil(document.documentElement.getBoundingClientRect().height) + 1 });
     // Sent again once everything has loaded, since the store page may still be settling the first time.
     const timers = [50, 600].map((ms) => setTimeout(() => toAnchor(send), ms));
+    // A new page: ask where the screen is, for its buy bar and tiles.
+    send({ viewport: true });
     const ro = new ResizeObserver(measure);
     ro.observe(document.body);
     measure();
@@ -69,6 +71,35 @@ export function FrameBridge({ stores }: { stores: string[] }) {
   }, [path, stores]);
 
   return null;
+}
+
+// The part of this page on screen inside the store page, in this page's own coordinates (the frame never scrolls).
+export type Viewport = { top: number; height: number };
+let viewport: Viewport | undefined;
+const watchers = new Set<(vp: Viewport) => void>();
+
+if (typeof window !== "undefined" && window.self !== window.top) {
+  window.addEventListener("message", (e) => {
+    if (e.source !== window.parent || e.data?.type !== "tc-viewport") return;
+    viewport = { top: Number(e.data.top) || 0, height: Number(e.data.height) || 0 };
+    // Where the bottom of the screen is, for bars pinned to it (see .sticky-buy).
+    document.documentElement.style.setProperty("--screen-bottom", `${viewport.top + viewport.height}px`);
+    watchers.forEach((w) => w(viewport!));
+  });
+  // Design tiles sweep to colour once they come on screen, as they do with view() outside a frame.
+  watchers.add((vp) => {
+    for (const t of document.querySelectorAll(".tile-art:not(.seen)")) {
+      const r = t.getBoundingClientRect();
+      if (r.top < vp.top + vp.height * 0.8 && r.bottom > vp.top + vp.height * 0.2) t.classList.add("seen");
+    }
+  });
+}
+
+// Calls `fn` now (if known) and whenever the part of the page on screen changes; returns a function to stop.
+export function onViewport(fn: (vp: Viewport) => void) {
+  watchers.add(fn);
+  if (viewport) fn(viewport);
+  return () => void watchers.delete(fn);
 }
 
 // Messages go only to the store page framing this one.

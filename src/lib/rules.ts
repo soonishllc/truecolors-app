@@ -9,7 +9,10 @@ export const GARMENT: {
   fabric?: string;
   fit?: string;
   sizeChart?: ({ label: string } & Record<Size, string>)[];
-} = {};
+} = {
+  // As the store describes its tees. Fit and the size chart are still to come from Truecolors.
+  fabric: "Premium 200 GSM cotton",
+};
 
 // Pre-orders sell in both of the store's markets, as one campaign with one goal counted across both. The UAE pays
 // the store's base price in AED; the USA pays from its own price list in USD. Compare-at is the "later" price

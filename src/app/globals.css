@@ -659,3 +659,68 @@ html.in-store-frame, html.in-store-frame body { overflow: hidden; }
 @media (max-width: 600px) { .in-app .app-nav { flex-wrap: nowrap; overflow-x: auto; gap: 18px; } .in-app .app-nav a { white-space: nowrap; } }
 .size-grid th:not(:first-child), .size-grid td:not(:first-child) { text-align: center; width: 72px; }
 .size-grid .warn { color: var(--warn); font-weight: 600; }
+
+/* The campaign hero: indoors, then the sun sweeps across and the print turns full colour. */
+.sun-reveal { position: relative; border-radius: var(--radius); overflow: hidden; }
+.sun-reveal img.art { border-radius: 0; }
+.sun-reveal .greyed { filter: grayscale(1) contrast(0.95) brightness(1.04); }
+.sun-reveal-sun { position: absolute; inset: 0; height: 100%; object-fit: cover; clip-path: circle(0% at 85% 12%); transition: clip-path 1.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sun-reveal.lit .sun-reveal-sun { clip-path: circle(150% at 85% 12%); }
+.sun-reveal::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 85% 12%, rgba(255, 210, 120, 0.6), transparent 45%); opacity: 0; transition: opacity 0.6s; }
+.sun-reveal.lit::after { animation: sun-flash 1.8s ease-out forwards; }
+@keyframes sun-flash { 30% { opacity: 1; } to { opacity: 0.2; } }
+.sun-reveal .compare-label { left: 12px; right: auto; }
+.sun-reveal .sun-toggle { position: absolute; right: 14px; bottom: 14px; z-index: 2; border: 0; border-radius: 999px; padding: 10px 16px; background: var(--sun); color: #fff; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
+
+/* The campaign's buy column: price, the first-backer offer, sizes and one big button. */
+.price-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 18px 0 2px; }
+.price-line s { font-size: 18px; }
+.save-tag { padding: 3px 8px; border-radius: 999px; background: var(--notice-bg); color: var(--gold-text); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.spec-line { margin: 0 0 16px; }
+html:not(.in-app) .spec-line .site-only { display: block; margin-top: 4px; }
+.first-backers { margin: 12px 0; padding: 12px 14px; border-left: 3px solid var(--gold); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
+.first-backers b { color: var(--gold-text); font-family: var(--font-mono); }
+.buy-box { display: grid; gap: 10px; margin: 16px 0 8px; }
+.size-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.size-pick button { min-width: 52px; padding: 10px 0; border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0; }
+.size-pick button:hover { border-color: var(--ink); transform: none; box-shadow: none; opacity: 1; }
+.size-pick button.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.size-pick .size-help { margin-left: auto; color: var(--muted); }
+.size-pick.nudge { animation: nudge 0.4s; }
+@keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.size-ask { margin: 0; color: var(--bad); }
+.buy-box .buy-button { display: block; width: 100%; padding: 17px 24px; border-color: transparent; background: var(--sun); color: #fff; font-size: 15px; text-align: center; }
+.risk-line { margin: 6px 0 4px; color: var(--muted); }
+.risk-line b { color: var(--good); }
+.timeline { list-style: none; padding: 0; margin: 14px 0 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.timeline li { padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); }
+.timeline b { display: block; color: var(--ink); font-size: 14px; }
+.story { margin-top: 20px; font-size: 16px; }
+.more-designs { margin-top: 56px; }
+.fan-link > * { min-width: 0; }
+.tile-price { color: var(--ink); }
+.empty-card { padding: 32px; }
+
+/* Explore's filters stay on one line and scroll sideways on phones. */
+.tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { white-space: nowrap; }
+
+/* The app menu: shopping links first, designer and wholesale links at the far end. */
+.in-app .app-nav-more { display: flex; gap: inherit; margin-left: auto; }
+@media (max-width: 600px) {
+  .in-app .app-nav { scrollbar-width: none; mask-image: linear-gradient(to right, #000 85%, transparent); }
+  .in-app .app-nav::-webkit-scrollbar { display: none; }
+  .in-app .app-nav-more { margin-left: 0; }
+}
+
+/* In a store page's frame, the frame is as tall as the page, so "the bottom of the screen" comes from the store page
+   (--screen-bottom, see FrameBridge), and tiles sweep to colour when the store page scrolls them into view. */
+@media (max-width: 720px) {
+  html.in-store-frame .sticky-buy { position: absolute; bottom: auto; top: var(--screen-bottom, 100vh); transform: none; visibility: hidden; transition: none; }
+  html.in-store-frame .sticky-buy.on { transform: translateY(-100%); visibility: visible; }
+}
+@media (hover: none) {
+  html.in-store-frame .tile-art .tile-sun { animation: none; clip-path: circle(0% at 85% 15%); }
+  html.in-store-frame .tile-art.seen .tile-sun { clip-path: circle(150% at 85% 15%); }
+}

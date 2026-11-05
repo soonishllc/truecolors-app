@@ -1,13 +1,14 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fanEmailAction, waitlistAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
+import { BuyBox } from "@/components/BuyBox";
 import { Countdown } from "@/components/Countdown";
 import { ShadeSun } from "@/components/ShadeSun";
 import { ShareKit } from "@/components/ShareKit";
-import { StickyBuy } from "@/components/StickyBuy";
+import { SunReveal } from "@/components/SunReveal";
 import { TileSweep } from "@/components/TileSweep";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
@@ -15,8 +16,8 @@ import { db } from "@/lib/db/client";
 import { RETAIL_MARKETS, preorderPrice, visitorMarket } from "@/lib/markets";
 import { campaigns, designs, media, pledges, users } from "@/lib/db/schema";
 import { campaignTarget, currentFan, designerTarget, referralStats, waitlistCount } from "@/lib/fans";
-import { ago, nextStretch } from "@/lib/format";
-import { GARMENT, REFERRALS_PER_REWARD, RETURN_WINDOW_DAYS, SIZES, STRETCH_REWARDS } from "@/lib/rules";
+import { ago, money, nextStretch } from "@/lib/format";
+import { GARMENT, PREORDER_PRICE, REFERRALS_PER_REWARD, RETURN_WINDOW_DAYS, SIZES, STRETCH_REWARDS } from "@/lib/rules";
 import { productUrl } from "@/lib/shopify/campaigns";
 import { fileUrl } from "@/lib/storage";
 import { publicUrl } from "@/lib/links";
@@ -86,6 +87,16 @@ export default async function CampaignPage({
   const shareUrl = `${pageUrl}?ref=${ref}`;
   const share = encodeURIComponent(`${c.title}: a shirt that changes colour in the sun ${shareUrl}`);
   const comebackList = missed ? await waitlistCount(campaignTarget(c)) : 0;
+  // The hero shows the colour change happening: the store's shade and sun pictures, or before those are made, the
+  // design itself (greyed when there's no separate line art).
+  const heroPair = !worn && !(sweep && pairShade) && pairShade && pairSun;
+  const heroArt = !worn && !(sweep && pairShade) && !heroPair && design.compositeKey;
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const shipFrom = c.endsAt && new Date(c.endsAt.getTime() + 21 * 86_400_000);
+  const shipTo = c.endsAt && new Date(c.endsAt.getTime() + 28 * 86_400_000);
+  // Few backers yet: the first-backer offer reads better than a near-empty bar.
+  const early = open && !c.fundedAt && stats.pledged < 10;
+  const more = await moreDesigns(c.id);
 
   return (
     <>
@@ -98,7 +109,13 @@ export default async function CampaignPage({
               <img className="art" src={fileUrl(pairShade.key)} alt={c.title} />
               <TileSweep src={fileUrl(sweep.key)} inView />
             </div>
-          ) : video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline />
+          ) : heroPair ? <SunReveal shade={fileUrl(pairShade.key)} sun={fileUrl(pairSun.key)} alt={c.title} />
+            : heroArt ? (
+              <SunReveal
+                shade={fileUrl(design.lineArtKey ?? heroArt)} sun={fileUrl(heroArt)} alt={c.title}
+                grey={!design.lineArtKey || design.lineArtKey === heroArt}
+              />
+            ) : video ? <video className="art" src={fileUrl(video.key)} autoPlay muted loop playsInline />
             // Before the mockups and clips are made: the design itself.
             : design.compositeKey ? <img className="art" src={fileUrl(design.compositeKey)} alt={c.title} /> : null}
         </div>
@@ -106,23 +123,23 @@ export default async function CampaignPage({
           <div className="eyebrow">{missed ? "Campaign ended" : "Pre-order campaign"}</div>
           <h1>{c.title}</h1>
           <p className="muted">Designed by <Link href={`/d/${designer.handle}`}>{designer.name}</Link></p>
-          <p>{c.story}</p>
-          <div className="edition-badge">
-            {c.editionSize ? <>Numbered limited edition · <b>{c.editionSize}</b> made, never restocked</>
-              : <>Numbered limited edition · every shirt gets its own number, no restocks</>}
-          </div>
           {!missed && (
-            <p>
-              <span className="stat">{preorderPrice(market)}</span> <span className="muted">· sizes S–XL · ships in the {RETAIL_MARKETS[market].label}</span>
-              <br />
-              {/* Inside the store, its own market switch does this. */}
-              <span className="small muted site-only">
-                Shopping from {market === "AE" ? "the USA" : "the UAE"}?{" "}
-                <Link href={`/c/${c.slug}?market=${market === "AE" ? "US" : "AE"}${q.ref ? `&ref=${encodeURIComponent(q.ref)}` : ""}`}>
-                  {preorderPrice(market === "AE" ? "US" : "AE")} in the {RETAIL_MARKETS[market === "AE" ? "US" : "AE"].label} store
-                </Link>
-              </span>
-            </p>
+            <>
+              <p className="price-line">
+                <s className="muted">{money(PREORDER_PRICE[market].compareAtCents, PREORDER_PRICE[market].currency)}</s>{" "}
+                <span className="stat">{preorderPrice(market)}</span> <span className="save-tag">Pre-order price</span>
+              </p>
+              <p className="small muted spec-line">
+                {GARMENT.fabric ? `${GARMENT.fabric} · ` : ""}Unisex S–XL · ships in the {RETAIL_MARKETS[market].label}
+                {/* Inside the store, its own market switch does this. */}
+                <span className="site-only">
+                  Shopping from {market === "AE" ? "the USA" : "the UAE"}?{" "}
+                  <Link href={`/c/${c.slug}?market=${market === "AE" ? "US" : "AE"}${q.ref ? `&ref=${encodeURIComponent(q.ref)}` : ""}`}>
+                    {preorderPrice(market === "AE" ? "US" : "AE")} in the {RETAIL_MARKETS[market === "AE" ? "US" : "AE"].label} store
+                  </Link>
+                </span>
+              </p>
+            </>
           )}
 
           {missed ? (
@@ -136,28 +153,58 @@ export default async function CampaignPage({
             </div>
           ) : (
             <>
-              <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
-              <p>
-                <strong>{stats.pledged} of {target}</strong> pre-orders
-                {open && !c.fundedAt && toGo > 0 && <> · <span className="to-go">{toGo} to go</span></>}
-                {open && c.endsAt && <> · <Countdown endsAt={c.endsAt.toISOString()} /></>}
-                {c.fundedAt && <> · <span className="good">Funded, going to print</span></>}
-              </p>
-              <div id="buy">
-                {open && (buyUrl
-                  ? <a className="button" href={buyUrl}>Pre-order now</a>
-                  // Launch always creates the store product, so only seeded demo campaigns land here.
-                  : <><span className="button" aria-disabled="true">Pre-order now</span>
-                    <p className="small muted">Checkout opens once this campaign is linked to the store.</p></>)}
-              </div>
-              <ul className="promise">
+              {early ? (
+                <p className="first-backers">
+                  <strong>Be one of the first {c.goal}.</strong> Back it now and yours is about <b>#{String(stats.pledged + 1).padStart(3, "0")}</b>:
+                  the lowest numbers go to the earliest backers.
+                  {c.endsAt && <span className="small muted"> <Countdown endsAt={c.endsAt.toISOString()} /></span>}
+                </p>
+              ) : (
+                <>
+                  <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
+                  <p>
+                    <strong>{stats.pledged} of {target}</strong> pre-orders
+                    {open && !c.fundedAt && toGo > 0 && <> · <span className="to-go">{toGo} to go</span></>}
+                    {open && c.endsAt && <> · <Countdown endsAt={c.endsAt.toISOString()} /></>}
+                    {c.fundedAt && <> · <span className="good">Funded, going to print</span></>}
+                  </p>
+                </>
+              )}
+              {open && (
+                <BuyBox
+                  href={buyUrl} variants={c.variantIds} sizes={SIZES} price={preorderPrice(market)}
+                  progress={`${stats.pledged} of ${target}`}
+                >
+                  {c.endsAt && <Countdown endsAt={c.endsAt.toISOString()} />}
+                </BuyBox>
+              )}
+              <p className="small risk-line">
                 {c.fundedAt
-                  ? <li><b>Funded.</b> Pre-orders are charged now and go straight to print.</li>
-                  : <li><b>No risk.</b> You&apos;re only charged if it reaches {c.goal}. If it doesn&apos;t, nobody pays.</li>}
-                <li><b>Numbered edition.</b> Ships about 3–4 weeks after the campaign closes, with tracking.</li>
+                  ? <><b>Funded.</b> Pre-orders are charged now and go straight to print.</>
+                  : <><b>No risk:</b> you&apos;re only charged if it reaches {c.goal}{c.endsAt ? ` by ${day(c.endsAt)}` : ""}. Otherwise nobody pays.</>}
+              </p>
+              {c.endsAt && shipFrom && shipTo && (
+                <ol className="timeline small">
+                  <li><b>{day(c.endsAt)}</b> Campaign closes</li>
+                  <li><b>{c.goal}</b> backers and it&apos;s printed</li>
+                  <li><b>{day(shipFrom)}–{day(shipTo)}</b> Ships, numbered, with tracking</li>
+                </ol>
+              )}
+            </>
+          )}
+
+          <p className="story">{c.story}</p>
+          <div className="edition-badge">
+            {c.editionSize ? <>Numbered limited edition · <b>{c.editionSize}</b> made, never restocked</>
+              : <>Numbered limited edition · every shirt gets its own number, no restocks</>}
+          </div>
+          {!missed && (
+            <>
+              <ul className="promise">
+                <li><b>Numbered edition.</b> Your number is printed inside, in the order people back it.</li>
                 <li><b>Returns.</b> Within {RETURN_WINDOW_DAYS} days of delivery. <Link href="/pre-orders">How pre-orders work</Link></li>
               </ul>
-              <details className="garment">
+              <details className="garment" id="size-guide">
                 <summary>Size, fabric &amp; care</summary>
                 <ul>
                   <li><b>Sizes</b> {SIZES.join(", ")}, unisex.</li>
@@ -205,6 +252,17 @@ export default async function CampaignPage({
         </div>
       </div>
 
+      {pairShade && pairSun && !heroPair && (
+        <>
+          <div className="eyebrow" style={{ marginTop: 48 }}>Try it</div>
+          <h2 style={{ marginTop: 8 }}>Drag the sun across it</h2>
+          <div style={{ maxWidth: 560 }}><ShadeSun shade={fileUrl(pairShade.key)} sun={fileUrl(pairSun.key)} alt={c.title} /></div>
+        </>
+      )}
+      <div className="grid" style={{ marginTop: 24 }}>
+        {mockups.map((m) => <img key={m.id} className="art" src={fileUrl(m.key)} alt={`${c.title} ${m.view}`} />)}
+      </div>
+
       {!missed && (
         <section className="goals">
           <div className="eyebrow">Goals</div>
@@ -226,11 +284,30 @@ export default async function CampaignPage({
         </section>
       )}
 
+      {more.length > 0 && (
+        <section className="more-designs">
+          <div className="eyebrow">Also close to its goal</div>
+          <h2 style={{ marginTop: 8 }}>More from the community</h2>
+          <div className="grid">
+            {more.map((m) => (
+              <Link key={m.c.id} href={`/c/${m.c.slug}`} className="tile">
+                <div className="tile-art">
+                  {m.lineArt && <img className="art" src={fileUrl(m.lineArt)} alt="" />}
+                  {m.art && <img className="art tile-sun" src={fileUrl(m.art)} alt={m.c.title} />}
+                </div>
+                <div className="name">{m.c.title}</div>
+                <div className="meta">by {m.designer} · {Math.max(0, m.c.goal - m.backed)} to go</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {open && (
         <section className="card fan-link">
           <div>
-            <div className="eyebrow">Bring {REFERRALS_PER_REWARD} friends, get a free tee</div>
-            <h2 style={{ margin: "8px 0" }}>Get your own link</h2>
+            <div className="eyebrow">Share it</div>
+            <h2 style={{ margin: "8px 0" }}>Bring {REFERRALS_PER_REWARD} friends, your tee is free</h2>
             <p className="small muted">
               Every {REFERRALS_PER_REWARD} pre-orders that come through your link earn you a free Truecolors tee once the
               designs are funded. Your own orders don&apos;t count.
@@ -257,17 +334,6 @@ export default async function CampaignPage({
         </section>
       )}
 
-      {pairShade && pairSun && (
-        <>
-          <div className="eyebrow" style={{ marginTop: 48 }}>Try it</div>
-          <h2 style={{ marginTop: 8 }}>Drag the sun across it</h2>
-          <div style={{ maxWidth: 560 }}><ShadeSun shade={fileUrl(pairShade.key)} sun={fileUrl(pairSun.key)} alt={c.title} /></div>
-        </>
-      )}
-      <div className="grid" style={{ marginTop: 24 }}>
-        {mockups.map((m) => <img key={m.id} className="art" src={fileUrl(m.key)} alt={`${c.title} ${m.view}`} />)}
-      </div>
-
       <section className="card follow">
         <div>
           <div className="eyebrow">Designer</div>
@@ -280,11 +346,20 @@ export default async function CampaignPage({
         </ActionForm>
       </section>
 
-      {open && (
-        <StickyBuy watch="buy" href={buyUrl} price={preorderPrice(market)} progress={`${stats.pledged} of ${target}`}>
-          {c.endsAt && <Countdown endsAt={c.endsAt.toISOString()} />}
-        </StickyBuy>
-      )}
     </>
   );
+}
+
+// Other live designs, nearest their goal first, so a visitor who isn't sold on this one finds the next.
+async function moreDesigns(id: string) {
+  const d = await db();
+  const rows = await d
+    .select({ c: campaigns, designer: users.name, lineArt: designs.lineArtKey, art: designs.compositeKey })
+    .from(campaigns)
+    .innerJoin(users, eq(users.id, campaigns.userId))
+    .innerJoin(designs, eq(designs.id, campaigns.designId))
+    .where(and(eq(campaigns.status, "live"), ne(campaigns.id, id)))
+    .limit(12);
+  const withCounts = await Promise.all(rows.map(async (r) => ({ ...r, backed: (await campaignStats(r.c.id)).pledged })));
+  return withCounts.sort((a, b) => (a.c.goal - a.backed) - (b.c.goal - b.backed)).slice(0, 3);
 }

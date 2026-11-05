@@ -204,7 +204,7 @@ export async function ensureDemoAccounts() {
   const admin = config().ADMIN_EMAILS.split(",")[0]?.trim().toLowerCase();
   const people = [
     ...(admin ? [{ email: admin, name: "Admin", handle: "admin" }] : []),
-    { email: "designer@demo.example", name: "Maya (demo designer)", handle: "maya" },
+    { email: "designer@demo.example", name: "Maya Haddad", handle: "maya" },
   ];
   for (const p of people) {
     await d.insert(users).values({ ...p, credits: 30, agreementVersion: "demo", agreementAcceptedAt: new Date() }).onConflictDoNothing();
@@ -231,6 +231,8 @@ const SAMPLE_ART = [
 
 async function seedDemoDesigns() {
   const d = await db();
+  // Shoppers see the designer's name, so it reads as a person's; demo databases from before kept the old label.
+  await d.update(users).set({ name: "Maya Haddad" }).where(eq(users.name, "Maya (demo designer)"));
   const [maya] = await d.select().from(users).where(eq(users.email, "designer@demo.example"));
   if (!maya || (await d.select({ id: designs.id }).from(designs).where(eq(designs.userId, maya.id)).limit(1)).length) return;
   for (const a of SAMPLE_ART) {
