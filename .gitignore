@@ -14,3 +14,8 @@ retail-displays/renders/
 retail-displays/preview.html
 __pycache__/
 .venv-displays/
+
+# Shopify CLI build output for the checkout extension
+extensions/*/dist/
+extensions/*/manifest.json
+extensions/*/shopify.d.ts
