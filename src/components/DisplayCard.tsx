@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 
 // One display, the way a guest meets it: the clip rests on its first frame (UV off, the shirt grey), "Press for
-// sun" plays it and it holds on the lit last frame. The render with its dimensions is a tap away under "Size".
+// sun" plays it (each clip starts just before the light comes on, and is loaded with the page so a press plays
+// at once) and it holds on the lit last frame. The render with its dimensions is a tap away under "Size".
 export function DisplayCard({ name, where, image, clip, children }: {
   name: string; where: string; image: string; clip: string; children: React.ReactNode;
 }) {
@@ -23,7 +24,7 @@ export function DisplayCard({ name, where, image, clip, children }: {
     <article className="display-card">
       <div className={`display-media ${view}`}>
         {/* #t=0.001 so phones show the first frame before playing. */}
-        <video ref={video} src={`${clip}#t=0.001`} muted playsInline preload="metadata" onEnded={() => setState("lit")} aria-label={`${name}: a guest presses for sun`} />
+        <video ref={video} src={`${clip}#t=0.001`} muted playsInline preload="auto" onEnded={() => setState("lit")} aria-label={`${name}: a guest presses for sun`} />
         {view === "size" && <img src={image} alt={`${name} display, with its dimensions`} loading="lazy" />}
         <div className="display-tabs" role="tablist" aria-label={`${name} views`}>
           <button type="button" role="tab" aria-selected={view === "clip"} onClick={() => setView("clip")}>Display</button>

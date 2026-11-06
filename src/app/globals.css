@@ -841,8 +841,10 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
 .display-tabs { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(20, 19, 17, 0.6); backdrop-filter: blur(6px); }
 .display-tabs button { min-height: 32px; padding: 0 12px !important; border: 0 !important; border-radius: 999px !important; background: transparent !important; color: #fff !important; font-family: var(--font-body) !important; font-size: 13px !important; letter-spacing: 0 !important; text-transform: none !important; }
 .display-tabs button[aria-selected="true"] { background: #fff !important; color: #111 !important; }
-.press-sun { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); min-height: 44px; padding: 0 20px !important; border: 0 !important; border-radius: 999px !important; background: var(--sun) !important; color: #fff !important; font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: 0.08em; text-transform: uppercase; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.press-sun { position: absolute; left: 0; right: 0; bottom: 14px; width: max-content; margin: 0 auto; min-height: 44px; padding: 0 20px !important; border: 0 !important; border-radius: 999px !important; background: var(--sun) !important; color: #fff !important; font-family: var(--font-mono) !important; font-size: 12px !important; letter-spacing: 0.08em; text-transform: uppercase; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); white-space: nowrap; }
 .press-sun { z-index: 2; }
+/* Centred by margin, not transform, so the buttons' hover lift doesn't knock it sideways. */
+.press-sun:hover, .press-sun:active { transform: none; }
 .display-body { padding: 18px; }
 .display-body h3 { margin: 4px 0 8px; font-size: 28px; }
 .display-body p { margin: 0 0 12px; }
@@ -856,7 +858,7 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
 .bring-grid ul { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 6px; }
 .place-chips { list-style: none; padding: 0; margin: 16px 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .place-chips li { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; }
-.walk-video { width: 100%; max-width: 640px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--radius); display: block; }
+.walk-video { width: 100%; max-width: 420px; aspect-ratio: 540 / 952; object-fit: cover; object-position: 50% 0%; border-radius: var(--radius); display: block; }
 .faq { border-top: 1px solid var(--line); }
 .in-app .faq details > summary, .faq details > summary { display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 12px 0; border: 0; border-radius: 0; font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; list-style: none; }
 .faq details > summary::after { content: "+"; color: var(--muted); font-size: 20px; }
