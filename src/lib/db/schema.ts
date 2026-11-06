@@ -26,6 +26,12 @@ export const users = pgTable("users", {
   aiBusyUntil: ts("ai_busy_until"),
   agreementVersion: text("agreement_version"),
   agreementAcceptedAt: ts("agreement_accepted_at"),
+  // The public profile on /d/[handle]: a short bio (280 characters, checked in code), an avatar image in storage,
+  // a city and an Instagram handle (without the @).
+  bio: text("bio"),
+  avatarKey: text("avatar_key"),
+  location: text("location"),
+  instagram: text("instagram"),
   createdAt: createdAt(),
 });
 

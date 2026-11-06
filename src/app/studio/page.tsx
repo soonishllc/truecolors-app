@@ -134,6 +134,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
           <div className="row">
             <span className="pill-stat"><b>{user.credits}</b> credits</span>
             <Link className="pill-stat" href={`/d/${user.handle}`}>Your page <b>/d/{user.handle}</b></Link>
+            <Link className="pill-stat" href="/studio/profile">Edit your profile</Link>
             <Link className="button small" href="/studio/new">＋ New design</Link>
           </div>
         </div>

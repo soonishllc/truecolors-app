@@ -1,0 +1,38 @@
+/* The community's home (explore/page.tsx). */
+.home-ctas { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
+.home-ctas .button.secondary { background: transparent; color: var(--dark-ink, #fff); border: 1.5px solid #ffffff66; }
+
+.home-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0 0 40px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--line); }
+.home-stats > div { display: grid; gap: 2px; padding: 16px 14px; background: var(--surface); text-align: center; }
+.home-stats b { font-family: var(--font-display); font-size: clamp(22px, 4vw, 32px); letter-spacing: -0.02em; background: var(--sun); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.home-stats span { font-size: 12px; color: var(--muted); }
+
+.home-section { margin: 0 0 48px; }
+.home-section h2 { margin: 4px 0 0; font-size: clamp(24px, 4vw, 34px); letter-spacing: -0.02em; }
+.home-section .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 0 0 16px; }
+.home-sub { margin: -6px 0 16px; max-width: 620px; }
+
+/* A row of tiles that scrolls sideways on phones and wraps into a grid on wider screens. */
+.home-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
+.home-rail::-webkit-scrollbar { display: none; }
+.home-rail > * { scroll-snap-align: start; }
+@media (max-width: 720px) {
+  .home-rail { grid-auto-columns: 72%; margin: 0 -20px; padding: 0 20px 6px; scroll-padding: 0 20px; }
+  .home-stats { grid-template-columns: 1fr; }
+  .home-stats > div { grid-template-columns: auto 1fr; align-items: baseline; gap: 10px; text-align: left; }
+}
+.home-example { margin: 0; }
+.home-example figcaption { margin-top: 8px; font-style: italic; }
+.home-rail a.tile .name { margin-top: 2px; }
+
+.home-challenge { position: relative; display: grid; gap: 4px; margin: 0 0 48px; padding: 22px 56px 22px 22px; border-radius: 16px; text-decoration: none; color: var(--ink); background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+.home-challenge b { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; }
+.home-challenge-go { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); font-size: 24px; color: var(--muted); }
+
+.home-band { margin: 8px 0 24px; padding: 40px 24px; border-radius: 18px; text-align: center; background: var(--surface); border: 1px solid var(--line); }
+.home-band h2 { margin: 0 0 8px; font-size: clamp(26px, 4.5vw, 40px); letter-spacing: -0.02em; }
+.home-band p { margin: 0 auto 20px; max-width: 520px; color: var(--muted); }
+
+/* The catalogue page (designs/page.tsx) heading. */
+.designs-title { margin: 6px 0 6px; font-size: clamp(30px, 5vw, 48px); letter-spacing: -0.02em; }
+.designs-lede { margin: 0 0 22px; max-width: 560px; }

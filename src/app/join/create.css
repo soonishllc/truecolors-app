@@ -1,0 +1,39 @@
+/* /join, "Design your own": the idea box, the AI example strip, earnings, FAQ. Phone first (375px). */
+
+.idea-box { display: grid; gap: 12px; margin: 20px 0 48px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.idea-box textarea { width: 100%; font: inherit; font-size: 17px; line-height: 1.4; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--ink); resize: vertical; min-height: 88px; }
+.idea-box textarea:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.idea-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+.idea-chips::-webkit-scrollbar { display: none; }
+.idea-chips .chip { flex: 0 0 auto; cursor: pointer; white-space: nowrap; }
+.idea-box > .button { justify-self: start; min-width: 160px; }
+.in-app .idea-chips .chip { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; padding: 0 14px; border-radius: 999px; }
+
+.ai-strip { margin: 0 0 48px; }
+.ai-strip h2 { margin: 8px 0 16px; }
+.ai-panels { list-style: none; margin: 0 -16px; padding: 0 16px 4px; display: grid; grid-auto-flow: column; grid-auto-columns: 78%; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; scrollbar-width: none; }
+.ai-panels::-webkit-scrollbar { display: none; }
+.ai-panel { scroll-snap-align: start; display: grid; grid-template-rows: auto 1fr; gap: 8px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.ai-panel img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: var(--radius); }
+.ai-step { font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ai-idea blockquote { margin: 0; display: grid; place-items: center; aspect-ratio: 1; padding: 20px; font-family: var(--font-display); font-size: 22px; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); background: var(--bg); border-radius: var(--radius); }
+@media (min-width: 720px) {
+  .ai-panels { margin: 0; padding: 0; grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); overflow: visible; }
+}
+
+.earn-card { margin: 0 0 48px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.earn-card h2 { margin: 8px 0 10px; font-size: clamp(24px, 6vw, 34px); }
+.earn-card p { margin: 0 0 8px; }
+
+.join-faq { margin: 0 0 48px; }
+.join-faq h2 { margin: 8px 0 12px; }
+.join-faq details { border-top: 1px solid var(--line); }
+.join-faq details:last-child { border-bottom: 1px solid var(--line); }
+.join-faq summary { cursor: pointer; padding: 14px 0; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.join-faq summary::-webkit-details-marker { display: none; }
+.join-faq summary::after { content: "+"; font-family: var(--font-display); color: var(--muted); }
+.join-faq details[open] summary::after { content: "–"; }
+.join-faq details p { margin: 0 0 14px; color: var(--muted); }
+
+.idea-kept { margin: 0 0 8px; padding: 10px 12px; border-left: 3px solid var(--gold); background: var(--bg); border-radius: var(--radius); }
+.idea-kept q { font-weight: 700; }

@@ -1,0 +1,35 @@
+/* The campaign page (/c/[slug]): breadcrumbs, the big progress block, the numbered backer wall, the designer block. */
+
+.crumbs { margin: 0 0 12px; }
+.crumbs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--muted); }
+.crumbs li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.crumbs li + li::before { content: "›"; color: var(--muted); }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.crumbs [aria-current] { color: var(--ink); font-weight: 600; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.camp-progress { margin: 14px 0 16px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.camp-count { margin: 0 0 10px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; font-family: var(--font-display); line-height: 1; }
+.camp-num { font-size: clamp(40px, 11vw, 56px); font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.camp-of { font-size: 22px; font-weight: 600; color: var(--muted); }
+.camp-label { width: 100%; margin-top: 6px; font-family: var(--font-body); font-size: 13px; color: var(--muted); }
+.camp-progress .progress { height: 10px; }
+.camp-meta { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.camp-meta .to-go { color: var(--ink); font-weight: 700; }
+.camp-meta .hot-line { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.camp-progress .first-backers { margin: 12px 0 0; }
+
+.backer-wall { margin: 48px 0 0; }
+.backer-wall h2 { margin: 8px 0 14px; }
+.wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.wall li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px; }
+.wall b { font-family: var(--font-mono); color: var(--gold-text); font-size: 15px; }
+.wall time { font-size: 12px; margin-left: auto; }
+
+/* Until src/app/designers/designers.css is imported here: keep the chip's avatar a sensible size. */
+.camp-designer .dz-chip { display: inline-flex; align-items: center; gap: 10px; margin: 6px 0 8px; color: var(--ink); text-decoration: none; }
+.camp-designer .dz-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; }
+.camp-designer .dz-avatar-initial { display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line); font-family: var(--font-display); font-weight: 700; }
+.camp-designer .dz-chip-text { display: grid; }
+.camp-designer .dz-chip-name { font-weight: 700; font-size: 18px; }
+.camp-designer .dz-chip-sub { font-size: 13px; color: var(--muted); }

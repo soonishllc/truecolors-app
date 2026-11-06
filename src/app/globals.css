@@ -892,7 +892,7 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
   .in-app .app-nav { gap: 8px; margin: 0 0 20px; padding: 2px 0 12px; border-bottom: 1px solid var(--line); mask-image: linear-gradient(to right, #000 88%, transparent); }
   .in-app .app-nav a { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--font-body); font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink); white-space: nowrap; }
   .in-app .app-nav a[aria-current="page"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .in-app .app-nav:not(.on-wholesale) .app-nav-more { display: none; }
+  .in-app .app-nav-more { margin-left: 0; }
   .in-app .app-nav-back { border-bottom: 0; margin-bottom: 8px; }
   .in-app .app-nav-back a { font-size: 14px !important; }
 }
@@ -1054,3 +1054,7 @@ fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 1
 .way-go { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--muted); }
 .way-shop { background: linear-gradient(135deg, rgba(232, 118, 42, 0.1), rgba(196, 178, 0, 0.1)), var(--surface); }
 .way-design { background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 1.5px solid transparent; }
+
+/* The community menu's "You" (your pre-orders and friend link), at the end of the row. */
+.in-app .app-nav a.nav-you { display: inline-flex; align-items: center; gap: 6px; }
+.in-app .app-nav a.nav-you svg { flex: none; }

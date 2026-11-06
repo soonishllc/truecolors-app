@@ -29,6 +29,7 @@ import { markBankTransferPaid, placeOrder, quoteOrder, shipOrder } from "@/lib/w
 import { addDisplay, reportFault, resolveFault } from "@/lib/wholesale/service";
 import { currentWholesaler } from "@/lib/wholesale/portal-auth";
 import { track, type EventName } from "@/lib/analytics";
+import { safePath } from "@/lib/links";
 
 export type FormState = { error?: string; message?: string; link?: string } | undefined;
 
@@ -65,8 +66,8 @@ export async function joinAction(_: FormState, f: FormData): Promise<FormState> 
     else return { message: "Account created. We've sent you a login link.", link };
   });
   if (!res?.error) await track("designer_joined", { path: "/join", props: { via: via?.provider ?? (store ? "store" : "email") } });
-  // Straight into their first design.
-  if (joined) redirect("/studio/new");
+  // Straight into their first design, with the idea they typed on /join if there was one.
+  if (joined) redirect(safePath(text(f, "next"), "/studio/new"));
   return res;
 }
 

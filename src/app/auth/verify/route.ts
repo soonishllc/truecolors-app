@@ -8,5 +8,5 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   if (!(await verifyLoginToken(url.searchParams.get("token") ?? ""))) return NextResponse.redirect(new URL("/login?expired=1", config().APP_URL));
   const user = await currentUser();
-  return NextResponse.redirect(user?.isAdmin ? new URL("/admin", url) : publicUrl("/studio"));
+  return NextResponse.redirect(user?.isAdmin ? new URL("/admin", config().APP_URL) : publicUrl("/studio"));
 }

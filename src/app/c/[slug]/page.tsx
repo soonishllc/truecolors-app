@@ -6,6 +6,7 @@ import { fanEmailAction, waitlistAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { BuyBox } from "@/components/BuyBox";
 import { Countdown } from "@/components/Countdown";
+import { DesignerChip } from "@/components/DesignerChip";
 import { ShadeSun } from "@/components/ShadeSun";
 import { ShareKit } from "@/components/ShareKit";
 import { SunReveal } from "@/components/SunReveal";
@@ -24,11 +25,36 @@ import { productUrl } from "@/lib/shopify/campaigns";
 import { fileUrl, thumbUrl } from "@/lib/storage";
 import { publicUrl, storefront } from "@/lib/links";
 import { trackView } from "@/lib/analytics";
+import "../campaign.css";
+import "../../designers/designers.css";
 
 export const dynamic = "force-dynamic";
 
 const PUBLIC = ["live", "closing", "funded", "in_production", "shipped", "missed"];
 const COUNTING = ["pledged", "charge_pending", "charged", "charge_failed"] as const;
+const WALL_SIZE = 24;
+const edition = (n: number) => `#${String(n).padStart(3, "0")}`;
+
+// The first backers, numbered in pre-order order the way their shirts are: "#007 · Dubai · 2h ago". Only the
+// number, the city and when: never an email or a name.
+async function backerWall(campaignId: string) {
+  const d = await db();
+  const rows = await d
+    .select({ quantity: pledges.quantity, city: pledges.city, at: pledges.createdAt, start: pledges.editionStart })
+    .from(pledges)
+    .where(and(eq(pledges.campaignId, campaignId), inArray(pledges.status, [...COUNTING])))
+    .orderBy(pledges.createdAt)
+    .limit(WALL_SIZE);
+  const wall: { n: number; city: string | null; at: Date }[] = [];
+  let n = 0;
+  for (const r of rows) {
+    for (let i = 0; i < r.quantity && wall.length < WALL_SIZE; i++) {
+      n++;
+      wall.push({ n: r.start != null ? r.start + i : n, city: r.city, at: r.at });
+    }
+  }
+  return wall;
+}
 
 async function load(slug: string) {
   const d = await db();
@@ -125,11 +151,19 @@ export default async function CampaignPage({
   const packCents = Math.round(unit.cents * 2 * (100 - TWO_PACK_PERCENT) / 100);
   const packPrice = money(packCents, unit.currency);
   const packSave = money(unit.cents * 2 - packCents, unit.currency);
+  const wall = await backerWall(c.id);
   const designerLive = (await d.select({ id: campaigns.id }).from(campaigns)
     .where(and(eq(campaigns.userId, designer.id), eq(campaigns.status, "live")))).length;
 
   return (
     <>
+      <nav className="crumbs small" aria-label="Breadcrumb">
+        <ol>
+          <li><Link href="/designs">Designs</Link></li>
+          <li><Link href={`/d/${designer.handle}`}>{designer.name}</Link></li>
+          <li aria-current="page">{c.title}</li>
+        </ol>
+      </nav>
       <div className="pair">
         <div>
           {worn ? (
@@ -200,25 +234,28 @@ export default async function CampaignPage({
             </div>
           ) : (
             <>
-              {open && today > 0 && (
-                <p className="hot-line"><span className="feed-dot" aria-hidden="true" /> {today} backed it in the last 24 hours</p>
-              )}
-              {early ? (
-                <p className="first-backers">
-                  Numbered 1–{c.goal} in the order people pre-order. Yours: <b>#{String(stats.pledged + 1).padStart(3, "0")}</b>.
-                  {c.endsAt && <span className="small muted"> <Countdown endsAt={c.endsAt.toISOString()} /></span>}
+              {/* How close it is, big enough to read at a glance: the count, the bar, the clock, today's backers. */}
+              <div className="camp-progress">
+                <p className="camp-count">
+                  <span className="camp-num">{stats.pledged}</span>
+                  <span className="camp-of"> of {target}</span>
+                  <span className="camp-label">pre-orders</span>
                 </p>
-              ) : (
-                <>
-                  <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
-                  <p>
-                    <strong>{stats.pledged} of {target}</strong> pre-orders
-                    {open && !c.fundedAt && toGo > 0 && <> · <span className="to-go">{toGo} to go</span></>}
-                    {open && c.endsAt && <> · <Countdown endsAt={c.endsAt.toISOString()} /></>}
-                    {c.fundedAt && <> · <span className="good">Funded, going to print</span></>}
+                <div className="progress"><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>
+                <p className="camp-meta small">
+                  {c.fundedAt ? <span className="good">Funded, going to print</span>
+                    : toGo > 0 && <span className="to-go">{toGo} to go</span>}
+                  {open && c.endsAt && <span><Countdown endsAt={c.endsAt.toISOString()} /></span>}
+                  {open && today > 0 && (
+                    <span className="hot-line"><span className="feed-dot" aria-hidden="true" /> {today} backed today</span>
+                  )}
+                </p>
+                {early && (
+                  <p className="first-backers small">
+                    Numbered 1–{c.goal} in the order people pre-order. Yours: <b>{edition(stats.pledged + 1)}</b>.
                   </p>
-                </>
-              )}
+                )}
+              </div>
               {open && (
                 <BuyBox
                   href={buyUrl} cart={cart} variants={c.variantIds} sizes={SIZES} price={preorderPrice(market)}
@@ -231,7 +268,7 @@ export default async function CampaignPage({
               <p className="small risk-line">
                 {c.fundedAt
                   ? <><b>Funded.</b> Pre-orders are charged now and go straight to print.</>
-                  : <><b>Charged only if it&apos;s printed:</b> {c.goal} people need to pre-order{c.endsAt ? ` by ${day(c.endsAt)}` : ""}. If not, nothing is printed and nobody pays.</>}
+                  : <><b>You&apos;re only charged if it reaches {c.goal}.</b> {c.goal} people need to pre-order{c.endsAt ? ` by ${day(c.endsAt)}` : ""}. If not, nothing is printed and nobody pays.</>}
               </p>
               <p className="small muted spec-line">
                 {GARMENT.fabric ? `${GARMENT.fabric} · ` : ""}Unisex S–XL{shipTo && open ? ` · arrives by ${day(shipTo)}` : ` · ships in the ${RETAIL_MARKETS[market].label}`}
@@ -315,6 +352,32 @@ export default async function CampaignPage({
           )}
         </div>
       </div>
+
+      {!missed && (
+        <section className="backer-wall" aria-labelledby="wall-h">
+          <div className="eyebrow">Backers</div>
+          {wall.length > 0 ? (
+            <>
+              <h2 id="wall-h">The first {wall.length === 1 ? "backer" : `${wall.length} backers`}</h2>
+              <ol className="wall">
+                {wall.map((b, i) => (
+                  <li key={i}>
+                    <b>{edition(b.n)}</b>
+                    {b.city && <span>{b.city}</span>}
+                    <time className="muted" dateTime={b.at.toISOString()}>{ago(b.at)}</time>
+                  </li>
+                ))}
+              </ol>
+              {stats.pledged > wall.length && <p className="small muted">and {stats.pledged - wall.length} more.</p>}
+            </>
+          ) : (
+            <>
+              <h2 id="wall-h">Be {edition(1)}</h2>
+              <p className="small muted">Nobody has backed it yet. The first pre-order gets shirt {edition(1)}, printed inside.</p>
+            </>
+          )}
+        </section>
+      )}
 
       {pairShade && pairSun && !heroPair && (
         <>
@@ -407,10 +470,13 @@ export default async function CampaignPage({
         </section>
       )}
 
-      <section className="card follow">
+      <section className="card follow camp-designer">
         <div>
           <div className="eyebrow">Designer</div>
-          <h3><Link href={`/d/${designer.handle}`}>{designer.name}</Link></h3>
+          <DesignerChip
+            handle={designer.handle} name={designer.name} avatarKey={designer.avatarKey} location={designer.location} size="md"
+            meta={designerLive > 1 ? `${designerLive} designs live` : undefined}
+          />
           <p className="small muted">Get an email when {designer.name.split(" ")[0]} launches a new design.</p>
         </div>
         <ActionForm action={waitlistAction} submit="Follow" className="inline-form">

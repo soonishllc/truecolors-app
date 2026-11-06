@@ -39,13 +39,13 @@ export function SketchPicker() {
 }
 
 // A text box with a live character count, so a long idea isn't cut off without warning.
-export function CountedText({ name, max, rows, placeholder, required }: {
-  name: string; max: number; rows?: number; placeholder?: string; required?: boolean;
+export function CountedText({ name, max, rows, placeholder, required, defaultValue }: {
+  name: string; max: number; rows?: number; placeholder?: string; required?: boolean; defaultValue?: string;
 }) {
-  const [n, setN] = useState(0);
+  const [n, setN] = useState(defaultValue?.length ?? 0);
   return (
     <span className="counted">
-      <textarea name={name} maxLength={max} rows={rows} placeholder={placeholder} required={required} onChange={(e) => setN(e.target.value.length)} />
+      <textarea name={name} maxLength={max} rows={rows} placeholder={placeholder} required={required} defaultValue={defaultValue} onChange={(e) => setN(e.target.value.length)} />
       <span className={`small counter${n > max * 0.9 ? " near" : ""}`}>{n}/{max}</span>
     </span>
   );

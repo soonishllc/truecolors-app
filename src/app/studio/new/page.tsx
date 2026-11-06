@@ -11,8 +11,10 @@ export const metadata = { title: "New design · Truecolors" };
 
 // Step 1 of a design, on its own screen: the idea first (and a sketch if there is one), then the exact words, a
 // style, where it's printed and how detailed. The AI draws the line art and the design opens at step 2.
-export default async function NewDesign() {
+export default async function NewDesign({ searchParams }: { searchParams: Promise<{ idea?: string }> }) {
   const user = await requireUser();
+  // An idea typed on /join before signing up comes through as ?idea=.
+  const idea = (await searchParams).idea?.trim().slice(0, 600) || undefined;
   const enough = user.credits >= CREDIT_COST.line_art;
   const groups = [...new Set(PRESETS.map((p) => p.group))];
   return (
@@ -30,7 +32,7 @@ export default async function NewDesign() {
         busy="Drawing your line art"
       >
         <label>Your idea
-          <CountedText name="idea" max={600} rows={4} required placeholder="A sea turtle gliding over a coral reef, with sunbeams from above" />
+          <CountedText name="idea" max={600} rows={4} required defaultValue={idea} placeholder="A sea turtle gliding over a coral reef, with sunbeams from above" />
         </label>
         <SketchPicker />
         <label><span>Words on the shirt <span className="muted small">(optional)</span></span>
