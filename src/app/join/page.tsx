@@ -8,18 +8,19 @@ import { providerLabel } from "@/lib/auth/oauth";
 import { currentUser, pendingSignUp, storeIdentity } from "@/lib/auth/session";
 import { publicUrl, safePath } from "@/lib/links";
 import { desc, eq, inArray } from "drizzle-orm";
-import { TileSweep } from "@/components/TileSweep";
+import { CampaignCard } from "@/components/CampaignCard";
+import { cardStats } from "@/lib/campaign-card";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, users } from "@/lib/db/schema";
 import { money } from "@/lib/format";
 import { onShirts } from "@/lib/media/shots";
 import { CAMPAIGN_DAYS, FUNDING_GOAL, PAYOUT_BUFFER_DAYS, PREORDER_PRICE, RELAUNCHES_ALLOWED, RETURN_WINDOW_DAYS, SHARE_BPS, SHARE_OWN_LINK_BPS, STARTING_CREDITS, royaltyCents } from "@/lib/rules";
-import { fileUrl, thumbUrl } from "@/lib/storage";
 import { IdeaBox, IdeaCarry } from "./IdeaBox";
 import { IdeaShowcase } from "./IdeaShowcase";
 import { PRESETS } from "@/lib/ai/presets";
 import { pendingSketchUrl } from "@/lib/design/pending-sketch";
 import "./create.css";
+import "../designers/designers.css";
 
 // The example strip: a real idea, the line art the AI drew for it and its sun colours (public/examples).
 const EXAMPLE = {
@@ -72,7 +73,7 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
   ];
   const d = await db();
   const samples = await onShirts(await d
-    .select({ c: campaigns, name: users.name, art: designs.compositeKey, lineArt: designs.lineArtKey })
+    .select({ c: campaigns, designer: users.name, handle: users.handle, avatarKey: users.avatarKey, art: designs.compositeKey, lineArt: designs.lineArtKey, ...cardStats })
     .from(campaigns)
     .innerJoin(users, eq(users.id, campaigns.userId))
     .innerJoin(designs, eq(designs.id, campaigns.designId))
@@ -155,21 +156,7 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
             <Link href="/designs" className="button small secondary">See all designs →</Link>
           </div>
           <div className="grid home-grid">
-            {samples.map(({ c, name, art, lineArt, sweep }) => (
-              <Link key={c.id} href={`/c/${c.slug}`} className="tile">
-                {art && (
-                  <div className="tile-art">
-                    {lineArt && <img className="art" src={thumbUrl(lineArt, 640)} alt="" loading="lazy" decoding="async" />}
-                    <img className="art tile-sun" src={thumbUrl(art, 640)} alt="" loading="lazy" decoding="async" />
-                    {sweep && <TileSweep src={fileUrl(sweep)} />}
-                  </div>
-                )}
-                <div>
-                  <div className="name">{c.title}</div>
-                  <div className="meta">by {name}</div>
-                </div>
-              </Link>
-            ))}
+            {samples.map((row) => <CampaignCard key={row.c.id} row={row} />)}
           </div>
         </>
       )}

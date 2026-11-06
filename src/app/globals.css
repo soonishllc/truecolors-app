@@ -1064,3 +1064,49 @@ fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 1
 /* New design: the sketch kept from the Create page, ticked by default. */
 .kept-sketch { align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .kept-sketch img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; flex: none; }
+
+/* Design cards (components/CampaignCard.tsx): the shirt big, what's happening on it on the picture, then who
+   made it, how many to go and the latest backer. */
+@property --p { syntax: "<number>"; inherits: false; initial-value: 0; }
+.ccard { display: grid; gap: 12px; align-content: start; }
+.ccard-art { display: block; aspect-ratio: 1; background: var(--surface); border-radius: 18px; }
+.ccard-art img.art { width: 100%; height: 100%; object-fit: cover; }
+.ccard:hover .ccard-art, .ccard:focus-within .ccard-art { transform: translateY(-4px); box-shadow: 0 26px 50px -22px rgba(232, 118, 42, 0.55); }
+.ccard:hover .tile-sun, .ccard:focus-within .tile-sun { clip-path: circle(150% at 85% 15%); }
+/* A streak of light across the shirt as the sun comes on. */
+.ccard-glint { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; background: linear-gradient(115deg, transparent 38%, rgba(255, 244, 214, 0.55) 50%, transparent 62%) 150% 0 / 250% 100% no-repeat; mix-blend-mode: overlay; }
+.ccard:hover .ccard-glint { animation: ccard-glint 1s ease-out; }
+@keyframes ccard-glint { from { opacity: 1; background-position: 150% 0; } to { opacity: 1; background-position: -60% 0; } }
+.ccard-badge, .ccard-edition { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; background: rgba(20, 19, 17, 0.82); color: #fff; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; backdrop-filter: blur(6px); white-space: nowrap; }
+.ccard-badge { top: 12px; left: 12px; }
+.ccard-badge.hot { background: var(--sun); box-shadow: 0 6px 18px -6px rgba(232, 118, 42, 0.8); }
+.ccard-badge .countdown { color: inherit; font: inherit; }
+.ccard-edition { left: 12px; bottom: 12px; }
+/* How close it is, as a ring filling up on the picture. */
+.ccard-ring { position: absolute; top: 10px; right: 10px; z-index: 2; width: 60px; height: 60px; border-radius: 50%; display: grid; place-content: center; text-align: center; line-height: 1; color: #fff; background: radial-gradient(closest-side, rgba(20, 19, 17, 0.88) 79%, transparent 81%), conic-gradient(#ffb547 calc(var(--p) * 1%), rgba(255, 255, 255, 0.22) 0); animation: ccard-ring 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes ccard-ring { from { --p: 0; } }
+.ccard-ring b { font-family: var(--font-display); font-size: 18px; letter-spacing: -0.02em; }
+.ccard-ring i { font-style: normal; font-family: var(--font-mono); font-size: 9px; opacity: 0.75; }
+.ccard-body { display: grid; gap: 8px; }
+.ccard-title { font-family: var(--font-display); font-size: 19px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; }
+.ccard-title:hover { text-decoration: underline; }
+.ccard .progress { height: 8px; }
+.ccard-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; color: var(--muted); }
+.ccard-line b { font-family: var(--font-display); font-size: 18px; color: var(--ink); }
+.ccard-price { font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+.ccard-proof { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
+.ccard-pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #3fd07a; animation: ccard-pulse 1.8s infinite; }
+@keyframes ccard-pulse { 0% { box-shadow: 0 0 0 0 rgba(63, 208, 122, 0.6); } 80%, 100% { box-shadow: 0 0 0 8px rgba(63, 208, 122, 0); } }
+@media (max-width: 639px) {
+  .ccard-ring { width: 46px; height: 46px; top: 8px; right: 8px; }
+  .ccard-ring b { font-size: 14px; }
+  .ccard-badge, .ccard-edition { top: 8px; left: 8px; padding: 4px 8px; font-size: 9px; }
+  .ccard-edition { top: auto; bottom: 8px; }
+  .ccard-title { font-size: 16px; }
+  .ccard-line { font-size: 12px; }
+  .ccard-line b { font-size: 15px; }
+  .ccard-proof { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ccard-glint, .ccard-pulse, .ccard-ring { animation: none !important; }
+}

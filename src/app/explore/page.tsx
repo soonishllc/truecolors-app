@@ -2,22 +2,20 @@ import { desc, eq, inArray, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HeroReveal } from "@/components/HeroReveal";
-import { DesignerChip } from "@/components/DesignerChip";
+import { CampaignCard } from "@/components/CampaignCard";
 import { HowItWorks } from "@/components/HowItWorks";
-import { TileSweep } from "@/components/TileSweep";
 import { trackView } from "@/lib/analytics";
+import { cardStats } from "@/lib/campaign-card";
 import { currentUser } from "@/lib/auth/session";
 import { listChallenges, phase } from "@/lib/challenges";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, pledges, users, type CampaignStatus } from "@/lib/db/schema";
-import { daysLeft } from "@/lib/format";
 import { storefront } from "@/lib/links";
-import { visitorMarket } from "@/lib/markets";
+import { preorderPrice, visitorMarket } from "@/lib/markets";
 import { onShirts } from "@/lib/media/shots";
 import { FUNDING_GOAL } from "@/lib/rules";
 import { storeOriginals } from "@/lib/shopify/originals";
 import { siteImageUrl } from "@/lib/site-images";
-import { fileUrl, thumbUrl } from "@/lib/storage";
 import "./home.css";
 import "../designers/designers.css";
 
@@ -44,9 +42,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
   const designer = await currentUser();
   const market = await visitorMarket();
   const d = await db();
-  const backed = sql<number>`coalesce((select sum(${pledges.quantity}) from ${pledges} where ${pledges.campaignId} = ${campaigns.id} and ${pledges.status} in ${COUNTING}), 0)::int`;
   const shirts = (statuses: readonly CampaignStatus[], limit: number) =>
-    d.select({ c: campaigns, designer: users.name, handle: users.handle, avatarKey: users.avatarKey, lineArt: designs.lineArtKey, art: designs.compositeKey, backed })
+    d.select({ c: campaigns, designer: users.name, handle: users.handle, avatarKey: users.avatarKey, lineArt: designs.lineArtKey, art: designs.compositeKey, ...cardStats })
       .from(campaigns)
       .innerJoin(users, eq(users.id, campaigns.userId))
       .innerJoin(designs, eq(designs.id, campaigns.designId))
@@ -73,6 +70,7 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
     .from(pledges);
   const create = designer ? "/studio/new" : "/join";
   const shop = storefront(market);
+  const price = preorderPrice(market);
 
   return (
     <>
@@ -109,23 +107,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
             <div><div className="eyebrow">Live now</div><h2>Almost there</h2></div>
             <Link href="/designs" className="button small secondary">All designs →</Link>
           </div>
-          <div className="home-rail">
-            {live.map(({ c, designer: name, handle, avatarKey, lineArt, art, sweep, backed: n }) => (
-              <article key={c.id} className="tile">
-                <Link href={`/c/${c.slug}`} className="tile-art">
-                  {lineArt && <img className="art" src={thumbUrl(lineArt, 320)} loading="lazy" decoding="async" alt="" />}
-                  {art && <img className="art tile-sun" src={thumbUrl(art, 320)} loading="lazy" decoding="async" alt={c.title} />}
-                  {sweep && <TileSweep src={fileUrl(sweep)} />}
-                  {daysLeft(c.endsAt) <= 7 && <span className="corner-badge">Ends in {daysLeft(c.endsAt)}d</span>}
-                </Link>
-                <div>
-                  <Link href={`/c/${c.slug}`} className="name">{c.title}</Link>
-                  <DesignerChip handle={handle} name={name} avatarKey={avatarKey} size="sm" />
-                </div>
-                <div className="progress"><div style={{ "--w": `${Math.min(100, (n / c.goal) * 100)}%` } as React.CSSProperties} /></div>
-                <div className="meta">{n === 0 ? `Be #001 · 0 of ${c.goal}` : `${n} of ${c.goal}`} · {daysLeft(c.endsAt)} days left</div>
-              </article>
-            ))}
+          <div className="home-rail card-rail">
+            {live.map((row) => <CampaignCard key={row.c.id} row={row} price={price} />)}
           </div>
         </section>
       )}
@@ -151,16 +134,7 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
             <Link href="/designs?show=funded" className="button small secondary">See them all →</Link>
           </div>
           <div className="grid home-grid">
-            {made.map(({ c, designer: name, lineArt, art }) => (
-              <Link key={c.id} href={`/c/${c.slug}`} className="tile">
-                <div className="tile-art">
-                  {lineArt && <img className="art" src={thumbUrl(lineArt, 320)} loading="lazy" decoding="async" alt="" />}
-                  {art && <img className="art tile-sun" src={thumbUrl(art, 320)} loading="lazy" decoding="async" alt={c.title} />}
-                  <span className="corner-badge">{c.status === "shipped" ? "Shipped" : "Funded"}</span>
-                </div>
-                <div><div className="name">{c.title}</div><div className="meta">by {name}</div></div>
-              </Link>
-            ))}
+            {made.map((row) => <CampaignCard key={row.c.id} row={row} />)}
           </div>
         </section>
       )}

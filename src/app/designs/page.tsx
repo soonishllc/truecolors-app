@@ -3,16 +3,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { campaigns, designs, pledges, users } from "@/lib/db/schema";
-import { daysLeft } from "@/lib/format";
+import { campaigns, designs, users } from "@/lib/db/schema";
 import { listChallenges, phase } from "@/lib/challenges";
 import { onShirts } from "@/lib/media/shots";
-import { fileUrl, thumbUrl } from "@/lib/storage";
-import { TileSweep } from "@/components/TileSweep";
+import { CampaignCard } from "@/components/CampaignCard";
+import { cardStats } from "@/lib/campaign-card";
 import { preorderPrice, visitorMarket } from "@/lib/markets";
 import { trackView } from "@/lib/analytics";
 import { storefront } from "@/lib/links";
 import "../explore/home.css";
+import "../designers/designers.css";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Designs · Truecolors" };
@@ -35,9 +35,8 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
   const term = q.q?.trim().slice(0, 60);
   const designer = await currentUser();
   const d = await db();
-  const backed = sql<number>`coalesce((select sum(${pledges.quantity}) from ${pledges} where ${pledges.campaignId} = ${campaigns.id} and ${pledges.status} in ('pledged','charge_pending','charged','charge_failed')), 0)::int`;
   const rows = await onShirts(await d
-    .select({ c: campaigns, designer: users.name, handle: users.handle, lineArt: designs.lineArtKey, art: designs.compositeKey, backed })
+    .select({ c: campaigns, designer: users.name, handle: users.handle, avatarKey: users.avatarKey, lineArt: designs.lineArtKey, art: designs.compositeKey, ...cardStats })
     .from(campaigns)
     .innerJoin(users, eq(users.id, campaigns.userId))
     .innerJoin(designs, eq(designs.id, campaigns.designId))
@@ -58,7 +57,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
   const quiet = show === "live" && !term && (rows.length < 2 || rows.every((r) => r.backed === 0));
   const funded = quiet
     ? await onShirts(await d
-        .select({ c: campaigns, designer: users.name, lineArt: designs.lineArtKey, art: designs.compositeKey, backed })
+        .select({ c: campaigns, designer: users.name, handle: users.handle, avatarKey: users.avatarKey, lineArt: designs.lineArtKey, art: designs.compositeKey, ...cardStats })
         .from(campaigns)
         .innerJoin(users, eq(users.id, campaigns.userId))
         .innerJoin(designs, eq(designs.id, campaigns.designId))
@@ -110,32 +109,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
       )}
       {/* A couple of designs fill the width rather than leaving half the row empty. */}
       <div className={`grid explore-grid${rows.length < 3 ? " few" : ""}`}>
-        {rows.map(({ c, designer, handle, lineArt, art, sweep, backed }) => {
-          const days = daysLeft(c.endsAt);
-          const pct = Math.min(100, (backed / c.goal) * 100);
-          return (
-            <article key={c.id} className="tile">
-              <Link href={`/c/${c.slug}`} className="tile-art">
-                {lineArt && <img className="art" src={thumbUrl(lineArt, 320)} loading="lazy" decoding="async" alt="" />}
-                {art && <img className="art tile-sun" src={thumbUrl(art, 320)} loading="lazy" decoding="async" alt={c.title} />}
-                {sweep && <TileSweep src={fileUrl(sweep)} />}
-                {c.status === "live" && days <= 7 && <span className="corner-badge">Ends in {days}d</span>}
-                {c.editionSize && <span className="corner-badge">Edition of {c.editionSize}</span>}
-              </Link>
-              <div>
-                <Link href={`/c/${c.slug}`} className="name">{c.title}</Link>
-                <div className="meta">by <Link href={`/d/${handle}`}>{designer}</Link></div>
-              </div>
-              {/* An empty bar with "Be #001" reads as an open door, not a dead campaign. */}
-              {c.status !== "missed" && <div className={`progress${backed === 0 ? " empty" : ""}`}><div style={{ "--w": `${pct}%` } as React.CSSProperties} /></div>}
-              <div className="meta">
-                {c.status === "live" ? <><b className="tile-price">{price}</b> · {backed > 0 ? `${backed} of ${c.goal} · ` : <span className="be-first">Be #001 · 0 of {c.goal} · </span>}{days}d left</>
-                  : c.status === "missed" ? `${backed} of ${c.goal} · ask for it back`
-                  : `${backed} backed · funded`}
-              </div>
-            </article>
-          );
-        })}
+        {rows.map((row) => <CampaignCard key={row.c.id} row={row} price={price} />)}
       </div>
 
       {quiet && (
@@ -144,19 +118,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
             <>
               <h2 className="explore-more-head">Funded by the community</h2>
               <div className={`grid explore-grid${funded.length < 3 ? " few" : ""}`}>
-                {funded.map(({ c, designer, lineArt, art, backed }) => (
-                  <article key={c.id} className="tile">
-                    <Link href={`/c/${c.slug}`} className="tile-art">
-                      {lineArt && <img className="art" src={thumbUrl(lineArt, 320)} loading="lazy" decoding="async" alt="" />}
-                      {art && <img className="art tile-sun" src={thumbUrl(art, 320)} loading="lazy" decoding="async" alt={c.title} />}
-                      <span className="corner-badge">{c.status === "shipped" ? "Shipped" : c.status === "in_production" ? "Printing" : "Funded"}</span>
-                    </Link>
-                    <div>
-                      <Link href={`/c/${c.slug}`} className="name">{c.title}</Link>
-                      <div className="meta">by {designer} · {backed} backed</div>
-                    </div>
-                  </article>
-                ))}
+                {funded.map((row) => <CampaignCard key={row.c.id} row={row} />)}
               </div>
             </>
           )}
