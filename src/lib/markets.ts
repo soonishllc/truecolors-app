@@ -16,7 +16,7 @@ export const retailMarket = (m: string | undefined): RetailMarket => (m && m.toU
 export const MARKET_COOKIE = "tc_market";
 
 // The market to show a visitor: the one they picked, else the store's market they came from, else by where they
-// are, from the country the host reports: the UAE store for the GCC and MENA, the USA store for everywhere else.
+// are, from the country the host reports: the UAE store for the UAE and the GCC, the USA store for everywhere else.
 export async function visitorMarket(picked?: string): Promise<RetailMarket> {
   if (picked) return retailMarket(picked);
   const fromStore = (await cookies()).get(MARKET_COOKIE)?.value;

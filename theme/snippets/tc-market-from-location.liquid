@@ -1,42 +1,50 @@
 {%- comment -%}
-  Truecolors: shows each visitor the market for where they are, once. Visitors in the GCC and the rest of MENA get
-  the UAE store; everyone else gets the USA store. Shopify only does this itself on Plus, so the theme does it.
-  A visitor who then picks the other market with the switch keeps their choice.
+  Truecolors: shows each visitor the market for where they are. Visitors in the UAE and the rest of the GCC get the
+  UAE store (/); everyone else gets the USA store (/en-us). Shopify only does this itself on Plus, so the theme does it.
+  It applies on every visit (a link to / from abroad still lands on the USA store) until the visitor picks a market
+  with the switch, which is then theirs. Search engines are left where they are.
 
-  Add to layout/theme.liquid, just before </body>:  {% render 'tc-market-from-location' %}
+  Rendered in layout/theme.liquid's <head>, so it starts before the page draws.
   Keep the country list in step with UAE_MARKET_COUNTRIES in the app (src/lib/rules.ts).
 {%- endcomment -%}
 <script>
   (function () {
-    var KEY = "tc_market_chosen";
-    var UAE = ["AE","SA","KW","QA","BH","OM","EG","JO","LB","IQ","SY","PS","YE","IR","IL","MA","DZ","TN","LY","DJ"];
+    var PICKED = "tc_market_chosen", COUNTRY = "tc_country";
+    var UAE = ["AE", "SA", "KW", "QA", "BH", "OM"];
     var current = "{{ localization.country.iso_code }}";
-    try {
-      if (localStorage.getItem(KEY)) return;
-      // A choice made with the market switch is the visitor's own.
-      document.addEventListener("submit", function (e) {
-        if (e.target && e.target.id === "localization_form") localStorage.setItem(KEY, "picked");
-      }, true);
-    } catch (e) { return; }
-    fetch("{{ routes.root_url | append: '/' | replace: '//', '/' }}browsing_context_suggestions.json")
+    var root = "{{ routes.root_url | append: '/' | replace: '//', '/' }}";
+    if (/bot|crawl|spider|slurp|lighthouse|preview/i.test(navigator.userAgent)) return;
+    var store;
+    try { store = window.localStorage; if (store.getItem(PICKED) === "picked") return; } catch (e) { return; }
+    // A choice made with the market switch is the visitor's own, from then on.
+    document.addEventListener("submit", function (e) {
+      if (e.target && e.target.id === "localization_form") try { store.setItem(PICKED, "picked"); } catch (x) {}
+    }, true);
+    var go = function (country) {
+      var want = UAE.indexOf(country) >= 0 ? "AE" : "US";
+      if (want === current) return;
+      var form = document.createElement("form");
+      form.method = "post";
+      form.action = root + "localization";
+      [["form_type", "localization"], ["_method", "put"], ["country_code", want], ["return_to", location.pathname.replace(/^\/en-us(?=\/|$)/, "") + location.search]]
+        .forEach(function (f) {
+          var i = document.createElement("input");
+          i.type = "hidden"; i.name = f[0]; i.value = f[1];
+          form.appendChild(i);
+        });
+      var send = function () { document.body.appendChild(form); form.submit(); };
+      document.body ? send() : document.addEventListener("DOMContentLoaded", send);
+    };
+    // Where the visitor is, looked up once and kept, so later pages switch at once.
+    var known = store.getItem(COUNTRY);
+    if (known) return go(known);
+    fetch(root + "browsing_context_suggestions.json")
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var country = data && data.detected_values && data.detected_values.country && data.detected_values.country.handle;
         if (!country) return;
-        var want = UAE.indexOf(country) >= 0 ? "AE" : "US";
-        localStorage.setItem(KEY, "location");
-        if (want === current) return;
-        var form = document.createElement("form");
-        form.method = "post";
-        form.action = "{{ routes.root_url | append: '/' | replace: '//', '/' }}localization";
-        [["form_type", "localization"], ["_method", "put"], ["country_code", want], ["return_to", location.pathname + location.search]]
-          .forEach(function (f) {
-            var i = document.createElement("input");
-            i.type = "hidden"; i.name = f[0]; i.value = f[1];
-            form.appendChild(i);
-          });
-        document.body.appendChild(form);
-        form.submit();
+        try { store.setItem(COUNTRY, country); } catch (e) {}
+        go(country);
       })
       .catch(function () {});
   })();

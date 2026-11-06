@@ -40,15 +40,9 @@ export const PREORDER_PRICE: Record<PreorderMarket, { currency: "AED" | "USD"; c
   AE: { currency: "AED", cents: 12900, compareAtCents: 16500, label: "UAE" },
   US: { currency: "USD", cents: 3600, compareAtCents: 4500, label: "USA" },
 };
-// Visitors in the GCC and the rest of the Middle East and North Africa see the UAE store; everyone else sees the
-// USA store. The same list is in theme/snippets/tc-market-from-location.liquid; the Shopify markets need these
+// Visitors in the UAE and the rest of the GCC see the UAE store; everyone else sees the USA store. The same list is in theme/snippets/tc-market-from-location.liquid; the Shopify markets need these
 // countries too, or checkout won't ship to them.
-export const UAE_MARKET_COUNTRIES = [
-  // GCC
-  "AE", "SA", "KW", "QA", "BH", "OM",
-  // Rest of MENA
-  "EG", "JO", "LB", "IQ", "SY", "PS", "YE", "IR", "IL", "MA", "DZ", "TN", "LY", "DJ",
-] as const;
+export const UAE_MARKET_COUNTRIES = ["AE", "SA", "KW", "QA", "BH", "OM"] as const;
 export const marketForCountry = (country: string | null | undefined): PreorderMarket =>
   country && (UAE_MARKET_COUNTRIES as readonly string[]).includes(country.toUpperCase()) ? "AE" : "US";
 
