@@ -20,13 +20,17 @@
     document.addEventListener("submit", function (e) {
       if (e.target && e.target.id === "localization_form") try { store.setItem(PICKED, "picked"); } catch (x) {}
     }, true);
+    var path = location.pathname.replace(/^\/en-us(?=\/|$)/, "");
     var go = function (country) {
       var want = UAE.indexOf(country) >= 0 ? "AE" : "US";
-      if (want === current) return;
+      if (want === current) { try { sessionStorage.removeItem("tc_switched"); } catch (e) {} return; }
+      // Sent to the other store for this page already and back here: it's only sold in this one (the store's URL
+      // redirects send a product's link to the store that has it), so stay rather than go round in circles.
+      try { if (sessionStorage.getItem("tc_switched") === path) return; sessionStorage.setItem("tc_switched", path); } catch (e) {}
       var form = document.createElement("form");
       form.method = "post";
       form.action = root + "localization";
-      [["form_type", "localization"], ["_method", "put"], ["country_code", want], ["return_to", location.pathname.replace(/^\/en-us(?=\/|$)/, "") + location.search]]
+      [["form_type", "localization"], ["_method", "put"], ["country_code", want], ["return_to", path + location.search]]
         .forEach(function (f) {
           var i = document.createElement("input");
           i.type = "hidden"; i.name = f[0]; i.value = f[1];
