@@ -25,12 +25,9 @@ import { visitorMarket } from "@/lib/markets";
 import "./create.css";
 import "../designers/designers.css";
 
-// The example strip: a real idea, the line art the AI drew for it and its sun colours (public/examples).
-const EXAMPLE = {
-  idea: "An iguana holding a taco beside Mayan ruins and a cenote pool",
-  lineArt: "/examples/iguana-line-art.webp",
-  sun: "/examples/iguana-sun.webp",
-};
+// "One idea, every style": the same idea drawn by the studio in four styles (public/examples/styles).
+const STYLE_IDEA = "A falcon over the dunes at sunset";
+const STYLE_TILES = ["classic", "badge", "tattoo", "mascot"];
 const pct = (bps: number) => `${bps / 100}%`;
 // "AED 1,290" rather than "AED 1,290.00" for round amounts.
 const whole = (cents: number, currency: string) => money(cents, currency).replace(/\.00$/, "");
@@ -103,24 +100,27 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
 
       <Ticker items={ticker} />
 
-      {/* What the AI actually makes, before anyone signs up: an idea, its line art, its sun colours. */}
-      <section className="ai-strip" aria-labelledby="ai-strip-h">
-        <div className="eyebrow">See what the AI makes</div>
-        <h2 id="ai-strip-h">One sentence in, a shirt that changes in the sun out</h2>
-        <ol className="ai-panels">
-          <li className="ai-panel ai-idea">
-            <span className="ai-step">1 · Your idea</span>
-            <blockquote>&ldquo;{EXAMPLE.idea}&rdquo;</blockquote>
-          </li>
-          <li className="ai-panel">
-            <span className="ai-step">2 · Line art, in the shade</span>
-            <img src={EXAMPLE.lineArt} alt="The AI's black line art of the iguana" width={900} height={900} loading="lazy" decoding="async" />
-          </li>
-          <li className="ai-panel">
-            <span className="ai-step">3 · Full colour, in the sun</span>
-            <img src={EXAMPLE.sun} alt="The same iguana in full colour, as it looks in the sun" width={900} height={900} loading="lazy" decoding="async" />
-          </li>
-        </ol>
+      {/* One idea through the studio in four of its styles: the style picker's range, from real output. Each one opens
+          the idea box with that style chosen. Made by scripts/style-examples.ts. */}
+      <section className="style-strip" aria-labelledby="style-strip-h">
+        <div className="eyebrow">One idea, every style</div>
+        <h2 id="style-strip-h">Same idea. Your pick of style.</h2>
+        <p className="muted style-idea">&ldquo;{STYLE_IDEA}&rdquo;, drawn by the studio four ways. Hover or tap one to step it into the sun.</p>
+        <div className="style-tiles">
+          {STYLE_TILES.map((id) => {
+            const p = PRESETS.find((x) => x.id === id)!;
+            return (
+              <Link key={id} href={`/join?${new URLSearchParams({ idea: STYLE_IDEA, style: id })}#join-idea`} className="tile style-tile">
+                <span className="tile-art">
+                  <img className="art" src={`/examples/styles/${id}-shade.webp`} alt="" loading="lazy" decoding="async" />
+                  <img className="art tile-sun" src={`/examples/styles/${id}-sun.webp`} alt={`${STYLE_IDEA}, ${p.label} style`} loading="lazy" decoding="async" />
+                </span>
+                <b>{p.label}</b>
+                <span className="muted small">{p.hint}</span>
+              </Link>
+            );
+          })}
+        </div>
       </section>
 
       {/* What a designer earns, worked out from the real price and rates. */}
@@ -173,12 +173,14 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         <section className="join-faq" aria-labelledby="faq-h">
           <div className="eyebrow">Questions</div>
           <h2 id="faq-h">Before you start</h2>
-          {faq.map((f) => (
-            <details key={f.q}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
-            </details>
-          ))}
+          <div className="faq">
+            {faq.map((f) => (
+              <details key={f.q}>
+                <summary>{f.q}</summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
         </section>
 
         <section className="start-card" id="start">
