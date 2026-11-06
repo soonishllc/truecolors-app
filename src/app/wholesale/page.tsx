@@ -75,7 +75,7 @@ export default async function WholesalePortal({ searchParams }: { searchParams: 
             {/* Not a partner yet: the two ways to become one, the display first because it's the easy yes. */}
             <h2 className="join-ways-title">Not a partner yet?</h2>
             <Link href="/wholesale/displays" className="ways-card displays-way">
-              <img src="/displays/tc-display-tower.jpg" alt="" />
+              <img src="/displays/tc-display-tower-card.jpg" alt="" />
               <span>
                 <span className="eyebrow">Hotels · airports · attractions</span>
                 <b>Host a display</b>

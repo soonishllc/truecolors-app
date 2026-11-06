@@ -3,6 +3,7 @@ import { makeHandoff } from "@/lib/proxy/handoff";
 import { campaignShareMeta } from "@/lib/proxy/share-meta";
 import { appPathFor, storeShell } from "@/lib/proxy/shell";
 import { verifyProxyQuery } from "@/lib/proxy/signature";
+import { storeFeed } from "@/lib/store-feed";
 
 // Shopify's app proxy: www.truecolors.global/apps/truecolors/<path> arrives here as /proxy/<path>, signed. The
 // answer is Liquid, so Shopify shows it inside the store's theme, with the store's header, menu and footer.
@@ -10,7 +11,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
   const url = new URL(req.url);
   const secret = config().SHOPIFY_PROXY_SECRET;
   if (!secret || !verifyProxyQuery(url.searchParams, secret)) return new Response("Not found", { status: 404 });
-  const appPath = appPathFor((await params).path?.join("/") ?? "");
+  const path = (await params).path?.join("/") ?? "";
+  // The community, as data for the theme's own pages (lib/store-feed.ts). Not Liquid, so Shopify passes it as is.
+  if (path === "feed.json") {
+    return Response.json(await storeFeed(), { headers: { "Cache-Control": "public, max-age=60" } });
+  }
+  const appPath = appPathFor(path);
   if (!appPath) return notFound();
 
   // Only the store page's own query (a referral code, a filter) goes on to the app; Shopify's signed fields don't.
