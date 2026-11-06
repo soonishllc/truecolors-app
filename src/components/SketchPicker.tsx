@@ -29,7 +29,7 @@ export function SketchPicker() {
         ) : (
           <>
             <span className="dz-title">✎ Add a sketch (optional)</span>
-            <span className="small muted">A photo or scan of a drawing. The AI keeps your idea and redraws it cleanly.</span>
+            <span className="small muted">A photo of a drawing. Lined paper and crayon are fine: we clean it up and redraw it in bold lines.</span>
           </>
         )}
       </label>

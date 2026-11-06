@@ -6,7 +6,7 @@
 import OpenAI from "openai";
 import { config } from "../config";
 import type { DesignOptions } from "../db/schema";
-import { preset } from "./presets";
+import { preset, SKETCH_SUBJECT } from "./presets";
 
 export type Brief = {
   // What to draw, in English, one hero subject: no style, colour or render words (the prompts own those).
@@ -155,7 +155,7 @@ export function tidyBrief(input: BriefInput): Brief {
   const given = tidyWords(o.text);
   let subject = text;
   if (!subject) {
-    subject = input.sketch ? "the subject of the sketch" : fallback.subject;
+    subject = input.sketch ? SKETCH_SUBJECT : fallback.subject;
     if (!input.sketch) notes.push("The idea didn't say what to draw, so the style's own subject was used.");
   }
   // Lettering styles need words: the typed ones, else the fallback's when the idea was empty (otherwise the
@@ -178,6 +178,9 @@ const SYSTEM = [
   "on the shirt, copy them exactly as written (same language, script, spelling and capitals; drop surrounding",
   "quotes); if the style needs words and none are given, write a short fitting phrase of at most 4 words in the",
   "idea's language. Never include brand names or names of real people in words. Otherwise null.",
+  "If fromSketch is true, the customer uploaded their own drawing, which you can't see and which decides what is",
+  "drawn: the subject only names what the idea says about it (no inventing, no adding elements), and words are null",
+  "unless the idea itself gives words for the shirt (the drawing's own words are copied from the drawing).",
   "Return notes: up to 3 short plain-English notes on what you changed (empty if nothing).",
 ].join(" ");
 
@@ -231,6 +234,8 @@ async function rewrite(input: BriefInput, tidy: Brief, userId: string): Promise<
 export async function makeBrief(input: BriefInput, userId: string): Promise<Brief> {
   const tidy = tidyBrief(input);
   if (config().AI_PROVIDER !== "openai") return tidy;
+  // A sketch with no usable idea is its own brief: the text model would only invent a subject to fight the drawing.
+  if (input.sketch && tidy.subject === SKETCH_SUBJECT) return tidy;
   try {
     return await rewrite(input, tidy, userId);
   } catch (e) {

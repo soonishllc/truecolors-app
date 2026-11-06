@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import sharp from "sharp";
+import sharp, { type OutputInfo, type Sharp } from "sharp";
 import { makeBrief, tidyIdea, tidyInstruction } from "../ai/brief";
 import { colourPrompt, lineArtPrompt, preset, promptFlags, refinePrompt, sketchPrompt } from "../ai/presets";
 import { imageProvider } from "../ai/provider";
@@ -117,15 +117,276 @@ async function checkImage(png: Buffer) {
   if (m.flagged) throw new UserError("The result was blocked by moderation. Try a different idea.");
 }
 
-// A photo or scan of a drawing, upright, on white and small enough for the image model.
-async function readSketch(upload: Buffer) {
+// A customer's upload, made ready for the image model: a phone photo of a drawing becomes the drawing alone, upright,
+// on clean white, cropped to it and centred on a square (the model draws on a square, so nothing gets squashed or
+// cut). Paper colour, warm light, shadows and notebook rules are taken out here, so the model isn't tempted to
+// draw them. A photo that isn't a drawing (a person, a pet, a place) is kept as it is and flagged, so the prompt
+// can ask for it to be redrawn as line art. A page with no drawing on it is refused before any credits are spent.
+export type Sketch = { png: Buffer; photo: boolean };
+
+const SKETCH_PX = 1536;
+const NO_DRAWING = "We couldn't find a drawing in that photo. Try a closer, brighter photo of it, from straight above.";
+
+export async function readSketch(upload: Buffer): Promise<Sketch> {
+  let px: { data: Buffer; info: OutputInfo };
   try {
-    // A small file can still unpack to a huge image; 40 megapixels is far more than any phone photo.
-    return await sharp(upload, { limitInputPixels: 40_000_000 }).rotate().resize(1536, 1536, { fit: "inside", withoutEnlargement: true })
-      .flatten({ background: "#ffffff" }).png().toBuffer();
+    // A small file can still unpack to a huge image; 40 megapixels is far more than any phone photo. rotate() reads
+    // the phone's EXIF orientation, so a portrait photo stored sideways comes out upright.
+    px = await sharp(upload, { limitInputPixels: 40_000_000 }).rotate().resize(SKETCH_PX, SKETCH_PX, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   } catch {
     throw new UserError("That sketch couldn't be opened. Upload a JPG or PNG photo of it.");
   }
+  const { width: w, height: h } = px.info;
+  const rgb = px.data;
+  const asPng = (data: Buffer) => sharp(data, { raw: { width: w, height: h, channels: 3 } });
+
+  // Paper is the brightest thing nearby, so each pixel is divided by its neighbourhood's brightest value: paper
+  // comes out white under any light or shadow, and the light's colour cast goes with it.
+  const paper = await paperLight(rgb, w, h);
+  const flat = Buffer.alloc(rgb.length);
+  const luma = new Float32Array(w * h);
+  for (let k = 0, i = 0; k < w * h; k++, i += 3) {
+    for (let c = 0; c < 3; c++) flat[i + c] = Math.min(255, (rgb[i + c] / Math.max(paper[i + c], 1)) * 255);
+    luma[k] = (0.299 * flat[i] + 0.587 * flat[i + 1] + 0.114 * flat[i + 2]) / 255;
+  }
+  const sorted = Float32Array.from(luma).sort();
+  const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))];
+
+  // A drawing is mostly bare paper: white once flattened, under light that's nearly colourless. A photo of a person
+  // or a place isn't (a big smooth sky flattens to white too, but it's blue). Photos go to the model as they are.
+  const bare = luma.reduce((n, v) => n + (v > 0.85 ? 1 : 0), 0) / luma.length;
+  // The colour is judged on the smoothed paper light, not the pixels: free of sensor noise in a dark photo, and
+  // warm lamplight on paper stays well short of sky blue.
+  let paperish = 0;
+  for (let i = 0; i < rgb.length; i += 3) {
+    const hi = Math.max(paper[i], paper[i + 1], paper[i + 2]), lo = Math.min(paper[i], paper[i + 1], paper[i + 2]);
+    if (hi - lo < 0.4 * Math.max(hi, 1) && flat[i] > 200 && flat[i + 1] > 200 && flat[i + 2] > 200) paperish++;
+  }
+  if (bare < 0.5 || paperish / (w * h) < 0.35) {
+    return { png: await square(asPng(rgb), { left: 0, top: 0, width: w, height: h }), photo: true };
+  }
+  // Around the paper: the table, a laptop, the paper's own edge. Whitened, so they're neither drawn nor cropped to.
+  const onPaper = await paperArea(rgb, w, h);
+  if (onPaper) {
+    for (let k = 0; k < w * h; k++) if (!onPaper[k]) { flat[k * 3] = flat[k * 3 + 1] = flat[k * 3 + 2] = 255; luma[k] = 1; }
+    sorted.set(luma);
+    sorted.sort();
+  }
+  // Nothing clearly darker than the paper (a blank page, faint pencil, or a photo too dark to tell ink from noise).
+  if (at(0.002) > 0.62) throw new UserError(NO_DRAWING);
+
+  // Levels: paper and its grain to white, the darkest ink to black, pencil darkened to read as line.
+  const lo = Math.min(at(0.001), 0.35), hi = 0.86;
+  const out = Buffer.alloc(rgb.length);
+  for (let k = 0, i = 0; k < w * h; k++, i += 3) {
+    for (let c = 0; c < 3; c++) out[i + c] = Math.round(255 * Math.min(1, Math.max(0, (flat[i + c] / 255 - lo) / (hi - lo))));
+    luma[k] = (0.299 * out[i] + 0.587 * out[i + 1] + 0.114 * out[i + 2]) / 255;
+  }
+  removeRules(out, luma, w, h);
+
+  // Crop to the drawing: rows and columns with a few ink pixels in them, ignoring specks. Light but strong colour
+  // (a yellow crayon sun) is drawing too.
+  const ink = (k: number) => luma[k] < 0.6 || Math.max(out[k * 3], out[k * 3 + 1], out[k * 3 + 2]) - Math.min(out[k * 3], out[k * 3 + 1], out[k * 3 + 2]) > 90;
+  const rows = new Uint32Array(h), cols = new Uint32Array(w);
+  let total = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (ink(y * w + x)) { rows[y]++; cols[x]++; total++; }
+  if (total < w * h * 0.002) throw new UserError(NO_DRAWING);
+  const span = (counts: Uint32Array, len: number, min: number) => {
+    let a = 0, b = len - 1;
+    while (a < b && counts[a] < min) a++;
+    while (b > a && counts[b] < min) b--;
+    return [a, b];
+  };
+  const [top, bottom] = span(rows, h, Math.max(2, w * 0.004));
+  const [left, right] = span(cols, w, Math.max(2, h * 0.004));
+  // A 3px median takes out leftover specks of paper grain and sensor noise without thinning lines.
+  const clean = sharp(await asPng(out).median(3).png().toBuffer());
+  return { png: await square(clean, { left, top, width: right - left + 1, height: bottom - top + 1 }), photo: false };
+}
+
+// The paper's brightness under the light at each pixel, per colour: the brightest value within a window wider than
+// any pen line (so lines don't count as paper), worked out small and blurred, as light changes slowly.
+async function paperLight(rgb: Buffer, w: number, h: number): Promise<Buffer> {
+  const scale = 8, sw = Math.max(1, Math.round(w / scale)), sh = Math.max(1, Math.round(h / scale));
+  const small = await sharp(rgb, { raw: { width: w, height: h, channels: 3 } }).resize(sw, sh, { fit: "fill" }).raw().toBuffer();
+  const r = Math.max(2, Math.round(Math.max(sw, sh) / 24));
+  const max1 = Buffer.alloc(small.length), max2 = Buffer.alloc(small.length);
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) for (let c = 0; c < 3; c++) {
+    let m = 0;
+    for (let d = Math.max(0, x - r); d <= Math.min(sw - 1, x + r); d++) m = Math.max(m, small[(y * sw + d) * 3 + c]);
+    max1[(y * sw + x) * 3 + c] = m;
+  }
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) for (let c = 0; c < 3; c++) {
+    let m = 0;
+    for (let d = Math.max(0, y - r); d <= Math.min(sh - 1, y + r); d++) m = Math.max(m, max1[(d * sw + x) * 3 + c]);
+    max2[(y * sw + x) * 3 + c] = m;
+  }
+  return sharp(max2, { raw: { width: sw, height: sh, channels: 3 } }).blur(r / 2 + 0.3).resize(w, h, { fit: "fill" }).raw().toBuffer();
+}
+
+// The sheet of paper in a photo of one on a table: the largest bright area (Otsu's threshold on a small grey copy),
+// its holes filled (they're the drawing) and its rim trimmed off (the paper's edge and shadow). Null when the paper
+// fills the frame (a scan or a close-up) or no clear sheet is found, and nothing is masked.
+async function paperArea(rgb: Buffer, w: number, h: number): Promise<Uint8Array | null> {
+  const sw = Math.max(8, Math.round(w / 8)), sh = Math.max(8, Math.round(h / 8)), n = sw * sh;
+  const g = await sharp(rgb, { raw: { width: w, height: h, channels: 3 } }).resize(sw, sh, { fit: "fill" }).blur(1).greyscale().extractChannel(0).raw().toBuffer();
+  const hist = new Array(256).fill(0);
+  for (const v of g) hist[v]++;
+  let sum = 0, sumB = 0, wB = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i];
+    if (!wB || wB === n) continue;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / (n - wB), between = wB * (n - wB) * (mB - mF) ** 2;
+    if (between > best) { best = between; t = i; }
+  }
+  // Labels connected bright areas; keeps the biggest.
+  const label = new Int32Array(n).fill(-1);
+  let biggest = -1, biggestSize = 0;
+  for (let s = 0; s < n; s++) {
+    if (label[s] !== -1 || g[s] <= t) continue;
+    const stack = [s];
+    label[s] = s;
+    let size = 0;
+    while (stack.length) {
+      const k = stack.pop()!;
+      size++;
+      const x = k % sw, y = (k / sw) | 0;
+      for (const m of [x > 0 ? k - 1 : -1, x < sw - 1 ? k + 1 : -1, y > 0 ? k - sw : -1, y < sh - 1 ? k + sw : -1]) {
+        if (m >= 0 && label[m] === -1 && g[m] > t) { label[m] = s; stack.push(m); }
+      }
+    }
+    if (size > biggestSize) { biggestSize = size; biggest = s; }
+  }
+  if (biggestSize < n * 0.15) return null;
+  // Fill holes: whatever isn't the paper and can't reach the frame's edge without crossing it.
+  const outside = new Uint8Array(n), stack: number[] = [];
+  for (let k = 0; k < n; k++) {
+    const x = k % sw, y = (k / sw) | 0;
+    if ((x === 0 || y === 0 || x === sw - 1 || y === sh - 1) && label[k] !== biggest) { outside[k] = 1; stack.push(k); }
+  }
+  while (stack.length) {
+    const k = stack.pop()!, x = k % sw, y = (k / sw) | 0;
+    for (const m of [x > 0 ? k - 1 : -1, x < sw - 1 ? k + 1 : -1, y > 0 ? k - sw : -1, y < sh - 1 ? k + sw : -1]) {
+      if (m >= 0 && !outside[m] && label[m] !== biggest) { outside[m] = 1; stack.push(m); }
+    }
+  }
+  const off = outside.reduce((a, v) => a + v, 0);
+  if (off < n * 0.03) return null;
+  // A real sheet has an edge: a sharp step in brightness along its outline. Light falling off across a page
+  // that fills the frame also splits it in two, but gently, and there nothing may be masked (it's all drawing).
+  let steps = 0, edge = 0;
+  const inside: number[] = [];
+  for (let k = 0; k < n; k++) if (!outside[k]) inside.push(g[k]);
+  inside.sort((a, b) => a - b);
+  const paperGrey = inside[inside.length >> 1] || 1;
+  for (let k = 0; k < n; k++) {
+    if (outside[k]) continue;
+    const x = k % sw, y = (k / sw) | 0;
+    if (!(x > 0 && outside[k - 1]) && !(x < sw - 1 && outside[k + 1]) && !(y > 0 && outside[k - sw]) && !(y < sh - 1 && outside[k + sw])) continue;
+    // Inside against outside within a few pixels: a sheet is clearly brighter than the table it's lying on.
+    let inSum = 0, inN = 0, outSum = 0, outN = 0;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= sw || yy >= sh) continue;
+      const m = yy * sw + xx;
+      if (outside[m]) { outSum += g[m]; outN++; } else { inSum += g[m]; inN++; }
+    }
+    edge++;
+    if (outN && (inSum / inN - outSum / outN) / paperGrey > 0.15) steps++;
+  }
+  // Most of it: paper meeting a white shirt or a bright laptop has no step there. Real sheets on a table measure
+  // 78-100%; light falling off across a page, 35-50%.
+  if (!edge || steps / edge < 0.65) return null;
+  // Trimmed by two small pixels (about 16 px here) all round, so the paper's edge goes with the table.
+  let keep = Uint8Array.from(outside, (v) => 1 - v);
+  for (let pass = 0; pass < 2; pass++) {
+    const next = Uint8Array.from(keep);
+    for (let k = 0; k < n; k++) {
+      const x = k % sw, y = (k / sw) | 0;
+      if (keep[k] && (x === 0 || y === 0 || x === sw - 1 || y === sh - 1 || !keep[k - 1] || !keep[k + 1] || !keep[k - sw] || !keep[k + sw])) next[k] = 0;
+    }
+    keep = next;
+  }
+  const big = await sharp(Buffer.from(keep.map((v) => v * 255)), { raw: { width: sw, height: sh, channels: 1 } })
+    .resize(w, h, { fit: "fill", kernel: "nearest" }).extractChannel(0).raw().toBuffer();
+  return Uint8Array.from(big, (v) => (v > 127 ? 1 : 0));
+}
+
+// Notebook rules: five or more evenly spaced, light, straight lines across most of the page (at whatever slight angle
+// the photo was taken). Their light pixels are whitened; ink crossing them is dark, so it stays. A single long line
+// (a drawn horizon) isn't evenly spaced company, so it's kept. A margin line is taken only on ruled paper.
+function removeRules(out: Buffer, luma: Float32Array, w: number, h: number) {
+  const light = (k: number) => luma[k] > 0.4 && luma[k] < 0.95;
+  const pts: number[] = [];
+  for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) if (light(y * w + x)) pts.push(x, y);
+  if (pts.length < 100) return;
+  const ruled = (vertical: boolean, needLines: number, minCover: number) => {
+    let best = { score: 0, angle: 0, bins: new Float64Array(0) };
+    const tryAngle = (a: number) => {
+      const t = (a * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t);
+      const len = w + h, bins = new Float64Array(len * 2);
+      for (let i = 0; i < pts.length; i += 2) {
+        const [x, y] = [pts[i], pts[i + 1]];
+        bins[Math.round(vertical ? x * cos + y * sin : y * cos - x * sin) + len]++;
+      }
+      let score = 0;
+      for (const b of bins) score += b * b;
+      if (score > best.score) best = { score, angle: a, bins };
+    };
+    // Coarse, then fine: a line a quarter of a degree off smears over several pixels across the page.
+    for (let a = -10; a <= 10; a += 0.5) tryAngle(a);
+    const coarse = best.angle;
+    for (let a = coarse - 0.45; a <= coarse + 0.45; a += 0.05) tryAngle(a);
+    best.angle = (best.angle * Math.PI) / 180;
+    // Sampled every other pixel both ways, so a line across the whole page counts about width / 2.
+    const across = (vertical ? h : w) / 2, len = w + h;
+    const lines: number[] = [];
+    for (let i = 1; i < best.bins.length - 1; i++) {
+      const v = best.bins[i - 1] + best.bins[i] + best.bins[i + 1];
+      if (v <= across * minCover || best.bins[i] < best.bins[i - 1] || best.bins[i] <= best.bins[i + 1]) continue;
+      // A thick rule can peak twice a pixel or two apart: one line.
+      const last = lines[lines.length - 1];
+      if (last !== undefined && i - len - last < 4) {
+        if (best.bins[i] > best.bins[last + len]) lines[lines.length - 1] = i - len;
+      } else lines.push(i - len);
+    }
+    if (lines.length < needLines) return null;
+    if (needLines > 1) {
+      const gaps = lines.slice(1).map((v, i) => v - lines[i]).sort((a, b) => a - b);
+      const med = gaps[gaps.length >> 1];
+      if (med < 6 || gaps.filter((g) => Math.abs(g - med) <= med * 0.2).length < gaps.length * 0.6) return null;
+    }
+    return { angle: best.angle, lines };
+  };
+  const wipe = (r: { angle: number; lines: number[] }, vertical: boolean) => {
+    const cos = Math.cos(r.angle), sin = Math.sin(r.angle), on = new Set<number>();
+    for (const l of r.lines) for (let d = -3; d <= 3; d++) on.add(l + d);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x;
+      if (light(k) && on.has(Math.round(vertical ? x * cos + y * sin : y * cos - x * sin))) {
+        out[k * 3] = out[k * 3 + 1] = out[k * 3 + 2] = 255;
+        luma[k] = 1;
+      }
+    }
+  };
+  const rules = ruled(false, 5, 0.45);
+  if (!rules) return;
+  wipe(rules, false);
+  const margin = ruled(true, 1, 0.6);
+  if (margin) wipe(margin, true);
+}
+
+// The crop, with a white margin, centred on a white square.
+async function square(img: Sharp, box: { left: number; top: number; width: number; height: number }) {
+  const pad = Math.round(Math.max(box.width, box.height) * 0.06);
+  const side = Math.max(box.width, box.height) + 2 * pad;
+  const crop = await img.extract(box).png().toBuffer();
+  const sq = await sharp({ create: { width: side, height: side, channels: 3, background: "#ffffff" } })
+    .composite([{ input: crop, left: Math.round((side - box.width) / 2), top: Math.round((side - box.height) / 2) }]).png().toBuffer();
+  return sharp(sq).resize(Math.min(side, SKETCH_PX), Math.min(side, SKETCH_PX)).png().toBuffer();
 }
 
 // From a written idea, or from the designer's own sketch, which the AI redraws as print-ready line art.
@@ -141,14 +402,15 @@ async function drawDesign(
   const p = preset(input.presetId);
   const options: DesignOptions = { ...input.options };
   await checkText(`${input.title}\n${input.idea}\n${options.text ?? ""}`);
-  const sketch = input.sketch && (await readSketch(input.sketch));
+  const upload = input.sketch && (await readSketch(input.sketch));
+  const sketch = upload ? upload.png : undefined;
   if (sketch) await checkImage(sketch);
   const ai = imageProvider();
   // Whatever was typed becomes a drawable, printable brief; words it settles on are kept with the design, so a
   // redraw letters the same words.
   const brief = await makeBrief({ presetId: p.id, idea: input.idea, options: input.options, sketch: Boolean(sketch) }, userId);
   if (brief.words && !options.text) options.text = brief.words;
-  const prompt = sketch ? sketchPrompt(p, brief.subject, options) : lineArtPrompt(p, brief.subject, options);
+  const prompt = sketch ? sketchPrompt(p, brief.subject, options, { photo: Boolean(upload && upload.photo) }) : lineArtPrompt(p, brief.subject, options);
 
   const lineArt = await withCredits(userId, CREDIT_COST.line_art, async () => {
     const raw = await imageCall(() => (sketch ? ai.fromSketch(sketch, prompt, userId) : ai.lineArt(prompt, userId, p.refs)));
@@ -167,7 +429,8 @@ async function drawDesign(
       prompt: input.idea,
       lineArtKey: key,
       options,
-      flags: promptFlags(`${input.title} ${input.idea} ${options.text ?? ""}`),
+      // A photo redrawn may be of a real person or someone else's artwork: the reviewer should know.
+      flags: [...promptFlags(`${input.title} ${input.idea} ${options.text ?? ""}`), ...(upload && upload.photo ? ["made from a photo, not a drawing"] : [])],
     })
     .returning();
   await d.insert(generations).values({

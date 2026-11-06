@@ -43,7 +43,7 @@ describe("design brief", () => {
   it("gives a lettering style words when the idea is empty, and a sketch its own subject", () => {
     expect(tidyBrief({ presetId: "lettering", idea: "" }).words).toBeTruthy();
     expect(tidyBrief({ presetId: "beach", idea: "" }).words).toBeNull();
-    expect(tidyBrief({ presetId: "beach", idea: "", sketch: true }).subject).toBe("the subject of the sketch");
+    expect(tidyBrief({ presetId: "beach", idea: "", sketch: true }).subject).toBe("the subject of the sketch, as drawn");
   });
 
   it("uses only the tidy pass without OpenAI", async () => {

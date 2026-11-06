@@ -61,7 +61,7 @@ export function IdeaBox({ initial, initialStyle, styles, sketchUrl }: {
         <p className="idea-sketch-kept small"><img src={sketchUrl} alt="" /> Your sketch is saved. Add another below to replace it.</p>
       ) : null}
       <SketchPicker />
-      <p className="small muted idea-sketch-tip">Best results: dark pen on plain paper, photographed from above in daylight.</p>
+      <p className="small muted idea-sketch-tip">Dark pen or marker on plain paper works best, photographed from straight above in daylight, with the page filling the screen.</p>
       {state?.error && <p className="error small" role="alert">{state.error}</p>}
       <button className="button sun-button" disabled={pending}>{pending ? "Saving…" : "Draw it"}</button>
     </form>

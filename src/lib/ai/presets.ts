@@ -127,17 +127,48 @@ export function lineArtPrompt(p: Preset, subject: string, o: DesignOptions = {})
   ].filter(Boolean).join("\n");
 }
 
-// For a designer's own drawing: the AI keeps their idea and composition and redraws it print-ready.
-export function sketchPrompt(p: Preset, subject: string, o: DesignOptions = {}): string {
+// The subject when a sketch comes with no usable idea: the drawing itself says what it is (brief.ts).
+export const SKETCH_SUBJECT = "the subject of the sketch, as drawn";
+
+// For a designer's own drawing: the AI keeps their idea and composition and redraws it print-ready. The upload has
+// been cleaned (service.readSketch), but it's still a phone photo of paper: the model is told what to ignore, and
+// that the sketch is the authority on what's drawn and where, with the subject line only naming it. `photo`: the
+// upload wasn't a drawing (a person, pet or place), so it's redrawn as an illustration rather than traced.
+export function sketchPrompt(p: Preset, subject: string, o: DesignOptions = {}, from: { photo?: boolean } = {}): string {
   const placement = o.placement ?? "front";
+  const size = placement === "chest" ? "Letters big and heavy for a small print." : "Letters large and heavy: strokes at least as thick as the main outlines.";
+  const words = o.text
+    ? lettering(p, o.text, placement)
+    : from.photo
+      ? "Words: none. Leave out any text, logos or signs in the photo."
+      : `Words: only the words written in the sketch, if any, letter for letter as written there (same spelling and capitals), redrawn as clean bold hand lettering in the same place; add no other words. ${size}`;
+  if (from.photo) {
+    return [
+      `T-shirt print artwork for a white tee: turn this photo into black ink line art for ${PLACEMENT[placement]}.`,
+      `Subject: ${quoteSafe(subject === SKETCH_SUBJECT ? "the main subject of the photo" : subject)}.`,
+      "Redraw the photo's main subject as an illustration, not a traced photo: keep its pose and what makes it " +
+        "recognisable, and leave out the photo's background clutter. Turn light and shadow into outlines, not tone.",
+      `Style: ${p.style.replace(/\.$/, "")}.`,
+      LINE_STYLE[detailFor(o)],
+      INK_ONLY,
+      words,
+      `${FRAME} ${ARTWORK_ONLY}`,
+    ].join("\n");
+  }
   return [
-    `T-shirt print artwork for a white tee: redraw this hand-drawn sketch as black ink line art for ${PLACEMENT[placement]}.`,
+    `T-shirt print artwork for a white tee: redraw this customer's hand-drawn sketch as finished black ink line art for ${PLACEMENT[placement]}.`,
     `Subject: ${quoteSafe(subject)}.`,
-    "Keep the sketch's subject, composition and character; clean up and complete the drawing, don't replace it.",
-    `Style: ${p.style.replace(/\.$/, "")}.`,
+    "The sketch decides what is drawn and where: keep its subject, every element in it, their positions, " +
+      "proportions, poses and expressions, and its charm; don't swap it for a different drawing or add new subjects.",
+    "Finish it: make wobbly, shaky or doubled strokes into single confident lines, close gaps, and square up anything " +
+      "skewed by the camera angle. Crayon, felt-pen or scribbled colour only shows where shapes are: draw them as " +
+      "clean outlines with the inside left white.",
+    "Ignore everything that isn't the drawing: paper edges and texture, notebook lines and holes, creases, shadows, " +
+      "pencils and the table.",
+    `Style: finished in this style, without losing the sketch's own look: ${p.style.replace(/\.$/, "")}.`,
     LINE_STYLE[detailFor(o)],
-    `${INK_ONLY} No paper texture.`,
-    o.text || p.text ? lettering(p, o.text, placement) : "Words: only those the sketch already has, spelled as in the sketch.",
+    INK_ONLY,
+    words,
     `${FRAME} ${ARTWORK_ONLY}`,
   ].join("\n");
 }
