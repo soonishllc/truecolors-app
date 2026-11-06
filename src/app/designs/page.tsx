@@ -7,6 +7,8 @@ import { campaigns, designs, users } from "@/lib/db/schema";
 import { listChallenges, phase } from "@/lib/challenges";
 import { onShirts } from "@/lib/media/shots";
 import { CampaignCard } from "@/components/CampaignCard";
+import { Ticker } from "@/components/Ticker";
+import { tickerItems } from "@/lib/ticker";
 import { cardStats } from "@/lib/campaign-card";
 import { preorderPrice, visitorMarket } from "@/lib/markets";
 import { trackView } from "@/lib/analytics";
@@ -52,6 +54,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
   const market = await visitorMarket();
   const price = preorderPrice(market);
   const challenge = (await listChallenges()).find((ch) => phase(ch) !== "closed");
+  const ticker = await tickerItems();
   // A quiet Live tab (nothing live, or a couple of campaigns nobody has backed yet) never dead-ends: it goes on to
   // designs the community already funded, the shirts ready to ship today, the open challenge and a way to design one.
   const quiet = show === "live" && !term && (rows.length < 2 || rows.every((r) => r.backed === 0));
@@ -75,6 +78,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
       <div className="eyebrow">Designs</div>
       <h1 className="designs-title">Every community design</h1>
       <p className="muted designs-lede">Back the ones you love on pre-order: you only pay if they reach 100 and get printed.</p>
+      <Ticker items={ticker} />
 
       {challenge && !quiet && (
         <Link href={`/challenges/${challenge.slug}`} className="challenge-strip">

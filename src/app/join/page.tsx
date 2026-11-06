@@ -9,6 +9,8 @@ import { currentUser, pendingSignUp, storeIdentity } from "@/lib/auth/session";
 import { publicUrl, safePath } from "@/lib/links";
 import { desc, eq, inArray } from "drizzle-orm";
 import { CampaignCard } from "@/components/CampaignCard";
+import { Ticker } from "@/components/Ticker";
+import { tickerItems } from "@/lib/ticker";
 import { cardStats } from "@/lib/campaign-card";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, users } from "@/lib/db/schema";
@@ -80,6 +82,7 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
     .where(inArray(campaigns.status, ["live", "funded", "in_production", "shipped"]))
     .orderBy(desc(campaigns.startsAt))
     .limit(6), (x) => x.c.designId);
+  const ticker = await tickerItems();
   return (
     <div className="design-own">
       {/* The hero: the words and the idea box on one side, the studio drawing real ideas on the other. */}
@@ -95,6 +98,8 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         <IdeaShowcase />
         <IdeaBox initial={idea} initialStyle={style} styles={PRESETS.map(({ id, label, hint, group }) => ({ id, label, hint, group }))} sketchUrl={sketchUrl} />
       </div>
+
+      <Ticker items={ticker} />
 
       {/* What the AI actually makes, before anyone signs up: an idea, its line art, its sun colours. */}
       <section className="ai-strip" aria-labelledby="ai-strip-h">

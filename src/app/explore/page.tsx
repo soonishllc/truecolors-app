@@ -4,6 +4,7 @@ import Link from "next/link";
 import { HeroReveal } from "@/components/HeroReveal";
 import { CampaignCard } from "@/components/CampaignCard";
 import { HowItWorks } from "@/components/HowItWorks";
+import { Ticker } from "@/components/Ticker";
 import { trackView } from "@/lib/analytics";
 import { cardStats } from "@/lib/campaign-card";
 import { currentUser } from "@/lib/auth/session";
@@ -16,6 +17,7 @@ import { onShirts } from "@/lib/media/shots";
 import { FUNDING_GOAL } from "@/lib/rules";
 import { storeOriginals } from "@/lib/shopify/originals";
 import { siteImageUrl } from "@/lib/site-images";
+import { tickerItems } from "@/lib/ticker";
 import "./home.css";
 import "../designers/designers.css";
 
@@ -58,6 +60,7 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
   const made = await onShirts(await shirts(["funded", "in_production", "shipped"], 4), (x) => x.c.designId);
   const challenge = (await listChallenges()).find((ch) => phase(ch) !== "closed");
   const originals = await storeOriginals(8);
+  const ticker = await tickerItems();
 
   const [counts] = await d
     .select({
@@ -83,6 +86,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
           <Link href={create} className="button secondary">{designer ? "Start a new design" : "Create yours"}</Link>
         </p>
       </HeroReveal>
+
+      <Ticker items={ticker} />
 
       {/* The community in numbers once there are some; until then, what's true about every shirt. */}
       <div className="home-stats">
