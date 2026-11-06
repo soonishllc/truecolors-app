@@ -26,10 +26,21 @@ export function HeroReveal({
     else v.pause();
   }, [inSun, motion]);
 
+  // Wider than the 4:3 picture: the CSS shows it whole on the right instead of cropping it to fill (his head).
+  const box = useRef<HTMLElement>(null);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWide(e.contentRect.width / Math.max(1, e.contentRect.height) > 4 / 3));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const playing = Boolean(video && motion);
   const cls = ["hero", sun && "photo", short && "short"].filter(Boolean).join(" ");
   return (
-    <section className={cls}>
+    <section className={cls} ref={box} data-wide={wide || undefined}>
       {sun && (
         <div className="hero-bg" aria-hidden="true">
           {playing ? (

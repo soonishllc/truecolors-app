@@ -4,7 +4,6 @@ import { cancelSocialJoinAction, joinAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { ProviderIcon, SocialButtons } from "@/components/SocialButtons";
 import { StoreSignIn } from "@/components/StoreSignIn";
-import { SunReveal } from "@/components/SunReveal";
 import { providerLabel } from "@/lib/auth/oauth";
 import { currentUser, pendingSignUp, storeIdentity } from "@/lib/auth/session";
 import { publicUrl } from "@/lib/links";
@@ -31,8 +30,11 @@ export default async function Join() {
       </p>
       <p><a className="button sun-button start-jump" href="#start">Start designing, free</a></p>
 
+      {/* Designing, not wearing: a sketch, the AI's line art on the laptop, and the printed shirt (the Designs page's
+          hero shows the shirt in the sun). */}
       <div className="design-own-art">
-        <SunReveal shade="/site/home-hero-shade.webp" sun="/site/home-hero-sun.webp" alt="A Truecolors shirt" />
+        <video src="/site/step-design.mp4" poster="/site/step-design.webp" autoPlay muted loop playsInline preload="metadata"
+          aria-label="A sketch of a falcon, the AI's line art of it on a laptop, and the printed shirt" />
       </div>
 
       <ol className="how-steps">
