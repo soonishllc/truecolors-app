@@ -9,6 +9,7 @@ import { verifyWebhook, type OrderPayload } from "@/lib/shopify/webhooks";
 import { trackOrder } from "@/lib/analytics";
 import { recordSettlementPayment } from "@/lib/wholesale/consignment";
 import { recordWholesaleShopifyOrder } from "@/lib/wholesale/orders";
+import { syncMarketRedirects } from "@/lib/shopify/market-redirects";
 
 const HANDLERS: Record<string, (body: never) => Promise<void>> = {
   // Campaign pre-orders, wholesale orders and settlement payments all arrive here; each handler ignores the rest.
@@ -25,6 +26,9 @@ const HANDLERS: Record<string, (body: never) => Promise<void>> = {
   "orders/cancelled": recordCancelledOrder,
   "refunds/create": recordRefund,
   "fulfillments/create": recordFulfillment,
+  // A product added or changed: its link in the store that doesn't sell it goes to the one that does.
+  "products/create": async () => void (await syncMarketRedirects()),
+  "products/update": async () => void (await syncMarketRedirects([], 60_000)),
 };
 
 export async function POST(req: Request) {

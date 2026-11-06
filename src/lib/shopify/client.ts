@@ -41,6 +41,12 @@ export async function admin<T>(query: string, variables: Record<string, unknown>
 }
 
 // Throws on mutation userErrors so callers only handle the happy path.
+// Whether the app can reach the store's Admin API at all (not in local demos and tests without credentials).
+export function shopifyConfigured() {
+  const { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_ADMIN_TOKEN } = config();
+  return Boolean((SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET) || SHOPIFY_ADMIN_TOKEN);
+}
+
 export function ok<T extends { userErrors: UserErrors }>(payload: T, what: string): T {
   if (payload.userErrors.length) {
     throw new ShopifyError(`${what}: ${payload.userErrors.map((e) => e.message).join("; ")}`);

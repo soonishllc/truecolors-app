@@ -679,6 +679,13 @@ async function runTick(now: Date): Promise<TickLog> {
   // Display partners' consignment periods: settle the ones that have ended, remind the late.
   const { runSettlements } = await import("../wholesale/consignment");
   await runSettlements(now, log);
+  // Product links that only one store sells, redirected to it (lib/shopify/market-redirects.ts). Hourly.
+  try {
+    const { syncMarketRedirects } = await import("../shopify/market-redirects");
+    await syncMarketRedirects(log, 60 * 60_000);
+  } catch (e) {
+    log.push(`market redirects: error ${(e as Error).message}`);
+  }
   return log;
 }
 
