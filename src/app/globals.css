@@ -1058,3 +1058,7 @@ fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 1
 /* The community menu's "You" (your pre-orders and friend link), at the end of the row. */
 .in-app .app-nav a.nav-you { display: inline-flex; align-items: center; gap: 6px; }
 .in-app .app-nav a.nav-you svg { flex: none; }
+
+/* New design: the sketch kept from the Create page, ticked by default. */
+.kept-sketch { align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.kept-sketch img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; flex: none; }

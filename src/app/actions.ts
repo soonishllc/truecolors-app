@@ -10,6 +10,7 @@ import {
 } from "@/lib/campaigns/service";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { clearPendingSketch, takePendingSketch } from "@/lib/design/pending-sketch";
 import { colourDesign, createDesign, designOptions, recomposeDesign, refineDesign, renderMedia, UserError } from "@/lib/design/service";
 import { createBatch, markBatch, type Destination } from "@/lib/production/batch";
 import { saveQuiqupInbound } from "@/lib/production/quiqup";
@@ -95,10 +96,13 @@ export async function createDesignAction(_: FormState, f: FormData): Promise<For
   let id = "";
   const res = await attempt(async () => {
     const file = f.get("sketch");
-    const sketch = file instanceof File && file.size ? Buffer.from(await file.arrayBuffer()) : undefined;
+    // A new upload wins; otherwise the sketch kept from the Create page, if it's still ticked.
+    const sketch = file instanceof File && file.size ? Buffer.from(await file.arrayBuffer())
+      : f.get("pendingSketch") === "1" ? await takePendingSketch() : undefined;
     const options = designOptions({ text: text(f, "text"), placement: text(f, "placement"), detail: text(f, "detail") });
     const design = await createDesign(user.id, { title: text(f, "title"), presetId: text(f, "preset"), idea: text(f, "idea"), sketch, options });
     id = design.id;
+    if (sketch) await clearPendingSketch();
   });
   if (id) await track("design_drawn", { userId: user.id, props: { designId: id } });
   if (id) redirect(`/studio/designs/${id}`);

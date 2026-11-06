@@ -37,3 +37,10 @@
 
 .idea-kept { margin: 0 0 8px; padding: 10px 12px; border-left: 3px solid var(--gold); background: var(--bg); border-radius: var(--radius); }
 .idea-kept q { font-weight: 700; }
+
+/* The idea box's style choice and sketch. */
+.idea-style { display: grid; gap: 6px; margin: 4px 0 0; }
+.idea-style select { width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
+.idea-sketch-kept { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; }
+.idea-sketch-kept img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.idea-sketch-tip { margin: -2px 0 0; }

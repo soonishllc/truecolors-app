@@ -17,6 +17,8 @@ import { CAMPAIGN_DAYS, FUNDING_GOAL, PAYOUT_BUFFER_DAYS, PREORDER_PRICE, RELAUN
 import { siteImageUrl, siteVideoUrl } from "@/lib/site-images";
 import { fileUrl, thumbUrl } from "@/lib/storage";
 import { IdeaBox, IdeaCarry } from "./IdeaBox";
+import { PRESETS } from "@/lib/ai/presets";
+import { pendingSketchUrl } from "@/lib/design/pending-sketch";
 import "./create.css";
 
 // The example strip: a real idea, the line art the AI drew for it and its sun colours (public/examples).
@@ -33,10 +35,16 @@ export const metadata = { title: "Design your own shirt · Truecolors" };
 
 // Where "Design your own" leads: what designing here is, in three animated steps, shirts the community has made,
 // and one way to start. Anyone can sign up; every design is reviewed before it goes on pre-order.
-export default async function Join({ searchParams }: { searchParams: Promise<{ idea?: string }> }) {
-  const idea = (await searchParams).idea?.trim().slice(0, 600) || undefined;
+export default async function Join({ searchParams }: { searchParams: Promise<{ idea?: string; style?: string }> }) {
+  const q = await searchParams;
+  const idea = q.idea?.trim().slice(0, 600) || undefined;
+  const style = PRESETS.some((p) => p.id === q.style) ? q.style : undefined;
+  const sketchUrl = await pendingSketchUrl();
   // Where joining (or an existing designer) lands: a new design, with the idea typed here already in it.
-  const next = safePath(idea ? `/studio/new?idea=${encodeURIComponent(idea)}` : "/studio/new", "/studio/new");
+  const carry = new URLSearchParams();
+  if (idea) carry.set("idea", idea);
+  if (style) carry.set("style", style);
+  const next = safePath(carry.size ? `/studio/new?${carry}` : "/studio/new", "/studio/new");
   // Already a designer: straight to a new design.
   if (await currentUser()) redirect(next);
   const via = await pendingSignUp();
@@ -77,7 +85,7 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         Describe it, or snap a sketch. Our AI draws it as print-ready line art and colours it for the sun. If {FUNDING_GOAL} people
         pre-order it, we print it, and you earn on every sale.
       </p>
-      <IdeaBox initial={idea} />
+      <IdeaBox initial={idea} initialStyle={style} styles={PRESETS.map(({ id, label, hint, group }) => ({ id, label, hint, group }))} sketchUrl={sketchUrl} />
 
       {/* What the AI actually makes, before anyone signs up: an idea, its line art, its sun colours. */}
       <section className="ai-strip" aria-labelledby="ai-strip-h">
@@ -195,7 +203,7 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         {/* Inside the store, a guest signs in to the store first and then sees this form. */}
         <div className={ready ? undefined : "site-only"}>
           <ActionForm action={joinAction} submit={idea ? "Sign up and draw it" : "Start designing"}>
-            <IdeaCarry idea={idea} />
+            <IdeaCarry idea={idea} style={style} />
             <label>Your name, as shoppers will see it<input name="name" required autoComplete="name" defaultValue={store?.name ?? via?.profile.name} /></label>
             {!store && !via?.profile.email && (
               <label>Email<input name="email" type="email" required autoComplete="email" /></label>

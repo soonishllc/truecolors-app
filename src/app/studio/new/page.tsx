@@ -3,6 +3,7 @@ import { createDesignAction } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { CountedText, SketchPicker } from "@/components/SketchPicker";
 import { PRESETS } from "@/lib/ai/presets";
+import { pendingSketchUrl } from "@/lib/design/pending-sketch";
 import { requireUser } from "@/lib/auth/session";
 import { CREDIT_COST } from "@/lib/rules";
 
@@ -11,10 +12,13 @@ export const metadata = { title: "New design · Truecolors" };
 
 // Step 1 of a design, on its own screen: the idea first (and a sketch if there is one), then the exact words, a
 // style, where it's printed and how detailed. The AI draws the line art and the design opens at step 2.
-export default async function NewDesign({ searchParams }: { searchParams: Promise<{ idea?: string }> }) {
+export default async function NewDesign({ searchParams }: { searchParams: Promise<{ idea?: string; style?: string }> }) {
   const user = await requireUser();
   // An idea typed on /join before signing up comes through as ?idea=.
-  const idea = (await searchParams).idea?.trim().slice(0, 600) || undefined;
+  const q = await searchParams;
+  const idea = q.idea?.trim().slice(0, 600) || undefined;
+  const chosen = PRESETS.some((p) => p.id === q.style) ? q.style : "classic";
+  const keptSketch = await pendingSketchUrl();
   const enough = user.credits >= CREDIT_COST.line_art;
   const groups = [...new Set(PRESETS.map((p) => p.group))];
   return (
@@ -32,8 +36,16 @@ export default async function NewDesign({ searchParams }: { searchParams: Promis
         busy="Drawing your line art"
       >
         <label>Your idea
-          <CountedText name="idea" max={600} rows={4} required defaultValue={idea} placeholder="A sea turtle gliding over a coral reef, with sunbeams from above" />
+          <CountedText name="idea" max={600} rows={4} required={!keptSketch} defaultValue={idea} placeholder="A sea turtle gliding over a coral reef, with sunbeams from above" />
         </label>
+        {keptSketch && (
+          // Added on the Create page before signing up; a new sketch below replaces it.
+          <label className="check kept-sketch">
+            <input type="checkbox" name="pendingSketch" value="1" defaultChecked />
+            <img src={keptSketch} alt="" />
+            <span><b>Use the sketch you added</b><span className="small muted"> Or add a different one below.</span></span>
+          </label>
+        )}
         <SketchPicker />
         <label><span>Words on the shirt <span className="muted small">(optional)</span></span>
           <input name="text" maxLength={60} placeholder="WAIT FOR THE SUN" autoComplete="off" />
@@ -48,7 +60,7 @@ export default async function NewDesign({ searchParams }: { searchParams: Promis
               <div className="style-grid">
                 {PRESETS.filter((p) => p.group === g).map((p) => (
                   <label key={p.id} className="style-card">
-                    <input type="radio" name="preset" value={p.id} defaultChecked={p.id === "classic"} />
+                    <input type="radio" name="preset" value={p.id} defaultChecked={p.id === chosen} />
                     <b>{p.label}</b>
                     <span className="small muted">{p.hint}</span>
                   </label>
