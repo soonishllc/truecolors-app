@@ -22,12 +22,10 @@ import { IdeaShowcase } from "./IdeaShowcase";
 import { PRESETS } from "@/lib/ai/presets";
 import { pendingSketchUrl } from "@/lib/design/pending-sketch";
 import { visitorMarket } from "@/lib/markets";
+import { STYLE_EXAMPLES, STYLE_IDEA } from "@/lib/design/style-examples";
 import "./create.css";
 import "../designers/designers.css";
 
-// "One idea, every style": the same idea drawn by the studio in four styles (public/examples/styles).
-const STYLE_IDEA = "A falcon over the dunes at sunset";
-const STYLE_TILES = ["classic", "badge", "tattoo", "mascot"];
 const pct = (bps: number) => `${bps / 100}%`;
 // "AED 1,290" rather than "AED 1,290.00" for round amounts.
 const whole = (cents: number, currency: string) => money(cents, currency).replace(/\.00$/, "");
@@ -104,10 +102,10 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
           the idea box with that style chosen. Made by scripts/style-examples.ts. */}
       <section className="style-strip" aria-labelledby="style-strip-h">
         <div className="eyebrow">One idea, every style</div>
-        <h2 id="style-strip-h">Same idea. Your pick of style.</h2>
-        <p className="muted style-idea">&ldquo;{STYLE_IDEA}&rdquo;, drawn by the studio four ways. Hover or tap one to step it into the sun.</p>
+        <h2 id="style-strip-h">Same idea. Your pick of style and colour.</h2>
+        <p className="muted style-idea">&ldquo;{STYLE_IDEA}&rdquo;, drawn by the studio four ways, each in its own colours. Hover or tap one to step it into the sun.</p>
         <div className="style-tiles">
-          {STYLE_TILES.map((id) => {
+          {STYLE_EXAMPLES.map(({ style: id }) => {
             const p = PRESETS.find((x) => x.id === id)!;
             return (
               <Link key={id} href={`/join?${new URLSearchParams({ idea: STYLE_IDEA, style: id })}#join-idea`} className="tile style-tile">
