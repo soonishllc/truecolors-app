@@ -21,6 +21,7 @@ import { IdeaBox, IdeaCarry } from "./IdeaBox";
 import { IdeaShowcase } from "./IdeaShowcase";
 import { PRESETS } from "@/lib/ai/presets";
 import { pendingSketchUrl } from "@/lib/design/pending-sketch";
+import { visitorMarket } from "@/lib/markets";
 import "./create.css";
 import "../designers/designers.css";
 
@@ -38,7 +39,7 @@ export const metadata = { title: "Design your own shirt · Truecolors" };
 
 // Where "Design your own" leads: what designing here is, in three animated steps, shirts the community has made,
 // and one way to start. Anyone can sign up; every design is reviewed before it goes on pre-order.
-export default async function Join({ searchParams }: { searchParams: Promise<{ idea?: string; style?: string }> }) {
+export default async function Join({ searchParams }: { searchParams: Promise<{ idea?: string; style?: string; market?: string }> }) {
   const q = await searchParams;
   const idea = q.idea?.trim().slice(0, 600) || undefined;
   const style = PRESETS.some((p) => p.id === q.style) ? q.style : undefined;
@@ -61,11 +62,12 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
     { title: "Launch and share", text: `We review it, then it goes on pre-order for ${CAMPAIGN_DAYS} days with its own page, mockups and a reveal video to post. Nobody pays unless ${FUNDING_GOAL} people pre-order.` },
     { title: "Get paid", text: `At ${FUNDING_GOAL} it's printed in Cancún and shipped. You earn ${pct(SHARE_BPS)} of every sale, ${pct(SHARE_OWN_LINK_BPS)} through your own link, paid by PayPal, bank transfer or USDC.` },
   ];
-  // The worked example: a design that just reaches its goal in the UAE store, at the pre-order price.
-  const aed = PREORDER_PRICE.AE;
-  const sales = aed.cents * FUNDING_GOAL;
-  const earn = whole(royaltyCents(sales, SHARE_BPS), aed.currency);
-  const earnOwn = whole(royaltyCents(sales, SHARE_OWN_LINK_BPS), aed.currency);
+  // The worked example: a design that just reaches its goal in the visitor's own store, at its pre-order price.
+  const market = await visitorMarket(q.market);
+  const price = PREORDER_PRICE[market];
+  const sales = price.cents * FUNDING_GOAL;
+  const earn = whole(royaltyCents(sales, SHARE_BPS), price.currency);
+  const earnOwn = whole(royaltyCents(sales, SHARE_OWN_LINK_BPS), price.currency);
   const faq = [
     { q: "Who owns the design?", a: `You do. You confirm you own or have the rights to what you create here, and Truecolors gets an exclusive licence to sell it as a shirt once it launches. You keep the credit: your name is on the shirt's page.` },
     { q: "What does it cost?", a: `Nothing. You start with ${STARTING_CREDITS} free credits, about ${Math.floor(STARTING_CREDITS / 3)} designs, and no card. Launching a pre-order is free too: we print, ship and handle returns.` },
@@ -131,10 +133,10 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         <div>
           <h2 id="earn-h">Your design, your cut, on every shirt</h2>
           <p>
-            At the {whole(aed.cents, aed.currency)} pre-order price you earn {pct(SHARE_BPS)} of every sale: {earn} when {FUNDING_GOAL} people back it.
+            At the {whole(price.cents, price.currency)} pre-order price you earn {pct(SHARE_BPS)} of every sale: {earn} when {FUNDING_GOAL} people back it.
             Sell them through your own link and it&apos;s {pct(SHARE_OWN_LINK_BPS)}, <b>{earnOwn}</b>. Every shirt after the goal earns the same again.
           </p>
-          <p className="small muted">Worked out on the UAE price before discounts; USA sales earn the same rates in dollars.</p>
+          <p className="small muted">Worked out on the {price.label} price before discounts; {market === "US" ? "UAE sales earn the same rates in dirhams" : "USA sales earn the same rates in dollars"}.</p>
         </div>
       </section>
 
