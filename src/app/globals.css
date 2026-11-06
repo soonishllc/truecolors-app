@@ -959,8 +959,12 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
 .in-app .hero { margin: 0 calc(50% - 50vw) 18px; padding: 40px max(20px, calc(50vw - 620px)); border-radius: 0; }
 .in-app .hero.photo.short { min-height: max(440px, calc(var(--screen-h, 100vh) * 0.86)); justify-content: flex-end; }
 .in-app .hero.short h1 { font-size: clamp(34px, 9vw, 56px); }
+/* The video fills the whole hero at every width, like the home page's, framed on his face and shirt; a dark fade
+   behind the words keeps them readable. */
+.in-app .hero-bg video { left: 0; right: 0; width: 100%; max-width: none; aspect-ratio: auto; object-fit: cover; object-position: 70% 22%; -webkit-mask-image: none; mask-image: none; }
+.in-app .hero-bg::after { background: linear-gradient(90deg, rgba(23, 22, 20, 0.88) 0%, rgba(23, 22, 20, 0.55) 38%, rgba(23, 22, 20, 0) 62%); }
 @media (max-width: 720px) {
-  .in-app .hero-bg video { max-width: none; width: 100%; -webkit-mask-image: none; mask-image: none; object-position: 65% 20%; }
+  .in-app .hero-bg video { object-position: 65% 20%; }
   .in-app .hero-bg::after { background: linear-gradient(rgba(23, 22, 20, 0.1), rgba(23, 22, 20, 0.92) 70%); }
 }
 

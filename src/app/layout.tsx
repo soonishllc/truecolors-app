@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Assistant, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
 import { Suspense } from "react";
@@ -11,10 +11,31 @@ import { config } from "@/lib/config";
 import { storeOrigins } from "@/lib/links";
 import "./globals.css";
 
-// The same three typefaces as the truecolors.global theme.
-const display = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-space-grotesk" });
-const body = Assistant({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-assistant" });
-const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-jetbrains-mono" });
+// The same three typefaces as the truecolors.global theme, kept in the app (Open Font License) rather than fetched
+// from Google Fonts at build time, so a deploy never fails on a download.
+const display = localFont({
+  src: [
+    { path: "./fonts/space-grotesk-latin-400-normal.woff2", weight: "400" },
+    { path: "./fonts/space-grotesk-latin-500-normal.woff2", weight: "500" },
+    { path: "./fonts/space-grotesk-latin-600-normal.woff2", weight: "600" },
+  ],
+  variable: "--font-space-grotesk",
+});
+const body = localFont({
+  src: [
+    { path: "./fonts/assistant-latin-400-normal.woff2", weight: "400" },
+    { path: "./fonts/assistant-latin-500-normal.woff2", weight: "500" },
+    { path: "./fonts/assistant-latin-600-normal.woff2", weight: "600" },
+  ],
+  variable: "--font-assistant",
+});
+const mono = localFont({
+  src: [
+    { path: "./fonts/jetbrains-mono-latin-400-normal.woff2", weight: "400" },
+    { path: "./fonts/jetbrains-mono-latin-700-normal.woff2", weight: "700" },
+  ],
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
   title: BRAND,
