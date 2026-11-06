@@ -19,8 +19,8 @@ export default async function Challenges() {
         <div className="card empty-card">
           <div className="eyebrow">Coming soon</div>
           <h2 style={{ margin: "8px 0" }}>The first challenge drops soon</h2>
-          <p className="muted">Until then, the community&apos;s designs are live now, and every one needs backers to get printed.</p>
-          <Link href="/explore" className="button">Back a design</Link>
+          <p className="muted">Until then, design your own: describe an idea and the AI draws it as a shirt that changes colour in the sun.</p>
+          <Link href="/join" className="button">Design your own</Link>
         </div>
       )}
       <div className="challenge-list">

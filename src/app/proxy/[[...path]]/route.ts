@@ -11,18 +11,32 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
   const secret = config().SHOPIFY_PROXY_SECRET;
   if (!secret || !verifyProxyQuery(url.searchParams, secret)) return new Response("Not found", { status: 404 });
   const appPath = appPathFor((await params).path?.join("/") ?? "");
-  if (!appPath) return new Response("Not found", { status: 404 });
+  if (!appPath) return notFound();
 
   // Only the store page's own query (a referral code, a filter) goes on to the app; Shopify's signed fields don't.
   const own = new URLSearchParams(url.searchParams);
   for (const k of ["shop", "logged_in_customer_id", "path_prefix", "timestamp", "signature"]) own.delete(k);
-  const slug = /^\/c\/([a-z0-9-]+)$/.exec(appPath)?.[1];
+  const slug = /^\/c\/([^/]+)$/.exec(appPath)?.[1];
+  const meta = slug ? await campaignShareMeta(slug).catch(() => undefined) : undefined;
+  // A campaign that doesn't exist (or isn't public) is a real 404, so search engines don't index an empty page.
+  if (slug && !meta) return notFound();
   const body = storeShell({
-    meta: slug ? await campaignShareMeta(slug).catch(() => undefined) : undefined,
+    meta,
     prefix: url.searchParams.get("path_prefix") || config().PROXY_PATH,
     appPath,
     query: own.toString(),
     handoff: makeHandoff(url.searchParams.get("logged_in_customer_id") ?? ""),
   });
   return new Response(body, { headers: { "Content-Type": "application/liquid", "Cache-Control": "no-store" } });
+}
+
+// Not found, inside the store's own header and footer, with a way on: Shopify keeps the status for the shopper.
+function notFound() {
+  const body = `<section style="max-width:560px;margin:0 auto;padding:72px 20px 96px">
+  <p style="font-family:var(--mono,monospace);font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7">Not found</p>
+  <h1 style="font-size:40px;line-height:1.05;margin:8px 0 14px">That page isn't here</h1>
+  <p style="margin:0 0 24px">The design may have ended or moved.</p>
+  <p><a class="btn-primary dark" href="{{ routes.root_url | append: '/' | replace: '//', '/' }}apps/truecolors">See the community designs</a></p>
+</section>`;
+  return new Response(body, { status: 404, headers: { "Content-Type": "application/liquid", "Cache-Control": "no-store" } });
 }

@@ -121,23 +121,8 @@ export async function createCampaignProduct(input: {
   const sellingPlanGroupId = group.id;
   const sellingPlanId = numericId(group.sellingPlans.nodes[0].id);
 
-  // The two-pack: two or more of this design are TWO_PACK_PERCENT off each, in every market's own currency.
-  const pack = await admin<{ discountAutomaticBasicCreate: { userErrors: UserErrors } }>(
-    `mutation($input: DiscountAutomaticBasicInput!) {
-      discountAutomaticBasicCreate(automaticBasicDiscount: $input) { userErrors { field message } }
-    }`,
-    {
-      input: {
-        title: `Two-pack: ${input.title}`,
-        startsAt: new Date().toISOString(),
-        endsAt: backstop.toISOString(),
-        minimumRequirement: { quantity: { greaterThanOrEqualToQuantity: "2" } },
-        customerGets: { value: { percentage: TWO_PACK_PERCENT / 100 }, items: { products: { productsToAdd: [product.id] } } },
-        combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true },
-      },
-    },
-  );
-  ok(pack.discountAutomaticBasicCreate, "discountAutomaticBasicCreate");
+  // The two-pack: one store-wide discount covers every campaign (Shopify allows only 25 automatic discounts).
+  await ensureTwoPack();
 
   // Each market's fixed price, on that market's price list (the base market needs none).
   for (const [market, priceListId] of Object.entries(marketPriceLists()) as [PreorderMarket, string][]) {
@@ -174,6 +159,71 @@ export async function createCampaignProduct(input: {
   }
 
   return { productId: numericId(product.id), handle: product.handle, variantIds, sellingPlanGroupId, sellingPlanId };
+}
+
+// The two-pack, set up once for the whole store: two or more community-design shirts in a cart are
+// TWO_PACK_PERCENT off each, in every market's own currency. It covers a smart collection of every product tagged
+// tc-campaign (each campaign product is), so new campaigns are included without touching the discount.
+const TWO_PACK_TITLE = "Two-pack: community designs";
+const CAMPAIGN_COLLECTION = "community-designs";
+let twoPackReady: Promise<void> | undefined;
+
+export function ensureTwoPack() {
+  twoPackReady ??= setUpTwoPack().catch((e) => {
+    twoPackReady = undefined;
+    throw e;
+  });
+  return twoPackReady;
+}
+
+async function setUpTwoPack() {
+  const found = await admin<{ discountNodes: { nodes: { id: string }[] } }>(
+    `query($q: String!) { discountNodes(first: 1, query: $q) { nodes { id } } }`,
+    { q: `title:'${TWO_PACK_TITLE}' AND method:automatic` },
+  );
+  if (found.discountNodes.nodes.length) return;
+
+  const existing = await admin<{ collectionByIdentifier: { id: string } | null }>(
+    `query($handle: String!) { collectionByIdentifier(identifier: { handle: $handle }) { id } }`,
+    { handle: CAMPAIGN_COLLECTION },
+  );
+  let collectionId = existing.collectionByIdentifier?.id;
+  if (!collectionId) {
+    const made = await admin<{ collectionCreate: { collection: { id: string } | null; userErrors: UserErrors } }>(
+      `mutation($input: CollectionInput!) {
+        collectionCreate(input: $input) { collection { id } userErrors { field message } }
+      }`,
+      {
+        input: {
+          title: "Community designs",
+          handle: CAMPAIGN_COLLECTION,
+          ruleSet: { appliedDisjunctively: false, rules: [{ column: "TAG", relation: "EQUALS", condition: "tc-campaign" }] },
+        },
+      },
+    );
+    collectionId = ok(made.collectionCreate, "collectionCreate").collection!.id;
+  }
+
+  const pack = await admin<{ discountAutomaticBasicCreate: { userErrors: UserErrors } }>(
+    `mutation($input: DiscountAutomaticBasicInput!) {
+      discountAutomaticBasicCreate(automaticBasicDiscount: $input) { userErrors { field message } }
+    }`,
+    {
+      input: {
+        title: TWO_PACK_TITLE,
+        startsAt: new Date().toISOString(),
+        minimumRequirement: { quantity: { greaterThanOrEqualToQuantity: "2" } },
+        customerGets: {
+          value: { percentage: TWO_PACK_PERCENT / 100 },
+          items: { collections: { add: [collectionId] } },
+          appliesOnOneTimePurchase: true,
+          appliesOnSubscription: true,
+        },
+        combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true },
+      },
+    },
+  );
+  ok(pack.discountAutomaticBasicCreate, "discountAutomaticBasicCreate");
 }
 
 // The price list for each market that isn't the base market. Without one, Shopify would convert the AED price.

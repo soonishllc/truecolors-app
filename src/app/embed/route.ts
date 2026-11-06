@@ -19,5 +19,8 @@ export async function GET(req: Request) {
   const hash = q.get("hash");
   if (hash) to.hash = hash;
   if (!ok) to.searchParams.set("signin", "expired");
-  return NextResponse.redirect(to, 303);
+  const res = NextResponse.redirect(to, 303);
+  // The sign-in token is in this request's address: don't pass it on to the next page as a referrer.
+  res.headers.set("Referrer-Policy", "no-referrer");
+  return res;
 }
