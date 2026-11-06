@@ -14,7 +14,6 @@ import { campaigns, designs, users } from "@/lib/db/schema";
 import { money } from "@/lib/format";
 import { onShirts } from "@/lib/media/shots";
 import { CAMPAIGN_DAYS, FUNDING_GOAL, PAYOUT_BUFFER_DAYS, PREORDER_PRICE, RELAUNCHES_ALLOWED, RETURN_WINDOW_DAYS, SHARE_BPS, SHARE_OWN_LINK_BPS, STARTING_CREDITS, royaltyCents } from "@/lib/rules";
-import { siteImageUrl, siteVideoUrl } from "@/lib/site-images";
 import { fileUrl, thumbUrl } from "@/lib/storage";
 import { IdeaBox, IdeaCarry } from "./IdeaBox";
 import { PRESETS } from "@/lib/ai/presets";
@@ -51,10 +50,12 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
   const store = via ? undefined : await storeIdentity();
   const who = via && (via.profile.username ? `@${via.profile.username}` : via.profile.name ?? via.profile.email);
   const ready = Boolean(store || via);
-  const steps = [
-    { id: "step-design", title: "You design it", text: "Describe an idea or snap a sketch, and the AI studio turns it into print-ready art that changes colour in the sun." },
-    { id: "step-preorder", title: "Fans pre-order", text: `Shoppers pre-order it for ${money(PREORDER_PRICE.AE.cents, "AED")} in the UAE or ${money(PREORDER_PRICE.US.cents, "USD")} in the USA. Nobody is charged unless it reaches ${FUNDING_GOAL}.` },
-    { id: "step-print", title: `We print at ${FUNDING_GOAL}`, text: `Funded designs are printed in Cancún and shipped, and you earn ${pct(SHARE_BPS)} of every sale, ${pct(SHARE_OWN_LINK_BPS)} through your own link.`, once: true },
+  // The designer's side of it, from idea to getting paid (the community home shows the shopper's side in photos).
+  const journey = [
+    { title: "Describe it or sketch it", text: `Type an idea or snap a drawing and pick a style. The AI draws it as line art in about a minute. You start with ${STARTING_CREDITS} free credits; each drawing or colouring uses one.` },
+    { title: "Make it yours", text: "Ask for changes in plain words, choose the sun's colours, and drag the sun across it to see the shirt in shade and in sun. We check every design prints cleanly." },
+    { title: "Launch and share", text: `We review it, then it goes on pre-order for ${CAMPAIGN_DAYS} days with its own page, mockups and a reveal video to post. Nobody pays unless ${FUNDING_GOAL} people pre-order.` },
+    { title: "Get paid", text: `At ${FUNDING_GOAL} it's printed in Cancún and shipped. You earn ${pct(SHARE_BPS)} of every sale, ${pct(SHARE_OWN_LINK_BPS)} through your own link, paid by PayPal, bank transfer or USDC.` },
   ];
   // The worked example: a design that just reaches its goal in the UAE store, at the pre-order price.
   const aed = PREORDER_PRICE.AE;
@@ -118,25 +119,19 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         <p className="small muted">Worked out on the UAE price before discounts; USA sales earn the same rates in dollars.</p>
       </section>
 
-      {/* How it works, in three animated photos: the design, the pre-orders, the print. */}
-      <div className="eyebrow">How it works</div>
-      <div className="steps">
-        {steps.map((st, i) => {
-          const img = siteImageUrl(st.id);
-          const clip = siteVideoUrl(st.id);
-          return (
-            <div key={st.id}>
-              {clip && img && st.once ? (
-                // An action shot: plays once each time it scrolls into view and holds its last frame.
-                <div className="tile-art"><img className="art" src={img} alt="" /><TileSweep src={clip} inView /></div>
-              ) : clip ? <video className="art" src={clip} poster={img} autoPlay muted loop playsInline preload="metadata" aria-hidden="true" />
-                : img ? <img className="art" src={img} alt="" /> : <div className="art step-fallback"><span className="sun-text">{i + 1}</span></div>}
-              <h3>{i + 1}. {st.title}</h3>
-              <p className="muted small">{st.text}</p>
-            </div>
-          );
-        })}
-      </div>
+      {/* The designer's journey in four steps (not the community home's photo tiles). */}
+      <section className="journey" aria-labelledby="journey-h">
+        <div className="eyebrow">From idea to income</div>
+        <h2 id="journey-h">How designing here works</h2>
+        <ol className="journey-steps">
+          {journey.map((st) => (
+            <li key={st.title}>
+              <b>{st.title}</b>
+              <span>{st.text}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       {/* Shirts the community has designed: what yours could be. */}
       {samples.length > 0 && (

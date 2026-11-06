@@ -44,3 +44,18 @@
 .idea-sketch-kept { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; }
 .idea-sketch-kept img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
 .idea-sketch-tip { margin: -2px 0 0; }
+
+/* From idea to income: the designer's four steps, as a numbered line down the page. */
+.journey { margin: 0 0 48px; }
+.journey h2 { margin: 4px 0 18px; font-size: clamp(24px, 4vw, 34px); letter-spacing: -0.02em; }
+.journey-steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; gap: 0; }
+.journey-steps li { counter-increment: step; position: relative; display: grid; gap: 4px; padding: 0 0 26px 56px; }
+.journey-steps li::before { content: counter(step); position: absolute; left: 0; top: -2px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--sun); color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 17px; }
+.journey-steps li:not(:last-child)::after { content: ""; position: absolute; left: 18px; top: 40px; bottom: 4px; width: 2px; background: var(--line); }
+.journey-steps b { font-family: var(--font-display); font-size: 19px; letter-spacing: -0.01em; }
+.journey-steps span { color: var(--muted); font-size: 15px; line-height: 1.55; max-width: 620px; }
+@media (min-width: 900px) {
+  .journey-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+  .journey-steps li { padding: 52px 0 0; }
+  .journey-steps li:not(:last-child)::after { left: 46px; right: -12px; top: 18px; bottom: auto; width: auto; height: 2px; }
+}
