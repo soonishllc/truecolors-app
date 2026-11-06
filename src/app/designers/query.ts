@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { campaigns, designs, pledges, users } from "@/lib/db/schema";
 import { onShirts } from "@/lib/media/shots";
@@ -48,7 +48,7 @@ export async function listDesigners(sort: DirectorySort = "popular") {
   const people = await d
     .select({ id: users.id, handle: users.handle, name: users.name, avatarKey: users.avatarKey, location: users.location, bio: users.bio })
     .from(users)
-    .where(inArray(users.id, [...byUser.keys()]));
+    .where(and(inArray(users.id, [...byUser.keys()]), isNull(users.deletedAt)));
   const out = people.map((p) => {
     const mine = byUser.get(p.id)!;
     return { ...p, stats: designerStats(mine), thumbs: mine.slice(0, 3) };

@@ -101,7 +101,8 @@ export async function currentUser() {
   if (!userId) return;
   const d = await db();
   const [user] = await d.select().from(users).where(eq(users.id, userId));
-  return user && { ...user, isAdmin: isAdminEmail(user.email) };
+  // A deleted account signs out everywhere: no session finds it.
+  return user && !user.deletedAt ? { ...user, isAdmin: isAdminEmail(user.email) } : undefined;
 }
 
 export async function requireUser() {

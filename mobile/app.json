@@ -8,7 +8,7 @@
     "scheme": "truecolors",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "global.truecolors.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Take a photo of your sketch so the AI can draw it as a design.",
@@ -46,7 +46,13 @@
         }
       ],
       "expo-sharing",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-notifications",
+        {
+          "color": "#e8762a"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

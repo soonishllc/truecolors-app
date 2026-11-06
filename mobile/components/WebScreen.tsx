@@ -1,8 +1,9 @@
 import { useNavigation } from "expo-router";
 import { type ComponentRef, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
+import { enablePush } from "@/lib/push";
 import { COLORS, staysInside } from "@/lib/site";
 
 // One live store page, full screen under the status bar. The site knows it's in the app by "TruecolorsApp" in
@@ -62,7 +63,19 @@ export const WebScreen = forwardRef<WebScreenHandle, { url: string; tabRoot?: bo
 
   const onMessage = (e: WebViewMessageEvent) => {
     try {
-      const msg = JSON.parse(e.nativeEvent.data) as { type: string; data: { title?: string; text?: string; url?: string } };
+      const msg = JSON.parse(e.nativeEvent.data) as { type: string; ticket?: string; data: { title?: string; text?: string; url?: string } };
+      // "Turn on notifications" in the studio.
+      if (msg.type === "push-enable" && msg.ticket) {
+        enablePush(msg.ticket).then((result) => {
+          if (result === "denied") {
+            Alert.alert("Notifications are off", "Turn them on for Truecolors in Settings to hear when someone backs your design.", [
+              { text: "Not now", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() },
+            ]);
+          }
+        }).catch(() => {});
+        return;
+      }
       if (msg.type !== "share") return;
       const { text, url: link } = msg.data;
       Share.share(Platform.OS === "ios" ? { message: text ?? "", url: link } : { message: [text, link].filter(Boolean).join(" ") });

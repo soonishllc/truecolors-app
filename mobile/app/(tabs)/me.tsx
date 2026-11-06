@@ -31,6 +31,18 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: "Account",
+    rows: [
+      { label: "Designer profile", hint: "Your name, photo and bio", url: `${APP}/studio/profile` },
+      { label: "Delete my designer account", hint: "Your profile, drafts and sign-ins", url: `${APP}/studio/profile#delete-h` },
+      {
+        label: "Delete my shop account",
+        hint: "Orders and addresses, deleted by our team within 30 days",
+        external: `mailto:hello@truecolors.global?subject=${encodeURIComponent("Delete my shop account")}&body=${encodeURIComponent("Please delete my Truecolors shop account and personal data. The email on my account is: ")}`,
+      },
+    ],
+  },
+  {
     title: "Help",
     rows: [
       { label: "Pre-orders, shipping and returns", url: `${APP}/pre-orders` },

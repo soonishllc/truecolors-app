@@ -1,8 +1,10 @@
-import { DarkTheme, Stack, ThemeProvider } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { COLORS } from "@/lib/site";
+import { urlOf } from "@/lib/push";
+import { COLORS, staysInside } from "@/lib/site";
 
 export { ErrorBoundary } from "expo-router";
 
@@ -19,6 +21,17 @@ const theme = {
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // A tapped notification opens its page (a design's campaign, or the studio), whether the app was open or not.
+  useEffect(() => {
+    const open = (response: Notifications.NotificationResponse | null) => {
+      const url = urlOf(response);
+      if (url && staysInside(url)) router.push({ pathname: "/web", params: { url, title: "Truecolors" } });
+    };
+    Notifications.getLastNotificationResponseAsync().then(open).catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener(open);
+    return () => sub.remove();
   }, []);
   return (
     <ThemeProvider value={theme}>

@@ -27,7 +27,8 @@ const PROFILE_URL: Record<string, (u: string) => string> = {
 async function load(handle: string) {
   const d = await db();
   const [designer] = await d.select().from(users).where(eq(users.handle, handle.toLowerCase()));
-  return designer;
+  // A deleted account has no page.
+  return designer?.deletedAt ? undefined : designer;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {

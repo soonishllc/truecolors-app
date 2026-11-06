@@ -1146,3 +1146,4 @@ fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 1
 }
 /* Inside a grid of designs, a break takes the whole row. */
 .grid > .editorial { grid-column: 1 / -1; margin-top: 28px; margin-bottom: 28px; }
+.push-prompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }

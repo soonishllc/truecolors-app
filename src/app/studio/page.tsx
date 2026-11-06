@@ -6,6 +6,8 @@ import { ShareKit } from "@/components/ShareKit";
 import { ProviderIcon } from "@/components/SocialButtons";
 import { enabledProviders, providerLabel, type Provider } from "@/lib/auth/oauth";
 import { connectedAccounts, requireUser } from "@/lib/auth/session";
+import { PushPrompt } from "@/components/PushPrompt";
+import { hasPushToken, pushTicket } from "@/lib/push";
 import { campaignStats } from "@/lib/campaigns/service";
 import { config } from "@/lib/config";
 import { db } from "@/lib/db/client";
@@ -140,6 +142,7 @@ export default async function Studio({ searchParams }: { searchParams: Promise<{
         </div>
       </section>
 
+      {!(await hasPushToken(user.id)) && <PushPrompt ticket={pushTicket(user.id)} store={new URL(config().STORE_URL).origin} />}
       {q.welcome && <p className="notice">Welcome to the studio. <Link href="/studio/new">Start your first design →</Link></p>}
       {q.connected && <p className="notice good-notice">Connected {providerLabel(q.connected as Provider)}.</p>}
       {q.connect === "taken" && <p className="notice">That account is already connected to another designer.</p>}

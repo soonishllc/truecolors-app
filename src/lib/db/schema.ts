@@ -32,6 +32,17 @@ export const users = pgTable("users", {
   avatarKey: text("avatar_key"),
   location: text("location"),
   instagram: text("instagram"),
+  // Set when the designer deleted their account: their personal details are cleared and no session finds them.
+  deletedAt: ts("deleted_at"),
+  createdAt: createdAt(),
+});
+
+// The phones a designer has the app on, for push notifications (Expo push tokens). Removed when Expo says a token
+// is no longer valid, or with the account.
+export const pushTokens = pgTable("push_tokens", {
+  token: text("token").primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  platform: text("platform").$type<"ios" | "android">().notNull(),
   createdAt: createdAt(),
 });
 

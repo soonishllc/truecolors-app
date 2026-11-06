@@ -86,6 +86,8 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
       try { if (sessionStorage.getItem("tc-reloaded")) return; sessionStorage.setItem("tc-reloaded", "1"); } catch (_) { return; }
       return location.reload();
     }
+    // A request for the phone app (turning on notifications): the app listens to this page, not to the frame.
+    if (e.data.native && window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(e.data.native));
     if (e.data.height) frame.style.height = e.data.height + "px";
     if (e.data.height || e.data.viewport) onScroll();
     if (e.data.path) {

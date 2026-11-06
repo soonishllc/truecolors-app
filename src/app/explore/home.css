@@ -39,3 +39,4 @@
 
 /* Under the pictures while they load, the page's own colour rather than white. */
 .home-rail .tile-art { background: var(--surface); }
+.home-deleted { margin: 16px 0 0; }

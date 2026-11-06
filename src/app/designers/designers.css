@@ -86,3 +86,9 @@
 .in-app .dz-head h1 { font-weight: 600; }
 .in-app .dz-sorts a { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
 .in-app .dz-sorts a.on { border-bottom-color: var(--gold); }
+
+/* Deleting the account, at the bottom of the profile page. */
+.dz-delete { margin-top: 32px; border-color: color-mix(in oklab, var(--bad) 45%, var(--line)); }
+.dz-delete h2 { margin: 0; font-size: 20px; }
+.dz-delete p { margin: 0; }
+.dz-delete button[type="submit"], .in-app .dz-delete button[type="submit"] { background: var(--bad); border-color: var(--bad); color: #fff; }

@@ -88,6 +88,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
         </p>
       </HeroReveal>
 
+      {q.deleted === "1" && <p className="notice home-deleted" role="status">Your account has been deleted. Thanks for designing with us.</p>}
+
       <Ticker items={ticker} />
 
       {/* The community in numbers once there are some; until then, what's true about every shirt. */}

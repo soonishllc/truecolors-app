@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { FormState } from "@/app/actions";
-import { requireUser } from "@/lib/auth/session";
+import { deleteAccount } from "@/lib/auth/delete-account";
+import { requireUser, signOut } from "@/lib/auth/session";
 import { UserError } from "@/lib/design/service";
 import { removeAvatar, saveProfile } from "./profile";
 
@@ -23,4 +25,17 @@ export async function saveProfileAction(_: FormState, f: FormData): Promise<Form
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+}
+
+// Deleting the account: confirmed by typing DELETE, then signed out everywhere (lib/auth/delete-account.ts).
+export async function deleteAccountAction(_: FormState, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  if (String(f.get("confirm") ?? "").trim().toUpperCase() !== "DELETE") return { error: "Type DELETE to confirm." };
+  try {
+    await deleteAccount(user.id);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  await signOut();
+  redirect("/explore?deleted=1");
 }

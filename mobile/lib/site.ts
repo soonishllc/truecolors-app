@@ -2,6 +2,8 @@
 // live pages, so the app always matches the website.
 export const STORE = "https://www.truecolors.global";
 export const APP = `${STORE}/apps/truecolors`;
+// Where the app registers for push notifications (the web app itself, not through the store).
+export const PUSH_REGISTER = "https://app.truecolors.global/api/push/register";
 
 // Pages that stay inside the app. Anything else (Instagram, WhatsApp, email, maps) opens in its own app.
 const INSIDE = [
