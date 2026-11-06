@@ -1,0 +1,26 @@
+{%- comment -%}
+  Plausible analytics: cookieless, no personal data, so no consent banner needed. Rendered in layout/theme.liquid's
+  <head>. Pageviews count by themselves; inside the community pages (/apps/truecolors) the app's shell counts each
+  page the visitor moves to (lib/proxy/shell.ts in the app). Purchases are counted by the custom pixel in Shopify
+  admin → Settings → Customer events (docs/plausible-purchase-pixel.js in the app), since checkout runs no theme code.
+  Goals to add in Plausible: Add to cart, Wholesale enquiry, Contact, Purchase (revenue).
+{%- endcomment -%}
+<script async src="https://plausible.io/js/pa-hBqaYqveWyiLDhDdS9odz.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init();
+  (function () {
+    // The forms that matter, whichever page they're on.
+    document.addEventListener("submit", function (e) {
+      var f = e.target;
+      if (!f || !f.classList) return;
+      if (f.id === "product-form") plausible("Add to cart");
+      else if (f.classList.contains("tcw-form")) plausible("Wholesale enquiry");
+      else if (f.classList.contains("tc-contact-form")) plausible("Contact");
+    }, true);
+    // Quick add from a product grid buys without a form.
+    document.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest(".modal-buy")) plausible("Add to cart", { props: { via: "Quick add" } });
+    }, true);
+  })();
+</script>

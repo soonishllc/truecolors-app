@@ -67,6 +67,9 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
     var covered = head ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
     frame.contentWindow.postMessage({ type: "tc-viewport", top: covered - frame.getBoundingClientRect().top, height: window.innerHeight - covered }, app);
   };
+  // Each page the visitor moves to inside the frame is a pageview in the store's analytics (the theme loads
+  // Plausible); the address only changes by replaceState, which Plausible doesn't count by itself.
+  var counted = location.href;
   var queued = false;
   var onScroll = function () {
     if (queued) return;
@@ -88,6 +91,9 @@ export function storeShell(input: { prefix: string; appPath: string; query: stri
     if (e.data.path) {
       var path = e.data.path === "/explore" ? "" : e.data.path;
       history.replaceState(null, "", root + prefix + path + (e.data.search || "") + (e.data.hash || ""));
+      var now = location.href.split("#")[0];
+      if (now !== counted.split("#")[0] && typeof window.plausible === "function") window.plausible("pageview");
+      counted = now;
     }
     if (e.data.title) document.title = e.data.title === "Truecolors" ? e.data.title : e.data.title + " · Truecolors";
     if (e.data.top) {
