@@ -916,7 +916,7 @@ html.in-store-frame .order-tally { position: absolute; left: 16px; right: 16px; 
 .design-cta-go { margin-left: auto; font-size: 22px; color: var(--muted); }
 
 /* Design your own (/join). */
-.design-own { max-width: 640px; }
+.design-own { max-width: 1180px; margin: 0 auto; }
 .design-own h1 { font-size: clamp(36px, 7vw, 60px); line-height: 1; letter-spacing: -0.04em; }
 .design-own .lede { font-size: 17px; line-height: 1.55; }
 .design-own-art { margin: 20px 0; }

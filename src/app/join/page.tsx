@@ -16,6 +16,7 @@ import { onShirts } from "@/lib/media/shots";
 import { CAMPAIGN_DAYS, FUNDING_GOAL, PAYOUT_BUFFER_DAYS, PREORDER_PRICE, RELAUNCHES_ALLOWED, RETURN_WINDOW_DAYS, SHARE_BPS, SHARE_OWN_LINK_BPS, STARTING_CREDITS, royaltyCents } from "@/lib/rules";
 import { fileUrl, thumbUrl } from "@/lib/storage";
 import { IdeaBox, IdeaCarry } from "./IdeaBox";
+import { IdeaShowcase } from "./IdeaShowcase";
 import { PRESETS } from "@/lib/ai/presets";
 import { pendingSketchUrl } from "@/lib/design/pending-sketch";
 import "./create.css";
@@ -80,13 +81,19 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
     .limit(6), (x) => x.c.designId);
   return (
     <div className="design-own">
-      <div className="eyebrow">Design your own</div>
-      <h1>Your idea, on a shirt that changes in the sun</h1>
-      <p className="lede">
-        Describe it, or snap a sketch. Our AI draws it as print-ready line art and colours it for the sun. If {FUNDING_GOAL} people
-        pre-order it, we print it, and you earn on every sale.
-      </p>
-      <IdeaBox initial={idea} initialStyle={style} styles={PRESETS.map(({ id, label, hint, group }) => ({ id, label, hint, group }))} sketchUrl={sketchUrl} />
+      {/* The hero: the words and the idea box on one side, the studio drawing real ideas on the other. */}
+      <div className="create-hero">
+        <div className="create-hero-text">
+          <div className="eyebrow">Design your own</div>
+          <h1>Your idea, on a shirt that <span className="sun-text">changes in the sun</span></h1>
+          <p className="lede">
+            Describe it, or snap a sketch. Our AI draws it as print-ready line art and colours it for the sun. If {FUNDING_GOAL} people
+            pre-order it, we print it, and you earn on every sale.
+          </p>
+        </div>
+        <IdeaShowcase />
+        <IdeaBox initial={idea} initialStyle={style} styles={PRESETS.map(({ id, label, hint, group }) => ({ id, label, hint, group }))} sketchUrl={sketchUrl} />
+      </div>
 
       {/* What the AI actually makes, before anyone signs up: an idea, its line art, its sun colours. */}
       <section className="ai-strip" aria-labelledby="ai-strip-h">
@@ -110,13 +117,19 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
 
       {/* What a designer earns, worked out from the real price and rates. */}
       <section className="earn-card" aria-labelledby="earn-h">
-        <div className="eyebrow">What you earn</div>
-        <h2 id="earn-h">{FUNDING_GOAL} shirts pre-ordered = <span className="sun-text">{earn}</span> to you</h2>
-        <p>
-          At the {whole(aed.cents, aed.currency)} pre-order price you earn {pct(SHARE_BPS)} of every sale: {earn} when {FUNDING_GOAL} people back it.
-          Sell them through your own link and it&apos;s {pct(SHARE_OWN_LINK_BPS)}, <b>{earnOwn}</b>. Every shirt after the goal earns the same again.
-        </p>
-        <p className="small muted">Worked out on the UAE price before discounts; USA sales earn the same rates in dollars.</p>
+        <div className="earn-figure">
+          <div className="eyebrow">What you earn</div>
+          <b className="sun-text">{earn}</b>
+          <span>to you when {FUNDING_GOAL} people pre-order</span>
+        </div>
+        <div>
+          <h2 id="earn-h">Your design, your cut, on every shirt</h2>
+          <p>
+            At the {whole(aed.cents, aed.currency)} pre-order price you earn {pct(SHARE_BPS)} of every sale: {earn} when {FUNDING_GOAL} people back it.
+            Sell them through your own link and it&apos;s {pct(SHARE_OWN_LINK_BPS)}, <b>{earnOwn}</b>. Every shirt after the goal earns the same again.
+          </p>
+          <p className="small muted">Worked out on the UAE price before discounts; USA sales earn the same rates in dollars.</p>
+        </div>
       </section>
 
       {/* The designer's journey in four steps (not the community home's photo tiles). */}
@@ -161,60 +174,63 @@ export default async function Join({ searchParams }: { searchParams: Promise<{ i
         </>
       )}
 
-      <section className="join-faq" aria-labelledby="faq-h">
-        <div className="eyebrow">Questions</div>
-        <h2 id="faq-h">Before you start</h2>
-        {faq.map((f) => (
-          <details key={f.q}>
-            <summary>{f.q}</summary>
-            <p>{f.a}</p>
-          </details>
-        ))}
-      </section>
+      {/* The questions beside the way in, so the answers are there while signing up. */}
+      <div className="join-end">
+        <section className="join-faq" aria-labelledby="faq-h">
+          <div className="eyebrow">Questions</div>
+          <h2 id="faq-h">Before you start</h2>
+          {faq.map((f) => (
+            <details key={f.q}>
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </section>
 
-      <section className="start-card" id="start">
-        <h2>Start designing</h2>
-        {idea && <p className="idea-kept">Your idea is saved: <q>{idea}</q> We&apos;ll draw it as soon as you&apos;re in.</p>}
-        <p className="muted small">Free to start: {STARTING_CREDITS} credits, about {Math.floor(STARTING_CREDITS / 3)} designs. No card needed.</p>
-        {store && <p className="small">Signed in as <strong>{store.email}</strong>.</p>}
-        {via && (
-          <form action={cancelSocialJoinAction} className="connected-as">
-            <ProviderIcon provider={via.provider} />
-            <span>Signed in with {providerLabel(via.provider)}{who && <> as <strong>{who}</strong></>}</span>
-            <button className="link">Use something else</button>
-          </form>
-        )}
-        {!ready && (
-          <>
-            <StoreSignIn back={idea ? `/join?idea=${encodeURIComponent(idea)}#start` : "/join#start"}>
-              <p className="small muted">Use your Truecolors store account. New here? You can create one on the next screen.</p>
-            </StoreSignIn>
-            <div className="site-only">
-              <SocialButtons verb="Sign up" />
-              <div className="or"><span>or sign up with your email</span></div>
-            </div>
-          </>
-        )}
-        {/* Inside the store, a guest signs in to the store first and then sees this form. */}
-        <div className={ready ? undefined : "site-only"}>
-          <ActionForm action={joinAction} submit={idea ? "Sign up and draw it" : "Start designing"}>
-            <IdeaCarry idea={idea} style={style} />
-            <label>Your name, as shoppers will see it<input name="name" required autoComplete="name" defaultValue={store?.name ?? via?.profile.name} /></label>
-            {!store && !via?.profile.email && (
-              <label>Email<input name="email" type="email" required autoComplete="email" /></label>
-            )}
-            <label className="check">
-              <input type="checkbox" name="agree" required />
-              <span className="small">
-                I accept the <a href={publicUrl("/designer-agreement")} target="_blank" rel="noreferrer">designer agreement</a> and{" "}
-                <a href={publicUrl("/terms")} target="_blank" rel="noreferrer">terms</a>: I own or have the rights to what I create here,
-                Truecolors gets an exclusive licence to sell it as a shirt once it launches, and I earn {pct(SHARE_BPS)} of net sales ({pct(SHARE_OWN_LINK_BPS)} through my own link).
-              </span>
-            </label>
-          </ActionForm>
-        </div>
-        <p className="small muted">Already designing with us? <Link href="/login">Log in</Link></p>
-      </section>
+        <section className="start-card" id="start">
+          <h2>Start designing</h2>
+          {idea && <p className="idea-kept">Your idea is saved: <q>{idea}</q> We&apos;ll draw it as soon as you&apos;re in.</p>}
+          <p className="muted small">Free to start: {STARTING_CREDITS} credits, about {Math.floor(STARTING_CREDITS / 3)} designs. No card needed.</p>
+          {store && <p className="small">Signed in as <strong>{store.email}</strong>.</p>}
+          {via && (
+            <form action={cancelSocialJoinAction} className="connected-as">
+              <ProviderIcon provider={via.provider} />
+              <span>Signed in with {providerLabel(via.provider)}{who && <> as <strong>{who}</strong></>}</span>
+              <button className="link">Use something else</button>
+            </form>
+          )}
+          {!ready && (
+            <>
+              <StoreSignIn back={idea ? `/join?idea=${encodeURIComponent(idea)}#start` : "/join#start"}>
+                <p className="small muted">Use your Truecolors store account. New here? You can create one on the next screen.</p>
+              </StoreSignIn>
+              <div className="site-only">
+                <SocialButtons verb="Sign up" />
+                <div className="or"><span>or sign up with your email</span></div>
+              </div>
+            </>
+          )}
+          {/* Inside the store, a guest signs in to the store first and then sees this form. */}
+          <div className={ready ? undefined : "site-only"}>
+            <ActionForm action={joinAction} submit={idea ? "Sign up and draw it" : "Start designing"}>
+              <IdeaCarry idea={idea} style={style} />
+              <label>Your name, as shoppers will see it<input name="name" required autoComplete="name" defaultValue={store?.name ?? via?.profile.name} /></label>
+              {!store && !via?.profile.email && (
+                <label>Email<input name="email" type="email" required autoComplete="email" /></label>
+              )}
+              <label className="check">
+                <input type="checkbox" name="agree" required />
+                <span className="small">
+                  I accept the <a href={publicUrl("/designer-agreement")} target="_blank" rel="noreferrer">designer agreement</a> and{" "}
+                  <a href={publicUrl("/terms")} target="_blank" rel="noreferrer">terms</a>: I own or have the rights to what I create here,
+                  Truecolors gets an exclusive licence to sell it as a shirt once it launches, and I earn {pct(SHARE_BPS)} of net sales ({pct(SHARE_OWN_LINK_BPS)} through my own link).
+                </span>
+              </label>
+            </ActionForm>
+          </div>
+          <p className="small muted">Already designing with us? <Link href="/login">Log in</Link></p>
+        </section>
+      </div>
     </div>
   );
 }
