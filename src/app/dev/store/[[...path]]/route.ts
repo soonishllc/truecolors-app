@@ -168,7 +168,7 @@ async function finish(doc: string, customer: string, market: string, here: strin
 async function displaysCard() {
   return (await readFile(join(process.cwd(), "theme/snippets/tc-displays-card.liquid"), "utf8"))
     .replace(/\{%-? comment -?%\}[\s\S]*?\{%-? endcomment -?%\}/, "")
-    .replace("{{ 'tc-display-tower.jpg' | asset_url }}", `${config().APP_URL}/displays/tc-display-tower.jpg`)
+    .replace("{{ 'tc-display-tower-card.jpg' | asset_url }}", `${config().APP_URL}/displays/tc-display-tower-card.jpg`)
     .replaceAll("{{ routes.root_url | append: '/' | replace: '//', '/' }}", "/");
 }
 

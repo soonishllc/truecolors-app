@@ -1,6 +1,6 @@
 {%- comment -%}
   Truecolors: a card on the Wholesale page for the display programme, with the Tower render, leading to the
-  displays page in the app. Needs tc-display-tower.jpg in the theme's assets (shopify-theme/assets/).
+  displays page in the app. Needs tc-display-tower-card.jpg (the Tower render without its measurements) in the theme's assets.
 
   Add to the Wholesale page template, right after its first section:  {% render 'tc-displays-card' %}
 {%- endcomment -%}
@@ -29,7 +29,7 @@
 </style>
 <section class="tc-dcard" aria-label="Retail displays">
   <div class="tc-dcard-in">
-    <div class="tc-dcard-art"><img src="{{ 'tc-display-tower.jpg' | asset_url }}" alt="The Tower display: a gallery of designs lit by its own sun, and stock by size" loading="lazy"></div>
+    <div class="tc-dcard-art"><img src="{{ 'tc-display-tower-card.jpg' | asset_url }}" alt="The Tower display: a gallery of designs lit by its own sun, and stock by size" loading="lazy"></div>
     <div class="tc-dcard-copy">
       <div class="tc-dcard-eyebrow">Hotels · airports · attractions</div>
       <h2>Host a display. <em>It sells itself in the sun.</em></h2>
