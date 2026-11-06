@@ -30,9 +30,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
   return new Response(body, { headers: { "Content-Type": "application/liquid", "Cache-Control": "no-store" } });
 }
 
-// Not found, inside the store's own header and footer, with a way on: Shopify keeps the status for the shopper.
+// Not found, inside the store's own header and footer, with a way on. Shopify's app proxy serves Liquid pages as 200
+// whatever the status here, so tc_noindex tells the theme to mark the page noindex (layout/theme.liquid).
 function notFound() {
-  const body = `<section style="max-width:560px;margin:0 auto;padding:72px 20px 96px">
+  const body = `{% assign tc_noindex = true %}<section style="max-width:560px;margin:0 auto;padding:72px 20px 96px">
   <p style="font-family:var(--mono,monospace);font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7">Not found</p>
   <h1 style="font-size:40px;line-height:1.05;margin:8px 0 14px">That page isn't here</h1>
   <p style="margin:0 0 24px">The design may have ended or moved.</p>
