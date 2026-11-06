@@ -9,6 +9,13 @@ import { storeOriginals } from "@/lib/shopify/originals";
 import { thumbUrl } from "@/lib/storage";
 import { tickerItems } from "@/lib/ticker";
 
+const EXAMPLES = [
+  { id: "iguana", idea: "An iguana holding a taco beside Mayan ruins and a cenote" },
+  { id: "axolotl", idea: "Un ajolote bailando en la playa de Cancún: “Cancún Mi Amor”" },
+  { id: "dog", idea: "My dog with his collar tag, a sun and palm leaves behind him" },
+  { id: "sun-mascot", idea: "A grinning sun in sunglasses with a surfboard" },
+];
+
 // What the store's own pages show of the community, read by the theme's scripts from /apps/truecolors/feed.json:
 // the designs closest to printing (for the band on the store home), the ticker's lines, and each Original's shade
 // and sun photos (for the product page's "step into the sun" toggle).
@@ -39,6 +46,8 @@ export async function storeFeed() {
       goal: c.goal,
       endsAt: c.endsAt?.toISOString() ?? null,
     })),
+    // Before there are live designs: what the studio made from one line of text (public/examples/gallery).
+    examples: EXAMPLES.map((x) => ({ idea: x.idea, shade: `${app}/examples/gallery/${x.id}-shade.webp`, sun: `${app}/examples/gallery/${x.id}-sun.webp` })),
     ticker: await tickerItems(),
     pairs: Object.fromEntries(originals.filter((o) => o.hover).map((o) => [o.handle, { shade: o.image, sun: o.hover }])),
   };
