@@ -176,7 +176,7 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
             <figure key={x.id} className="tile home-example">
               <div className="tile-art">
                 <img className="art" src={`/examples/gallery/${x.id}-shade.webp`} loading="lazy" decoding="async" alt="" />
-                <img className="art tile-sun" src={`/examples/gallery/${x.id}-sun.webp`} loading="lazy" decoding="async" alt={x.idea} />
+                <img className="art tile-sun" src={`/examples/gallery/${x.id}-sun.webp`} loading="eager" decoding="async" alt={x.idea} />
               </div>
               <figcaption className="meta">“{x.idea}”</figcaption>
             </figure>
@@ -196,7 +196,7 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
               <a key={p.handle} href={`${shop}/products/${p.handle}`} target="_top" className="tile">
                 <div className="tile-art">
                   <img className="art" src={p.image} loading="lazy" decoding="async" alt={p.title} />
-                  {p.hover && <img className="art tile-sun" src={p.hover} loading="lazy" decoding="async" alt="" />}
+                  {p.hover && <img className="art tile-sun" src={p.hover} loading="eager" decoding="async" alt="" />}
                 </div>
                 <div className="name">{p.title}</div>
               </a>

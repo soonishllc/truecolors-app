@@ -36,3 +36,6 @@
 /* The catalogue page (designs/page.tsx) heading. */
 .designs-title { margin: 6px 0 6px; font-size: clamp(30px, 5vw, 48px); letter-spacing: -0.02em; }
 .designs-lede { margin: 0 0 22px; max-width: 560px; }
+
+/* Under the pictures while they load, the page's own colour rather than white. */
+.home-rail .tile-art { background: var(--surface); }
