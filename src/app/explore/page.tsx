@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { HeroReveal } from "@/components/HeroReveal";
 import { CampaignCard } from "@/components/CampaignCard";
+import { EDITORIAL, Editorial } from "@/components/Editorial";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Ticker } from "@/components/Ticker";
 import { trackView } from "@/lib/analytics";
@@ -127,6 +128,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
         </Link>
       )}
 
+      <Editorial item={EDITORIAL.walk("/designs")} />
+
       <section className="home-section">
         <div className="eyebrow">How it works</div>
         <HowItWorks />
@@ -162,6 +165,8 @@ export default async function CommunityHome({ searchParams }: { searchParams: Pr
           ))}
         </div>
       </section>
+
+      <Editorial item={EDITORIAL.surf(create)} flip />
 
       {originals.length > 0 && (
         <section className="home-section">

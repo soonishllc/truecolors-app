@@ -8,6 +8,8 @@ import { listChallenges, phase } from "@/lib/challenges";
 import { onShirts } from "@/lib/media/shots";
 import { CampaignCard } from "@/components/CampaignCard";
 import { Ticker } from "@/components/Ticker";
+import { EDITORIAL, Editorial } from "@/components/Editorial";
+import { Fragment } from "react";
 import { tickerItems } from "@/lib/ticker";
 import { cardStats } from "@/lib/campaign-card";
 import { preorderPrice, visitorMarket } from "@/lib/markets";
@@ -68,6 +70,7 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
         .orderBy(desc(sql`coalesce(${campaigns.fundedAt}, ${campaigns.createdAt})`))
         .limit(4), (x) => x.c.designId)
     : [];
+  const split = EDITORIAL.split(designer ? "/studio/new" : "/join");
   const href = (p: Partial<Record<"show" | "sort" | "q", string>>) => {
     const params = new URLSearchParams({ show, sort, ...(term && { q: term }), ...p });
     return `/designs?${params}`;
@@ -113,8 +116,15 @@ export default async function Designs({ searchParams }: { searchParams: Promise<
       )}
       {/* A couple of designs fill the width rather than leaving half the row empty. */}
       <div className={`grid explore-grid${rows.length < 3 ? " few" : ""}`}>
-        {rows.map((row) => <CampaignCard key={row.c.id} row={row} price={price} />)}
+        {rows.map((row, i) => (
+          <Fragment key={row.c.id}>
+            <CampaignCard row={row} price={price} />
+            {/* After two rows, a break; a shorter list has it underneath instead. */}
+            {i === 5 && rows.length > 6 && <Editorial item={split} />}
+          </Fragment>
+        ))}
       </div>
+      {rows.length > 0 && rows.length <= 6 && <Editorial item={split} />}
 
       {quiet && (
         <section className="explore-more" aria-label="More to see">
